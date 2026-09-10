@@ -15,6 +15,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify staged source chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd phantom-core
+          echo 'c9aa90fe3d73ff1d84ee8225a6be32904611c9594076213d700a66a128a715f4  source.b64.part-00' | sha256sum -c -
+          echo '384a79307e3d9dc15dcf6b2a66f0c8168433eac08087c6eebb1b50b085f1759d  source.b64.part-01' | sha256sum -c -
+          echo '6c32ee1d6f1a8cf8b647807dacd660f15b91a5f0c9c77cc3ad06aac182cf7009  source.b64.part-02' | sha256sum -c -
+          echo '057c58a8c7cb7b0418ca88c5cb7d7da743ef0b04ae9f8b04b60ececc5880725f  source.b64.part-03' | sha256sum -c -
+          echo 'b51807d2ce9790851c7b3efb726755d05e3b1bf5811ae981a2e2c697d416ce1f  source.b64.part-04' | sha256sum -c -
+          echo '5dba306d24eba69e720919b6acf6c56bd02781e2935af894ffae974715391a66  source.b64.part-05' | sha256sum -c -
+          echo '462ea0a1a5450902abd1537990b5647c7303625473ed56900559cb31af30168e  source.b64.part-06x0' | sha256sum -c -
+          echo '854541b4600d19cbcd3109745d98f9fadd0122cdc8215b56716f9ec237a1150a  source.b64.part-06x1' | sha256sum -c -
+          echo 'a583f21035d8284b18e5fc3ea049fe13e79161bd91c0dcf22923c032bec3923d  source.b64.part-06x2' | sha256sum -c -
+
       - name: Reconstruct verified v0.7 source
         shell: bash
         run: |
