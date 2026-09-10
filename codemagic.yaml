@@ -1,0 +1,24 @@
+workflows:
+  android-debug-apk:
+    name: FME Bookwriter Android Debug APK
+    max_build_duration: 60
+    environment:
+      java: 17
+    scripts:
+      - name: Set Android SDK location
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+      - name: Validate source
+        script: |
+          chmod +x ./VALIDATE_OPENAI_EDITION.sh ./gradlew
+          ./VALIDATE_OPENAI_EDITION.sh
+      - name: Build installable debug APK
+        script: |
+          ./gradlew --no-daemon :app:assembleDebug
+      - name: Verify APK exists
+        script: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
+    artifacts:
+      - app/build/outputs/apk/debug/app-debug.apk
+      - app/build/reports/**
