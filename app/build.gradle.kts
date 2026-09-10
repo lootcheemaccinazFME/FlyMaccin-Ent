@@ -8,8 +8,8 @@ android {
         applicationId = "com.flymaccin.bookwriter.openai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 121
-        versionName = "1.2.1-aide-ready"
+        versionCode = 122
+        versionName = "1.2.2-house-core-loop"
     }
 
     signingConfigs {
