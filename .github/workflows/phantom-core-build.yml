@@ -22,7 +22,9 @@ jobs:
           cd phantom-core
           echo 'c03e0b55bb5f9346f68c3602e50aa55fa110693d2ff55e0848936f85004ea880  source.b64.part-00x0' | sha256sum -c -
           echo '8695348feb40d3e6f00756b3c41bf45af6b857e9744f9891feed504f4477a8ee  source.b64.part-00x1' | sha256sum -c -
-          echo '68c27b6e58e01dd8ddf8bea1cf2605a8f2730347fe546d0ddd3563b139e3d63a  source.b64.part-00x2' | sha256sum -c -
+          echo '4cba3f6750933c3494f959f74a255a7c223f0d40fd8e7141d7024cb601849c63  source.b64.part-00x2y0' | sha256sum -c -
+          echo '9f83492defa38f5342847be3551b2c51eab74bdac7097eea6c6103c83c01b974  source.b64.part-00x2y1' | sha256sum -c -
+          echo '372fb0e5b560634d4f95ceb2e27afb3a71cc3d7a1f1aff671c95c381eae41beb  source.b64.part-00x2y2' | sha256sum -c -
           echo '84480d09825ae50dc10116dbecae5931d71305d2ea40241b5819d8f6b0a633b3  source.b64.part-00x3' | sha256sum -c -
           echo '384a79307e3d9dc15dcf6b2a66f0c8168433eac08087c6eebb1b50b085f1759d  source.b64.part-01' | sha256sum -c -
           echo '6c32ee1d6f1a8cf8b647807dacd660f15b91a5f0c9c77cc3ad06aac182cf7009  source.b64.part-02' | sha256sum -c -
@@ -40,7 +42,9 @@ jobs:
           cat \
             phantom-core/source.b64.part-00x0 \
             phantom-core/source.b64.part-00x1 \
-            phantom-core/source.b64.part-00x2 \
+            phantom-core/source.b64.part-00x2y0 \
+            phantom-core/source.b64.part-00x2y1 \
+            phantom-core/source.b64.part-00x2y2 \
             phantom-core/source.b64.part-00x3 \
             phantom-core/source.b64.part-01 \
             phantom-core/source.b64.part-02 \
