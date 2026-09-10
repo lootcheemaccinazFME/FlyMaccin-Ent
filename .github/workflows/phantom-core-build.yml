@@ -1,0 +1,76 @@
+name: Phantom Core Android Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'phantom-core/**'
+      - '.github/workflows/phantom-core-build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct verified v0.7 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            phantom-core/source.b64.part-00 \
+            phantom-core/source.b64.part-01 \
+            phantom-core/source.b64.part-02 \
+            phantom-core/source.b64.part-03 \
+            phantom-core/source.b64.part-04 \
+            phantom-core/source.b64.part-05 \
+            phantom-core/source.b64.part-06x0 \
+            phantom-core/source.b64.part-06x1 \
+            phantom-core/source.b64.part-06x2 \
+            > phantom-core/source.b64
+          base64 --decode phantom-core/source.b64 > phantom-core/source.zip
+          echo '278813f4b2e11d6af38ed3816e1cc3885cbeede49e6afc11d868a0172400ede2  phantom-core/source.zip' | sha256sum -c -
+          mkdir -p phantom-core/build
+          unzip -q phantom-core/source.zip -d phantom-core/build
+          test -f phantom-core/build/PhantomCoreAndroid/app/build.gradle.kts
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 36 SDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Test and build debug APK
+        working-directory: phantom-core/build/PhantomCoreAndroid
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee app/build/outputs/apk/debug/app-debug.apk.sha256
+
+      - name: Upload Phantom Core debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhantomCore-v0.7.0-debug-apk
+          path: |
+            phantom-core/build/PhantomCoreAndroid/app/build/outputs/apk/debug/app-debug.apk
+            phantom-core/build/PhantomCoreAndroid/app/build/outputs/apk/debug/app-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
