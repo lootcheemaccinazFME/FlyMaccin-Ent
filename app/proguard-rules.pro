@@ -1,0 +1,1 @@
+-keepclassmembers class com.flymaccin.bookwriter.BookwriterBridge { public *; }
