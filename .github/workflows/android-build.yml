@@ -1,6 +1,6 @@
 name: Pocket Potna FME Android Build
 
-# Pocket Potna FME v1.6.0: FME Agent Mode + voice lab + Google Voice + Android app/game build queue.
+# Pocket Potna FME v1.7.0: $0 Free-First operating law, local model/fallback engines, free Android build worker.
 on:
   workflow_dispatch:
   push:
@@ -31,34 +31,35 @@ jobs:
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Restore Pocket Potna FME v1.6.0 source
+      - name: Restore Pocket Potna FME v1.7.0 source
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/77ccf4b1-9947-47fb-a752-16e338d83a92-Pocket_Potna_FME_v1.6.0_AGENT_FULLSTACK_SOURCE_FIXED.zip' -o /tmp/pocket-potna-fme.zip
-          echo 'ee0a42c04a335cecf456d7948ee2460696f5813ae87f65e9b43d0a9e32514aaf  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/64033368-d204-4a90-89b7-3cd6644c1778-Pocket_Potna_FME_v1.7.0_FREE_FIRST_SOURCE_FIXED.zip' -o /tmp/pocket-potna-fme.zip
+          echo '26623592a5b851f8939d0c376234a811afe9820dc85bd04797cb9ed80d0ff15e  /tmp/pocket-potna-fme.zip' | sha256sum -c -
           unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
-      - name: Validate FME Agent Fullstack edition
+      - name: Validate FME Free-First edition
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'applicationId = "com.flymaccin.pocketpotna"' app/build.gradle.kts
-          grep -q 'versionName = "1.6.0"' app/build.gradle.kts
+          grep -q 'versionName = "1.7.0"' app/build.gradle.kts
           grep -q '<string name="app_name">Pocket Potna FME</string>' app/src/main/res/values/strings.xml
-          grep -q 'FME AGENT MODE ACTIVE' app/src/main/assets/app.js
-          grep -q 'AUTO + MULTI + REAL + QA + SAVE + FME' app/src/main/assets/app.js
-          grep -q 'startVoiceRecording' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'stopVoiceRecording' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'googleVoiceCall' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'googleVoiceText' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'ZERO-DOLLAR OPERATING LAW ACTIVE' app/src/main/assets/app.js
+          grep -q 'FREE LOCAL ENGINE FIRST' app/src/main/assets/app.js
+          grep -q 'OPTIONAL PAID · DEFAULT OFF' app/src/main/assets/app.js
+          grep -q 'getBoolean("paidProvidersEnabled",false)' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'localGenerateText' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'generateLocalVoice' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'generateLocalImage' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'generateLocalVideo' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'offlineAndroidProject' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'com.google.mediapipe:tasks-genai:latest.release' app/build.gradle.kts
           grep -q 'queueAndroidBuild' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'Android Game' app/src/main/assets/app.js
-          grep -q 'Android App' app/src/main/assets/app.js
           grep -q 'deviceSecretRequired",false' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'android.permission.RECORD_AUDIO' app/src/main/AndroidManifest.xml
-          grep -q 'com.google.android.apps.googlevoice' app/src/main/AndroidManifest.xml
+          test -f app/src/main/assets/FME_FREE_FIRST_STANDARD.md
           test -f app/src/main/assets/FME_AGENT_MODE.md
           test -f app/src/main/assets/Universal_Master_Doctrine_Current_Indexed_v1.md
           test -f app/src/main/assets/FME_SKULL_MASTER_KNOWLEDGE_CORE.json
@@ -74,15 +75,15 @@ jobs:
       - name: Name APK
         shell: bash
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_FME_v1.6.0-debug.apk
-          sha256sum Pocket_Potna_FME_v1.6.0-debug.apk > Pocket_Potna_FME_v1.6.0-debug.apk.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_FME_v1.7.0-debug.apk
+          sha256sum Pocket_Potna_FME_v1.7.0-debug.apk > Pocket_Potna_FME_v1.7.0-debug.apk.sha256
 
       - name: Upload Pocket Potna FME APK
         uses: actions/upload-artifact@v4
         with:
-          name: Pocket-Potna-FME-v1.6.0-APK
+          name: Pocket-Potna-FME-v1.7.0-APK
           path: |
-            Pocket_Potna_FME_v1.6.0-debug.apk
-            Pocket_Potna_FME_v1.6.0-debug.apk.sha256
+            Pocket_Potna_FME_v1.7.0-debug.apk
+            Pocket_Potna_FME_v1.7.0-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
