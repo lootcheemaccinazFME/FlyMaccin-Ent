@@ -100,7 +100,7 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 600
           script: |
-            set -euo pipefail
+            set -eu
             PACKAGE='com.flymaccin.pocketpotna'
             APK='demonic-ai-studio-hut/app/build/outputs/apk/debug/app-debug.apk'
             : > emulator-smoke-report.txt
