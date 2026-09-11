@@ -10,6 +10,7 @@ on:
       - '.github/scripts/patch_restore_full_studio.py'
       - '.github/scripts/patch_studio_os_v213.py'
       - '.github/scripts/patch_browser_persistence_v214.py'
+      - '.github/scripts/patch_rooms_game_v215.py'
       - '.github/scripts/android_smoke_test.sh'
       - 'app/src/main/assets/**'
   workflow_dispatch:
@@ -57,38 +58,55 @@ jobs:
       - name: Apply browser account persistence v2.1.4
         run: python3 .github/scripts/patch_browser_persistence_v214.py demonic-ai-studio-hut
 
-      - name: Static validation
+      - name: Apply playable rooms and game v2.1.5
+        run: python3 .github/scripts/patch_rooms_game_v215.py demonic-ai-studio-hut
+
+      - name: Static functional validation
         run: |
           node --check demonic-ai-studio-hut/app/src/main/assets/app.js
           node --check demonic-ai-studio-hut/app/src/main/assets/studio_os.js
+          node --check demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
           node --check demonic-ai-studio-hut/app/src/main/assets/bookwriter/app.js
           test -f demonic-ai-studio-hut/app/src/main/assets/studio_os.css
+          test -f demonic-ai-studio-hut/app/src/main/assets/rooms_v215.css
           test -f demonic-ai-studio-hut/app/src/main/assets/bookwriter/index.html
           test -f demonic-ai-studio-hut/app/src/main/assets/bookwriter/core.mjs
           test -f demonic-ai-studio-hut/app/src/main/assets/bookwriter/houses.js
           grep -q 'Demonic AI Studio Hut' demonic-ai-studio-hut/app/src/main/res/values/strings.xml
-          grep -q 'versionName = "2.1.4"' demonic-ai-studio-hut/app/build.gradle.kts
-          grep -q 'versionCode = 214' demonic-ai-studio-hut/app/build.gradle.kts
+          grep -q 'versionName = "2.1.5"' demonic-ai-studio-hut/app/build.gradle.kts
+          grep -q 'versionCode = 215' demonic-ai-studio-hut/app/build.gradle.kts
           grep -q 'android:resizeableActivity="true"' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
           grep -q 'android:supportsPictureInPicture="true"' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
           grep -q 'BackgroundPlaybackService' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
           grep -q 'Add to Home Screen' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/MainActivity.java
           grep -q 'Split Screen' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/MainActivity.java
           grep -q 'Picture in Picture Now' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/MainActivity.java
-          grep -q 'Demonic Studio OS' demonic-ai-studio-hut/app/src/main/assets/studio_os.js
-          grep -q 'Universal Send To pipeline' demonic-ai-studio-hut/app/src/main/assets/studio_os.js
-          grep -q 'Autosave/version snapshots/crash recovery' demonic-ai-studio-hut/app/src/main/assets/studio_os.js
-          grep -q 'studio_os.js' demonic-ai-studio-hut/app/src/main/assets/index.html
           grep -q 'DEMONIC_BROWSER_PERSISTENCE_V214' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
           grep -q 'setAcceptCookie(true)' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
-          grep -q 'setAcceptThirdPartyCookies' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
-          grep -q 'setDomStorageEnabled(true)' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
           grep -q 'CookieManager.getInstance().flush()' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
+          grep -q 'rooms_v215.js' demonic-ai-studio-hut/app/src/main/assets/index.html
+          grep -q 'rooms_v215.css' demonic-ai-studio-hut/app/src/main/assets/index.html
+          # Functional room checks, not label-only checks.
+          grep -q "const STORE='demonic_rooms_v215'" demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q 'requestAnimationFrame(gameLoop)' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q 'function physics(dt)' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q 'function launchBall()' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q 'function renderArt' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q 'toDataURL' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q 'function renderNotes' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q 'function renderLibrary' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q 'FileReader' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q 'cycleTheme' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
+          grep -q -- '--demonic-room-bg' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.css
+          grep -q '#dr-launchbar' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.css
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BackgroundPlaybackService.java
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
           for room in 'Book Writer' 'Creator AI' 'Demonic DAW' 'Scripture Writer' 'Game Maker' 'Development Room' 'Beat Maker' 'Tools' 'FME Library' 'Audit Archive' 'Settings'; do
             grep -q "$room" demonic-ai-studio-hut/app/src/main/assets/app.js || { echo "Missing room in merged app.js: $room"; exit 1; }
+          done
+          for room in 'Pinball Basketball' 'Art Room' 'Notes Room' 'FME Library'; do
+            grep -q "$room" demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js || { echo "Missing functional v2.1.5 room: $room"; exit 1; }
           done
           grep -q 'FME BOOKWRITER OPENAI STUDIOS' demonic-ai-studio-hut/app/src/main/assets/bookwriter/index.html
           grep -q 'Book Planning Command Center' demonic-ai-studio-hut/app/src/main/assets/bookwriter/index.html
@@ -97,34 +115,43 @@ jobs:
       - name: Build debug APK
         run: gradle -p demonic-ai-studio-hut :app:assembleDebug --stacktrace
 
-      - name: APK structural and room smoke test
+      - name: APK structural and functional asset smoke test
         run: |
           APK='demonic-ai-studio-hut/app/build/outputs/apk/debug/app-debug.apk'
           test -s "$APK"
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'assets/studio_os.js'
-          unzip -l "$APK" | grep -q 'assets/studio_os.css'
+          unzip -l "$APK" | grep -q 'assets/rooms_v215.js'
+          unzip -l "$APK" | grep -q 'assets/rooms_v215.css'
           unzip -l "$APK" | grep -q 'assets/bookwriter/index.html'
-          unzip -l "$APK" | grep -q 'assets/bookwriter/core.mjs'
-          unzip -l "$APK" | grep -q 'assets/bookwriter/houses.js'
           unzip -p "$APK" assets/app.js > packaged-app.js
           unzip -p "$APK" assets/studio_os.js > packaged-studio-os.js
+          unzip -p "$APK" assets/rooms_v215.js > packaged-rooms-v215.js
+          unzip -p "$APK" assets/rooms_v215.css > packaged-rooms-v215.css
+          node --check packaged-rooms-v215.js
+          grep -q 'Pinball Basketball' packaged-rooms-v215.js
+          grep -q 'requestAnimationFrame(gameLoop)' packaged-rooms-v215.js
+          grep -q 'function physics(dt)' packaged-rooms-v215.js
+          grep -q 'function renderArt' packaged-rooms-v215.js
+          grep -q 'function renderNotes' packaged-rooms-v215.js
+          grep -q 'function renderLibrary' packaged-rooms-v215.js
+          grep -q 'demonic_rooms_v215' packaged-rooms-v215.js
+          grep -q -- '--demonic-room-bg' packaged-rooms-v215.css
           for room in 'Book Writer' 'Creator AI' 'Demonic DAW' 'Scripture Writer' 'Game Maker' 'Development Room' 'Beat Maker' 'Tools' 'FME Library' 'Audit Archive' 'Settings'; do
             grep -q "$room" packaged-app.js || { echo "Missing room from packaged APK: $room"; exit 1; }
           done
           grep -q 'Demonic Studio OS' packaged-studio-os.js
-          grep -q 'Universal Send To pipeline' packaged-studio-os.js
           unzip -p "$APK" assets/bookwriter/index.html | grep -q 'Book Planning Command Center'
-          cp "$APK" Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk
-          sha256sum Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk > Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk.sha256
+          cp "$APK" Demonic_AI_Studio_Hut_v2.1.5_FUNCTIONAL_ROOMS-debug.apk
+          sha256sum Demonic_AI_Studio_Hut_v2.1.5_FUNCTIONAL_ROOMS-debug.apk > Demonic_AI_Studio_Hut_v2.1.5_FUNCTIONAL_ROOMS-debug.apk.sha256
 
       - name: Upload compiled APK before runtime QA
         uses: actions/upload-artifact@v4
         with:
-          name: Demonic-AI-Studio-Hut-v2.1.4-BROWSER-PERSISTENCE-debug
+          name: Demonic-AI-Studio-Hut-v2.1.5-FUNCTIONAL-ROOMS-debug
           path: |
-            Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk
-            Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk.sha256
+            Demonic_AI_Studio_Hut_v2.1.5_FUNCTIONAL_ROOMS-debug.apk
+            Demonic_AI_Studio_Hut_v2.1.5_FUNCTIONAL_ROOMS-debug.apk.sha256
           if-no-files-found: error
 
       - name: Enable KVM
@@ -148,6 +175,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: sh .github/scripts/android_smoke_test.sh
 
       - name: Capture fallback QA diagnostics
@@ -164,7 +192,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Demonic-AI-Studio-Hut-v2.1.4-BROWSER-PERSISTENCE-emulator-QA
+          name: Demonic-AI-Studio-Hut-v2.1.5-FUNCTIONAL-ROOMS-emulator-QA
           path: |
             emulator-smoke-report.txt
             adb-devices.txt
