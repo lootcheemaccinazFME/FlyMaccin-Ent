@@ -1,0 +1,154 @@
+name: Pocket Potna Generated Android Builder
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pocket-potna-generated-android-builder
+  cancel-in-progress: false
+
+env:
+  PP_API: https://pocket-potna-remote.floot.app/_api
+
+jobs:
+  build-next:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Claim next Pocket Potna Android build
+        id: claim
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS -X POST "$PP_API/android-build-next" -H 'Content-Type: application/json' -d '{"worker":"github-actions"}' > /tmp/job.json
+          cat /tmp/job.json
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          j=json.load(open('/tmp/job.json')).get('job')
+          if not j:
+              print('has_job=false')
+          else:
+              print('has_job=true')
+              print('job_id='+j['jobId'])
+              print('project_name='+j['projectName'].replace('\n',' '))
+          PY
+
+      - name: Set up Java 17
+        if: steps.claim.outputs.has_job == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        if: steps.claim.outputs.has_job == 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        if: steps.claim.outputs.has_job == 'true'
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.10.2
+        if: steps.claim.outputs.has_job == 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Reconstruct generated Android project
+        if: steps.claim.outputs.has_job == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p generated
+          python - <<'PY'
+          import json, os, pathlib
+          job=json.load(open('/tmp/job.json'))['job']
+          root=pathlib.Path('generated').resolve()
+          files=job['files']
+          if not isinstance(files, dict) or not files:
+              raise SystemExit('No generated files supplied')
+          for name, content in files.items():
+              rel=pathlib.PurePosixPath(str(name))
+              if rel.is_absolute() or '..' in rel.parts:
+                  raise SystemExit(f'Unsafe path: {name}')
+              out=(root/pathlib.Path(*rel.parts)).resolve()
+              if root not in out.parents and out != root:
+                  raise SystemExit(f'Path escaped root: {name}')
+              out.parent.mkdir(parents=True, exist_ok=True)
+              out.write_text(str(content), encoding='utf-8')
+          PY
+          test -f generated/settings.gradle.kts
+          test -f generated/build.gradle.kts
+          test -f generated/app/build.gradle.kts
+          test -f generated/app/src/main/AndroidManifest.xml
+
+      - name: Build generated APK
+        if: steps.claim.outputs.has_job == 'true'
+        id: build
+        shell: bash
+        run: |
+          set +e
+          cd generated
+          gradle --no-daemon :app:lintDebug :app:assembleDebug 2>&1 | tee /tmp/build.log
+          code=${PIPESTATUS[0]}
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish successful generated APK
+        if: steps.claim.outputs.has_job == 'true' && steps.build.outputs.code == '0'
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=$(find generated/app/build/outputs/apk/debug -name '*.apk' -type f | head -1)
+          test -n "$apk"
+          safe_id=$(echo '${{ steps.claim.outputs.job_id }}' | tr -cd 'A-Za-z0-9._-')
+          name="Pocket_Potna_Generated_${safe_id}.apk"
+          cp "$apk" "/tmp/$name"
+          sha=$(sha256sum "/tmp/$name" | awk '{print $1}')
+          tag="pp-generated-${safe_id}"
+          gh release delete "$tag" --yes >/dev/null 2>&1 || true
+          gh release create "$tag" "/tmp/$name#$name" --repo "$GITHUB_REPOSITORY" --title "Pocket Potna Generated Android Build $safe_id" --notes "Generated and validated by Pocket Potna FME Agent Mode."
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$name"
+          echo "apk_url=$url" >> "$GITHUB_OUTPUT"
+          echo "apk_sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Report success to Pocket Potna
+        if: steps.claim.outputs.has_job == 'true' && steps.build.outputs.code == '0'
+        shell: bash
+        run: |
+          python - <<'PY' > /tmp/complete.json
+          import json, os
+          print(json.dumps({
+            'jobId': os.environ['JOB_ID'],
+            'ok': True,
+            'apkUrl': os.environ['APK_URL'],
+            'apkSha256': os.environ['APK_SHA'],
+            'buildLog': 'Android lint + assembleDebug passed in GitHub Actions.'
+          }))
+          PY
+          curl -fsS -X POST "$PP_API/android-build-complete" -H 'Content-Type: application/json' --data-binary @/tmp/complete.json
+        env:
+          JOB_ID: ${{ steps.claim.outputs.job_id }}
+          APK_URL: ${{ steps.publish.outputs.apk_url }}
+          APK_SHA: ${{ steps.publish.outputs.apk_sha }}
+
+      - name: Report failed build to Pocket Potna
+        if: steps.claim.outputs.has_job == 'true' && steps.build.outputs.code != '0'
+        shell: bash
+        run: |
+          python - <<'PY' > /tmp/fail.json
+          import json, os
+          log=open('/tmp/build.log', errors='replace').read()[-18000:]
+          print(json.dumps({'jobId':os.environ['JOB_ID'],'ok':False,'buildLog':log}))
+          PY
+          curl -fsS -X POST "$PP_API/android-build-complete" -H 'Content-Type: application/json' --data-binary @/tmp/fail.json
+        env:
+          JOB_ID: ${{ steps.claim.outputs.job_id }}
