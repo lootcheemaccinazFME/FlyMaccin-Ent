@@ -1,6 +1,6 @@
-name: Pocket Potna Android Build
+name: Pocket Potna FME Android Build
 
-# Pocket Potna v1.2.0 secure remote-session build
+# Pocket Potna FME v1.3.0: FME-only auto creation, persistent remote pairing, browser, bundled UMD/library/audit brain.
 on:
   workflow_dispatch:
   push:
@@ -31,25 +31,31 @@ jobs:
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Restore Pocket Potna v1.2.0 source
+      - name: Restore Pocket Potna FME v1.3.0 source
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/cd41bb08-94bc-465b-b588-8261f832f3d0-Pocket_Potna_v1.2.0_SOURCE.zip' -o /tmp/pocket-potna.zip
-          echo 'e635b86a87a1254b700b323345172ecbbbeaf3b63a0e079934f920e1af4fa93f  /tmp/pocket-potna.zip' | sha256sum -c -
-          unzip -oq /tmp/pocket-potna.zip -d .
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/81afdd91-433f-45ef-9afd-5c25b00986ba-Pocket_Potna_FME_v1.3.0_SOURCE.zip' -o /tmp/pocket-potna-fme.zip
+          echo '9053b3992998b49fe202c078d2652fb83ab2fea760e56cec389e411fca796ef9  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
-      - name: Validate Pocket Potna remote edition
+      - name: Validate Pocket Potna FME edition
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'applicationId = "com.flymaccin.pocketpotna"' app/build.gradle.kts
-          grep -q 'versionName = "1.2.0"' app/build.gradle.kts
-          grep -q '<string name="app_name">Pocket Potna</string>' app/src/main/res/values/strings.xml
-          grep -q 'Remote Session' app/src/main/assets/app.js
-          grep -q 'startRemoteSession' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'pocket-potna-remote.floot.app' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'versionName = "1.3.0"' app/build.gradle.kts
+          grep -q '<string name="app_name">Pocket Potna FME</string>' app/src/main/res/values/strings.xml
+          grep -q 'FME_CONTEXT' app/src/main/assets/app.js
+          grep -q 'CREATE SOMETHING FME' app/src/main/assets/app.js
+          grep -q 'AI + Human + ChatGPT' app/src/main/assets/app.js
+          grep -q 'Universal_Master_Doctrine_Current_Indexed_v1.md' app/src/main/assets/app.js
+          grep -q 'hasRemoteSession' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'BrowserActivity' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          test -f app/src/main/assets/Universal_Master_Doctrine_Current_Indexed_v1.md
+          test -f app/src/main/assets/FME_SKULL_MASTER_KNOWLEDGE_CORE.json
+          test -f app/src/main/assets/MACCIN_AZZ_UNIVERSAL_MEMORY_ARCHIVE.md
           node --check app/src/main/assets/app.js
 
       - name: Android lint
@@ -61,15 +67,15 @@ jobs:
       - name: Name APK
         shell: bash
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_v1.2.0-remote-debug.apk
-          sha256sum Pocket_Potna_v1.2.0-remote-debug.apk > Pocket_Potna_v1.2.0-remote-debug.apk.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_FME_v1.3.0-debug.apk
+          sha256sum Pocket_Potna_FME_v1.3.0-debug.apk > Pocket_Potna_FME_v1.3.0-debug.apk.sha256
 
-      - name: Upload Pocket Potna APK
+      - name: Upload Pocket Potna FME APK
         uses: actions/upload-artifact@v4
         with:
-          name: Pocket-Potna-v1.2.0-Remote-APK
+          name: Pocket-Potna-FME-v1.3.0-APK
           path: |
-            Pocket_Potna_v1.2.0-remote-debug.apk
-            Pocket_Potna_v1.2.0-remote-debug.apk.sha256
+            Pocket_Potna_FME_v1.3.0-debug.apk
+            Pocket_Potna_FME_v1.3.0-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
