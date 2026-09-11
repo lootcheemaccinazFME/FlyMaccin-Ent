@@ -35,8 +35,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/b8d2bb3b-ce56-4720-aad2-9c14f281f462-Pocket_Potna_FME_v1.9.0_DEVICE_HUB_SOURCE.zip' -o /tmp/pocket-potna-fme.zip
-          echo '624e987aa533a019791d546da146acf0281ed2511875246cb91d77314f71ea76  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/536259b3-9089-433b-b47b-a183e8f337f6-Pocket_Potna_FME_v1.9.0_DEVICE_HUB_SOURCE_FIXED.zip' -o /tmp/pocket-potna-fme.zip
+          echo '07b9c21ae3f4226e98aea67c232147232f65db1a4dab45bfcb4240c923e89f24  /tmp/pocket-potna-fme.zip' | sha256sum -c -
           unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
@@ -51,7 +51,7 @@ jobs:
           grep -q 'MediaPlayerActivity' app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/flymaccin/bookwriter/AppLauncherActivity.java
           test -f app/src/main/java/com/flymaccin/bookwriter/MediaPlayerActivity.java
-          grep -q 'androidx.media3:media3-exoplayer:1.11.0' app/build.gradle.kts
+          grep -q 'androidx.media3:media3-exoplayer:1.8.1' app/build.gradle.kts
           grep -q 'Apps & Media' app/src/main/assets/app.js
           grep -q 'openAppLauncher' app/src/main/assets/app.js
           grep -q 'openMediaRoom' app/src/main/assets/app.js
