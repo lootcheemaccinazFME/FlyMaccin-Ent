@@ -35,8 +35,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/f362546d-3826-47f5-8a9d-6797072f5f89-Pocket_Potna_FME_v2.0.0_FULL_LIBRARY_HUB_SOURCE.zip' -o /tmp/pocket-potna-fme.zip
-          echo '6751dff2c273e180270286f512cd4ad1b34c9d08742ecb5a1314ce2e13977b64  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/3bfb7394-0bd9-4a35-94ec-014710fbc25d-Pocket_Potna_FME_v2.0.0_FULL_LIBRARY_HUB_SOURCE_FIXED.zip' -o /tmp/pocket-potna-fme.zip
+          echo '2bf21c3f76d55cedb8b1565ef03bc06899842eaf1bcca9c160235f0d01a24982  /tmp/pocket-potna-fme.zip' | sha256sum -c -
           unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
@@ -57,6 +57,7 @@ jobs:
           grep -q 'MediaStore.Audio' app/src/main/java/com/flymaccin/bookwriter/LibraryHubActivity.java
           grep -q 'MediaStore.Images' app/src/main/java/com/flymaccin/bookwriter/LibraryHubActivity.java
           grep -q 'MediaStore.Video' app/src/main/java/com/flymaccin/bookwriter/LibraryHubActivity.java
+          grep -q '@TargetApi(29)' app/src/main/java/com/flymaccin/bookwriter/LibraryHubActivity.java
           node --check app/src/main/assets/app.js
 
       - name: Android lint
