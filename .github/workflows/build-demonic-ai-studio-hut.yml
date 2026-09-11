@@ -6,6 +6,7 @@ on:
       - demonic-ai-studio-hut-v2.1.0
     paths:
       - '.github/workflows/build-demonic-ai-studio-hut.yml'
+      - '.github/scripts/patch_demonic_mobile_multitask.py'
   workflow_dispatch:
 
 jobs:
@@ -39,11 +40,21 @@ jobs:
           echo '23a19eae631789961b6818b87094743dfbbafccfd14ebf4f23b2713caee8e48b  source.zip' | sha256sum -c -
           unzip -q source.zip -d demonic-ai-studio-hut
 
+      - name: Apply mobile multitasking patch
+        run: python3 .github/scripts/patch_demonic_mobile_multitask.py demonic-ai-studio-hut
+
       - name: Static validation
         run: |
           node --check demonic-ai-studio-hut/app/src/main/assets/app.js
           grep -q 'Demonic AI Studio Hut' demonic-ai-studio-hut/app/src/main/res/values/strings.xml
-          grep -q 'versionName = "2.1.0"' demonic-ai-studio-hut/app/build.gradle.kts
+          grep -q 'versionName = "2.1.1"' demonic-ai-studio-hut/app/build.gradle.kts
+          grep -q 'android:resizeableActivity="true"' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
+          grep -q 'android:supportsPictureInPicture="true"' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
+          grep -q 'BackgroundPlaybackService' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
+          grep -q 'Add to Home Screen' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/MainActivity.java
+          grep -q 'Split Screen' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/MainActivity.java
+          grep -q 'Picture in Picture Now' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/MainActivity.java
+          test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BackgroundPlaybackService.java
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
 
@@ -55,16 +66,16 @@ jobs:
           APK='demonic-ai-studio-hut/app/build/outputs/apk/debug/app-debug.apk'
           test -s "$APK"
           unzip -t "$APK" >/dev/null
-          cp "$APK" Demonic_AI_Studio_Hut_v2.1.0-debug.apk
-          sha256sum Demonic_AI_Studio_Hut_v2.1.0-debug.apk > Demonic_AI_Studio_Hut_v2.1.0-debug.apk.sha256
+          cp "$APK" Demonic_AI_Studio_Hut_v2.1.1-debug.apk
+          sha256sum Demonic_AI_Studio_Hut_v2.1.1-debug.apk > Demonic_AI_Studio_Hut_v2.1.1-debug.apk.sha256
 
       - name: Upload compiled APK before runtime QA
         uses: actions/upload-artifact@v4
         with:
-          name: Demonic-AI-Studio-Hut-v2.1.0-debug
+          name: Demonic-AI-Studio-Hut-v2.1.1-debug
           path: |
-            Demonic_AI_Studio_Hut_v2.1.0-debug.apk
-            Demonic_AI_Studio_Hut_v2.1.0-debug.apk.sha256
+            Demonic_AI_Studio_Hut_v2.1.1-debug.apk
+            Demonic_AI_Studio_Hut_v2.1.1-debug.apk.sha256
           if-no-files-found: error
 
       - name: Enable KVM
@@ -101,7 +112,7 @@ jobs:
             PACKAGE_PATH="$(adb shell pm path "$PACKAGE" | tr -d '\r')"
             echo "$PACKAGE_PATH" | tee -a emulator-smoke-report.txt
             test -n "$PACKAGE_PATH"
-            adb shell dumpsys package "$PACKAGE" | grep -E 'versionName=|versionCode=' | head -4 | tee -a emulator-smoke-report.txt
+            adb shell dumpsys package "$PACKAGE" | grep -E 'versionName=|versionCode=|supportsPictureInPicture|resizeMode' | head -8 | tee -a emulator-smoke-report.txt
             adb logcat -c
             adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 | tee -a emulator-smoke-report.txt
             sleep 10
@@ -153,7 +164,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Demonic-AI-Studio-Hut-v2.1.0-emulator-QA
+          name: Demonic-AI-Studio-Hut-v2.1.1-emulator-QA
           path: |
             emulator-smoke-report.txt
             adb-devices.txt
