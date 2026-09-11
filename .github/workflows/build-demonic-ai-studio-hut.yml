@@ -9,6 +9,7 @@ on:
       - '.github/scripts/patch_demonic_mobile_multitask.py'
       - '.github/scripts/patch_restore_full_studio.py'
       - '.github/scripts/patch_studio_os_v213.py'
+      - '.github/scripts/patch_browser_persistence_v214.py'
       - '.github/scripts/android_smoke_test.sh'
       - 'app/src/main/assets/**'
   workflow_dispatch:
@@ -53,6 +54,9 @@ jobs:
       - name: Apply Studio OS v2.1.3 layer
         run: python3 .github/scripts/patch_studio_os_v213.py demonic-ai-studio-hut
 
+      - name: Apply browser account persistence v2.1.4
+        run: python3 .github/scripts/patch_browser_persistence_v214.py demonic-ai-studio-hut
+
       - name: Static validation
         run: |
           node --check demonic-ai-studio-hut/app/src/main/assets/app.js
@@ -63,8 +67,8 @@ jobs:
           test -f demonic-ai-studio-hut/app/src/main/assets/bookwriter/core.mjs
           test -f demonic-ai-studio-hut/app/src/main/assets/bookwriter/houses.js
           grep -q 'Demonic AI Studio Hut' demonic-ai-studio-hut/app/src/main/res/values/strings.xml
-          grep -q 'versionName = "2.1.3"' demonic-ai-studio-hut/app/build.gradle.kts
-          grep -q 'versionCode = 213' demonic-ai-studio-hut/app/build.gradle.kts
+          grep -q 'versionName = "2.1.4"' demonic-ai-studio-hut/app/build.gradle.kts
+          grep -q 'versionCode = 214' demonic-ai-studio-hut/app/build.gradle.kts
           grep -q 'android:resizeableActivity="true"' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
           grep -q 'android:supportsPictureInPicture="true"' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
           grep -q 'BackgroundPlaybackService' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
@@ -75,6 +79,11 @@ jobs:
           grep -q 'Universal Send To pipeline' demonic-ai-studio-hut/app/src/main/assets/studio_os.js
           grep -q 'Autosave/version snapshots/crash recovery' demonic-ai-studio-hut/app/src/main/assets/studio_os.js
           grep -q 'studio_os.js' demonic-ai-studio-hut/app/src/main/assets/index.html
+          grep -q 'DEMONIC_BROWSER_PERSISTENCE_V214' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
+          grep -q 'setAcceptCookie(true)' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
+          grep -q 'setAcceptThirdPartyCookies' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
+          grep -q 'setDomStorageEnabled(true)' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
+          grep -q 'CookieManager.getInstance().flush()' demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BackgroundPlaybackService.java
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
@@ -106,16 +115,16 @@ jobs:
           grep -q 'Demonic Studio OS' packaged-studio-os.js
           grep -q 'Universal Send To pipeline' packaged-studio-os.js
           unzip -p "$APK" assets/bookwriter/index.html | grep -q 'Book Planning Command Center'
-          cp "$APK" Demonic_AI_Studio_Hut_v2.1.3_STUDIO_OS-debug.apk
-          sha256sum Demonic_AI_Studio_Hut_v2.1.3_STUDIO_OS-debug.apk > Demonic_AI_Studio_Hut_v2.1.3_STUDIO_OS-debug.apk.sha256
+          cp "$APK" Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk
+          sha256sum Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk > Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk.sha256
 
       - name: Upload compiled APK before runtime QA
         uses: actions/upload-artifact@v4
         with:
-          name: Demonic-AI-Studio-Hut-v2.1.3-STUDIO-OS-debug
+          name: Demonic-AI-Studio-Hut-v2.1.4-BROWSER-PERSISTENCE-debug
           path: |
-            Demonic_AI_Studio_Hut_v2.1.3_STUDIO_OS-debug.apk
-            Demonic_AI_Studio_Hut_v2.1.3_STUDIO_OS-debug.apk.sha256
+            Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk
+            Demonic_AI_Studio_Hut_v2.1.4_BROWSER_PERSISTENCE-debug.apk.sha256
           if-no-files-found: error
 
       - name: Enable KVM
@@ -155,7 +164,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Demonic-AI-Studio-Hut-v2.1.3-STUDIO-OS-emulator-QA
+          name: Demonic-AI-Studio-Hut-v2.1.4-BROWSER-PERSISTENCE-emulator-QA
           path: |
             emulator-smoke-report.txt
             adb-devices.txt
