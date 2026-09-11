@@ -5,7 +5,6 @@ on:
   push:
     branches: [ main ]
     paths:
-      - '.pocket-potna/**'
       - '.github/workflows/android-build.yml'
 
 permissions:
@@ -31,38 +30,25 @@ jobs:
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Restore Pocket Potna source
+      - name: Restore Pocket Potna v1.2.0 source
         shell: bash
         run: |
           set -euo pipefail
-          cat \
-            .pocket-potna/source.b64.part-00 \
-            .pocket-potna/source.b64.part-01 \
-            .pocket-potna/source.b64.part-02 \
-            .pocket-potna/source.b64.part-03 \
-            .pocket-potna/source.b64.part-04 \
-            .pocket-potna/source.b64.part-05 \
-            .pocket-potna/source.b64.part-06 \
-            .pocket-potna/source.b64.part-07 \
-            .pocket-potna/source.b64.part-08 \
-            .pocket-potna/source.b64.part-09 \
-            .pocket-potna/source.b64.part-10 \
-            .pocket-potna/source.b64.part-11 > /tmp/pocket-potna.b64
-          echo '7338906bf2fea9fa48a56c025a24b6fc24753e472514339841fbfc81935ce9bd  /tmp/pocket-potna.b64' | sha256sum -c -
-          base64 -d /tmp/pocket-potna.b64 > /tmp/pocket-potna.tgz
-          echo 'c70cbb27378bd422b1379146fe09b8d49b57f21338c55c89d8534cb66299c7ed  /tmp/pocket-potna.tgz' | sha256sum -c -
-          tar -xzf /tmp/pocket-potna.tgz -C .
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/cd41bb08-94bc-465b-b588-8261f832f3d0-Pocket_Potna_v1.2.0_SOURCE.zip' -o /tmp/pocket-potna.zip
+          echo 'e635b86a87a1254b700b323345172ecbbbeaf3b63a0e079934f920e1af4fa93f  /tmp/pocket-potna.zip' | sha256sum -c -
+          unzip -oq /tmp/pocket-potna.zip -d .
           chmod +x gradlew
 
-      - name: Validate Pocket Potna identity
+      - name: Validate Pocket Potna remote edition
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'applicationId = "com.flymaccin.pocketpotna"' app/build.gradle.kts
+          grep -q 'versionName = "1.2.0"' app/build.gradle.kts
           grep -q '<string name="app_name">Pocket Potna</string>' app/src/main/res/values/strings.xml
-          grep -q 'AI Chatbot' app/src/main/assets/app.js
-          grep -q 'Generator Hub' app/src/main/assets/app.js
-          grep -q 'Agent Maker' app/src/main/assets/app.js
+          grep -q 'Remote Session' app/src/main/assets/app.js
+          grep -q 'startRemoteSession' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'pocket-potna-remote.floot.app' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
           node --check app/src/main/assets/app.js
 
       - name: Android lint
@@ -74,15 +60,15 @@ jobs:
       - name: Name APK
         shell: bash
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_v1.1.0-debug.apk
-          sha256sum Pocket_Potna_v1.1.0-debug.apk > Pocket_Potna_v1.1.0-debug.apk.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_v1.2.0-remote-debug.apk
+          sha256sum Pocket_Potna_v1.2.0-remote-debug.apk > Pocket_Potna_v1.2.0-remote-debug.apk.sha256
 
       - name: Upload Pocket Potna APK
         uses: actions/upload-artifact@v4
         with:
-          name: Pocket-Potna-v1.1.0-APK
+          name: Pocket-Potna-v1.2.0-Remote-APK
           path: |
-            Pocket_Potna_v1.1.0-debug.apk
-            Pocket_Potna_v1.1.0-debug.apk.sha256
+            Pocket_Potna_v1.2.0-remote-debug.apk
+            Pocket_Potna_v1.2.0-remote-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
