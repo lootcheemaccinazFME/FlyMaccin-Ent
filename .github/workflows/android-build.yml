@@ -1,6 +1,6 @@
 name: Pocket Potna FME Android Build
 
-# Pocket Potna FME v1.8.0: Chat/ChatGPT split, NO-AI authoring, Notebook/Art Room, Split Studio.
+# Pocket Potna FME v1.8.1: Chat Mode keeps separate history but may launch production tools on explicit request.
 on:
   workflow_dispatch:
   push:
@@ -31,26 +31,28 @@ jobs:
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Restore Pocket Potna FME v1.8.0 source
+      - name: Restore Pocket Potna FME v1.8.1 source
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/08894fdd-4b50-4f99-864a-d3209d1505d4-Pocket_Potna_FME_v1.8.0_AUTHOR_STUDIO_SOURCE.zip' -o /tmp/pocket-potna-fme.zip
-          echo '254dd656069081d250f7395224e515db2da8bda3a488f4b5b546de21ee848438  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/fd151711-328f-4cb7-af7c-866a2716a854-Pocket_Potna_FME_v1.8.1_CHAT_TOOLS_SOURCE.zip' -o /tmp/pocket-potna-fme.zip
+          echo '652895a8de3a0513d97fa33778d2672ae572369428ae5b178ef360c104c9e8dd  /tmp/pocket-potna-fme.zip' | sha256sum -c -
           unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
-      - name: Validate FME Author Studio edition
+      - name: Validate FME Chat Tool edition
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'applicationId = "com.flymaccin.pocketpotna"' app/build.gradle.kts
-          grep -q 'versionName = "1.8.0"' app/build.gradle.kts
+          grep -q 'versionName = "1.8.1"' app/build.gradle.kts
           grep -q '<string name="app_name">Pocket Potna FME</string>' app/src/main/res/values/strings.xml
           grep -q 'ZERO-DOLLAR OPERATING LAW ACTIVE' app/src/main/assets/app.js
           grep -q 'NO AI · AUTHOR MODE' app/src/main/assets/app.js
           grep -q 'Notebook / Drawing / Painting Room' app/src/main/assets/app.js
-          grep -q 'Chat Mode' app/src/main/assets/app.js
+          grep -q 'COMPANION + TOOLS' app/src/main/assets/app.js
+          grep -q 'CHAT TOOL LAUNCH' app/src/main/assets/app.js
+          grep -q 'allowed to launch production tools' app/src/main/assets/app.js
           grep -q 'ChatGPT Mode' app/src/main/assets/app.js
           grep -q 'openSplitStudio' app/src/main/assets/app.js
           grep -q 'openSplitStudio' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
@@ -70,15 +72,15 @@ jobs:
       - name: Name APK
         shell: bash
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_FME_v1.8.0-debug.apk
-          sha256sum Pocket_Potna_FME_v1.8.0-debug.apk > Pocket_Potna_FME_v1.8.0-debug.apk.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_FME_v1.8.1-debug.apk
+          sha256sum Pocket_Potna_FME_v1.8.1-debug.apk > Pocket_Potna_FME_v1.8.1-debug.apk.sha256
 
       - name: Upload Pocket Potna FME APK
         uses: actions/upload-artifact@v4
         with:
-          name: Pocket-Potna-FME-v1.8.0-APK
+          name: Pocket-Potna-FME-v1.8.1-APK
           path: |
-            Pocket_Potna_FME_v1.8.0-debug.apk
-            Pocket_Potna_FME_v1.8.0-debug.apk.sha256
+            Pocket_Potna_FME_v1.8.1-debug.apk
+            Pocket_Potna_FME_v1.8.1-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
