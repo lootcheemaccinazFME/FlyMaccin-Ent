@@ -1,6 +1,6 @@
 name: Pocket Potna FME Android Build
 
-# Pocket Potna FME v1.9.0: installed app/game launcher + native Media3 music/video/movie player.
+# Pocket Potna FME v2.0.0: full FME Library Hub + device media + imported folders.
 on:
   workflow_dispatch:
   push:
@@ -31,34 +31,32 @@ jobs:
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Restore Pocket Potna FME v1.9.0 source
+      - name: Restore Pocket Potna FME v2.0.0 source
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/5467619d-71ca-4c58-8cbd-2098e62dcbe7-Pocket_Potna_FME_v1.9.0_DEVICE_HUB_SOURCE_FINAL.zip' -o /tmp/pocket-potna-fme.zip
-          echo '19c53a0efb6fbca5364d307f48fac5ade3b7f1b512a009018abb5f15d0d1b72b  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/f362546d-3826-47f5-8a9d-6797072f5f89-Pocket_Potna_FME_v2.0.0_FULL_LIBRARY_HUB_SOURCE.zip' -o /tmp/pocket-potna-fme.zip
+          echo '6751dff2c273e180270286f512cd4ad1b34c9d08742ecb5a1314ce2e13977b64  /tmp/pocket-potna-fme.zip' | sha256sum -c -
           unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
-      - name: Validate FME Device Hub edition
+      - name: Validate FME Full Library Hub edition
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'applicationId = "com.flymaccin.pocketpotna"' app/build.gradle.kts
-          grep -q 'versionName = "1.9.0"' app/build.gradle.kts
-          grep -q 'android.intent.category.LAUNCHER' app/src/main/AndroidManifest.xml
-          grep -q 'AppLauncherActivity' app/src/main/AndroidManifest.xml
-          grep -q 'MediaPlayerActivity' app/src/main/AndroidManifest.xml
-          test -f app/src/main/java/com/flymaccin/bookwriter/AppLauncherActivity.java
-          test -f app/src/main/java/com/flymaccin/bookwriter/MediaPlayerActivity.java
-          grep -q 'androidx.media3:media3-exoplayer:1.8.1' app/build.gradle.kts
-          grep -q 'Apps & Media' app/src/main/assets/app.js
-          grep -q 'openAppLauncher' app/src/main/assets/app.js
-          grep -q 'openMediaRoom' app/src/main/assets/app.js
-          grep -q 'openAppLauncher' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'openMediaRoom' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'ZERO-DOLLAR OPERATING LAW ACTIVE' app/src/main/assets/app.js
-          grep -q 'COMPANION + TOOLS' app/src/main/assets/app.js
+          grep -q 'versionName = "2.0.0"' app/build.gradle.kts
+          grep -q 'LibraryHubActivity' app/src/main/AndroidManifest.xml
+          test -f app/src/main/java/com/flymaccin/bookwriter/LibraryHubActivity.java
+          test -f app/src/main/assets/FME_LIBRARY_MAP.json
+          grep -q 'androidx.documentfile:documentfile:1.0.1' app/build.gradle.kts
+          grep -q 'FME Library Hub' app/src/main/assets/app.js
+          grep -q 'openLibraryHub' app/src/main/assets/app.js
+          grep -q 'openLibraryHub' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'IMPORT FME FOLDER' app/src/main/java/com/flymaccin/bookwriter/LibraryHubActivity.java
+          grep -q 'MediaStore.Audio' app/src/main/java/com/flymaccin/bookwriter/LibraryHubActivity.java
+          grep -q 'MediaStore.Images' app/src/main/java/com/flymaccin/bookwriter/LibraryHubActivity.java
+          grep -q 'MediaStore.Video' app/src/main/java/com/flymaccin/bookwriter/LibraryHubActivity.java
           node --check app/src/main/assets/app.js
 
       - name: Android lint
@@ -70,15 +68,15 @@ jobs:
       - name: Name APK
         shell: bash
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_FME_v1.9.0-debug.apk
-          sha256sum Pocket_Potna_FME_v1.9.0-debug.apk > Pocket_Potna_FME_v1.9.0-debug.apk.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_FME_v2.0.0-debug.apk
+          sha256sum Pocket_Potna_FME_v2.0.0-debug.apk > Pocket_Potna_FME_v2.0.0-debug.apk.sha256
 
       - name: Upload Pocket Potna FME APK
         uses: actions/upload-artifact@v4
         with:
-          name: Pocket-Potna-FME-v1.9.0-APK
+          name: Pocket-Potna-FME-v2.0.0-APK
           path: |
-            Pocket_Potna_FME_v1.9.0-debug.apk
-            Pocket_Potna_FME_v1.9.0-debug.apk.sha256
+            Pocket_Potna_FME_v2.0.0-debug.apk
+            Pocket_Potna_FME_v2.0.0-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
