@@ -58,25 +58,52 @@ jobs:
           sha256sum Demonic_AI_Studio_Hut_v2.1.0-debug.apk > Demonic_AI_Studio_Hut_v2.1.0-debug.apk.sha256
 
       - name: Install Android emulator image
+        timeout-minutes: 6
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager 'emulator' 'system-images;android-35;google_apis;x86_64'
 
       - name: Create and boot Android 35 emulator
+        timeout-minutes: 5
         run: |
+          set -euo pipefail
           IMAGE='system-images;android-35;google_apis;x86_64'
           echo no | avdmanager create avd -n demonic_ci -k "$IMAGE" --force
-          nohup "$ANDROID_HOME/emulator/emulator" \
-            -avd demonic_ci \
-            -no-window \
-            -no-audio \
-            -no-boot-anim \
-            -no-snapshot \
-            -gpu swiftshader_indirect \
-            > emulator.log 2>&1 &
-          adb wait-for-device
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm || true
+            ls -l /dev/kvm
+          else
+            echo 'No /dev/kvm exposed; emulator will use software acceleration.'
+          fi
+          adb start-server
+          EMU_ARGS=(
+            -avd demonic_ci
+            -no-window
+            -no-audio
+            -no-boot-anim
+            -no-snapshot
+            -gpu swiftshader_indirect
+            -camera-back none
+            -camera-front none
+          )
+          if [ ! -e /dev/kvm ]; then
+            EMU_ARGS+=( -accel off )
+          fi
+          nohup "$ANDROID_HOME/emulator/emulator" "${EMU_ARGS[@]}" > emulator.log 2>&1 &
+          EMU_PID=$!
+          echo "EMULATOR_PID=$EMU_PID"
+          if ! timeout 90 adb wait-for-device; then
+            echo 'ADB never saw the emulator.'
+            tail -250 emulator.log || true
+            exit 1
+          fi
           BOOTED=0
-          for i in $(seq 1 90); do
+          for i in $(seq 1 60); do
+            if ! kill -0 "$EMU_PID" 2>/dev/null; then
+              echo 'Emulator process exited during boot.'
+              tail -250 emulator.log || true
+              exit 1
+            fi
             if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
               BOOTED=1
               break
@@ -84,8 +111,9 @@ jobs:
             sleep 2
           done
           if [ "$BOOTED" != "1" ]; then
-            echo 'Emulator failed to finish booting.'
-            tail -200 emulator.log || true
+            echo 'Emulator connected but failed to finish booting.'
+            adb devices -l || true
+            tail -250 emulator.log || true
             exit 1
           fi
           adb shell settings put global window_animation_scale 0
@@ -95,6 +123,7 @@ jobs:
           echo 'Android emulator booted.'
 
       - name: Install and launch smoke test
+        timeout-minutes: 3
         run: |
           set -euo pipefail
           PACKAGE='com.flymaccin.pocketpotna'
@@ -133,11 +162,17 @@ jobs:
             adb logcat -d > logcat.txt
             exit 1
           fi
-          echo 'PASS: install, launch, process survival, and relaunch smoke test.' | tee -a emulator-smoke-report.txt
+          adb logcat -d > logcat-final.txt
+          if grep -A30 -B10 -E "Process: ${PACKAGE}|FATAL EXCEPTION" logcat-final.txt | grep -q "$PACKAGE"; then
+            echo 'FAIL: app-specific fatal exception detected after relaunch.' | tee -a emulator-smoke-report.txt
+            exit 1
+          fi
+          echo 'PASS: install, launch, process survival, crash scan, and relaunch smoke test.' | tee -a emulator-smoke-report.txt
 
       - name: Capture emulator QA diagnostics
         if: always()
         run: |
+          adb devices -l > adb-devices.txt 2>/dev/null || true
           adb logcat -d > logcat-final.txt 2>/dev/null || true
           adb shell dumpsys activity activities > activity-final.txt 2>/dev/null || true
           adb shell dumpsys package com.flymaccin.pocketpotna > package-final.txt 2>/dev/null || true
@@ -152,6 +187,7 @@ jobs:
           path: |
             emulator-smoke-report.txt
             emulator.log
+            adb-devices.txt
             logcat.txt
             logcat-final.txt
             activity-final.txt
