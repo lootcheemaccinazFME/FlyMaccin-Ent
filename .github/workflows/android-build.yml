@@ -35,8 +35,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/e1701639-8179-4526-87da-3d2180cb22b6-Pocket_Potna_FME_v1.6.0_AGENT_FULLSTACK_SOURCE.zip' -o /tmp/pocket-potna-fme.zip
-          echo 'bd5ff1ec552ed96872fb850a0d13088a8e18453e3dfaa7f518f007df0cdf740d  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/77ccf4b1-9947-47fb-a752-16e338d83a92-Pocket_Potna_FME_v1.6.0_AGENT_FULLSTACK_SOURCE_FIXED.zip' -o /tmp/pocket-potna-fme.zip
+          echo 'ee0a42c04a335cecf456d7948ee2460696f5813ae87f65e9b43d0a9e32514aaf  /tmp/pocket-potna-fme.zip' | sha256sum -c -
           unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
