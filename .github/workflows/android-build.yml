@@ -1,5 +1,6 @@
 name: Pocket Potna Android Build
 
+# Pocket Potna v1.2.0 secure remote-session build
 on:
   workflow_dispatch:
   push:
