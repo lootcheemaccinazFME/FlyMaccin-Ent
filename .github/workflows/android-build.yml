@@ -1,6 +1,6 @@
 name: Pocket Potna FME Android Build
 
-# Pocket Potna FME v1.4.0: real multimodal artifact production + persistent remote pairing + browser + PS Remote Play launcher.
+# Pocket Potna FME v1.6.0: FME Agent Mode + voice lab + Google Voice + Android app/game build queue.
 on:
   workflow_dispatch:
   push:
@@ -31,32 +31,35 @@ jobs:
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Restore Pocket Potna FME v1.4.0 source
+      - name: Restore Pocket Potna FME v1.6.0 source
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/9602c44d-d1c7-4726-90b9-156590790834-Pocket_Potna_FME_v1.4.0_PRODUCTION_SOURCE_FIXED.zip' -o /tmp/pocket-potna-fme.zip
-          echo 'a2b443759ab68e317bfe586d13415d4b8b66d17571e0b7178533320d7ba0b47f  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/e1701639-8179-4526-87da-3d2180cb22b6-Pocket_Potna_FME_v1.6.0_AGENT_FULLSTACK_SOURCE.zip' -o /tmp/pocket-potna-fme.zip
+          echo 'bd5ff1ec552ed96872fb850a0d13088a8e18453e3dfaa7f518f007df0cdf740d  /tmp/pocket-potna-fme.zip' | sha256sum -c -
           unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
-      - name: Validate Pocket Potna FME production edition
+      - name: Validate FME Agent Fullstack edition
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'applicationId = "com.flymaccin.pocketpotna"' app/build.gradle.kts
-          grep -q 'versionName = "1.4.0"' app/build.gradle.kts
+          grep -q 'versionName = "1.6.0"' app/build.gradle.kts
           grep -q '<string name="app_name">Pocket Potna FME</string>' app/src/main/res/values/strings.xml
-          grep -q 'REAL OUTPUT LAW' app/src/main/assets/app.js
-          grep -q 'generateMedia' app/src/main/assets/app.js
-          grep -q 'PRODUCTION PASS' app/src/main/assets/app.js
-          grep -q 'launchPSRemotePlay' app/src/main/assets/app.js
-          grep -q 'gpt-image-2' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'sora-2' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'gpt-4o-mini-tts' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'renderBeatWav' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'generateSong' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
-          grep -q 'com.playstation.remoteplay' app/src/main/AndroidManifest.xml
+          grep -q 'FME AGENT MODE ACTIVE' app/src/main/assets/app.js
+          grep -q 'AUTO + MULTI + REAL + QA + SAVE + FME' app/src/main/assets/app.js
+          grep -q 'startVoiceRecording' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'stopVoiceRecording' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'googleVoiceCall' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'googleVoiceText' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'queueAndroidBuild' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'Android Game' app/src/main/assets/app.js
+          grep -q 'Android App' app/src/main/assets/app.js
+          grep -q 'deviceSecretRequired",false' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'android.permission.RECORD_AUDIO' app/src/main/AndroidManifest.xml
+          grep -q 'com.google.android.apps.googlevoice' app/src/main/AndroidManifest.xml
+          test -f app/src/main/assets/FME_AGENT_MODE.md
           test -f app/src/main/assets/Universal_Master_Doctrine_Current_Indexed_v1.md
           test -f app/src/main/assets/FME_SKULL_MASTER_KNOWLEDGE_CORE.json
           test -f app/src/main/assets/MACCIN_AZZ_UNIVERSAL_MEMORY_ARCHIVE.md
@@ -71,15 +74,15 @@ jobs:
       - name: Name APK
         shell: bash
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_FME_v1.4.0-debug.apk
-          sha256sum Pocket_Potna_FME_v1.4.0-debug.apk > Pocket_Potna_FME_v1.4.0-debug.apk.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk Pocket_Potna_FME_v1.6.0-debug.apk
+          sha256sum Pocket_Potna_FME_v1.6.0-debug.apk > Pocket_Potna_FME_v1.6.0-debug.apk.sha256
 
       - name: Upload Pocket Potna FME APK
         uses: actions/upload-artifact@v4
         with:
-          name: Pocket-Potna-FME-v1.4.0-APK
+          name: Pocket-Potna-FME-v1.6.0-APK
           path: |
-            Pocket_Potna_FME_v1.4.0-debug.apk
-            Pocket_Potna_FME_v1.4.0-debug.apk.sha256
+            Pocket_Potna_FME_v1.6.0-debug.apk
+            Pocket_Potna_FME_v1.6.0-debug.apk.sha256
           if-no-files-found: error
           retention-days: 30
