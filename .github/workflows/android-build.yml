@@ -35,8 +35,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/81afdd91-433f-45ef-9afd-5c25b00986ba-Pocket_Potna_FME_v1.3.0_SOURCE.zip' -o /tmp/pocket-potna-fme.zip
-          echo '9053b3992998b49fe202c078d2652fb83ab2fea760e56cec389e411fca796ef9  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/563f37c7-790b-4836-9bcb-aeb1632b399a-Pocket_Potna_FME_v1.3.0_SOURCE_FIXED.zip' -o /tmp/pocket-potna-fme.zip
+          echo 'a38fd2dd732c0fcf0f4d414d0b927384c4f1041442ee45649ed909e3762d813c  /tmp/pocket-potna-fme.zip' | sha256sum -c -
           unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
@@ -53,6 +53,7 @@ jobs:
           grep -q 'Universal_Master_Doctrine_Current_Indexed_v1.md' app/src/main/assets/app.js
           grep -q 'hasRemoteSession' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
           grep -q 'BrowserActivity' app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          grep -q 'URLEncoder.encode(value,"UTF-8")' app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
           test -f app/src/main/assets/Universal_Master_Doctrine_Current_Indexed_v1.md
           test -f app/src/main/assets/FME_SKULL_MASTER_KNOWLEDGE_CORE.json
           test -f app/src/main/assets/MACCIN_AZZ_UNIVERSAL_MEMORY_ARCHIVE.md
