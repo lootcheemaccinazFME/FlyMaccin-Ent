@@ -37,11 +37,11 @@ jobs:
         run: gradle -p demonic-daw-android :app:assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp demonic-daw-android/app/build/outputs/apk/debug/app-debug.apk Demonic_DAW_v1.0.0-debug.apk
+        run: cp demonic-daw-android/app/build/outputs/apk/debug/app-debug.apk Demonic_DAW_v1.1.0-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Demonic-DAW-v1.0.0-debug
-          path: Demonic_DAW_v1.0.0-debug.apk
+          name: Demonic-DAW-v1.1.0-debug
+          path: Demonic_DAW_v1.1.0-debug.apk
           if-no-files-found: error
