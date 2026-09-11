@@ -35,7 +35,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .pocket-potna/source.b64.part-00 .pocket-potna/source.b64.part-01 .pocket-potna/source.b64.part-02 > /tmp/pocket-potna.b64
+          cat \
+            .pocket-potna/source.b64.part-00 \
+            .pocket-potna/source.b64.part-01 \
+            .pocket-potna/source.b64.part-02 \
+            .pocket-potna/source.b64.part-03 \
+            .pocket-potna/source.b64.part-04 \
+            .pocket-potna/source.b64.part-05 \
+            .pocket-potna/source.b64.part-06 \
+            .pocket-potna/source.b64.part-07 \
+            .pocket-potna/source.b64.part-08 \
+            .pocket-potna/source.b64.part-09 \
+            .pocket-potna/source.b64.part-10 \
+            .pocket-potna/source.b64.part-11 > /tmp/pocket-potna.b64
           echo '7338906bf2fea9fa48a56c025a24b6fc24753e472514339841fbfc81935ce9bd  /tmp/pocket-potna.b64' | sha256sum -c -
           base64 -d /tmp/pocket-potna.b64 > /tmp/pocket-potna.tgz
           echo 'c70cbb27378bd422b1379146fe09b8d49b57f21338c55c89d8534cb66299c7ed  /tmp/pocket-potna.tgz' | sha256sum -c -
