@@ -7,7 +7,9 @@ on:
     paths:
       - '.github/workflows/build-demonic-ai-studio-hut.yml'
       - '.github/scripts/patch_demonic_mobile_multitask.py'
+      - '.github/scripts/patch_restore_full_studio.py'
       - '.github/scripts/android_smoke_test.sh'
+      - 'app/src/main/assets/**'
   workflow_dispatch:
 
 jobs:
@@ -44,11 +46,19 @@ jobs:
       - name: Apply mobile multitasking patch
         run: python3 .github/scripts/patch_demonic_mobile_multitask.py demonic-ai-studio-hut
 
+      - name: Merge full Book Writer and unified studio
+        run: python3 .github/scripts/patch_restore_full_studio.py demonic-ai-studio-hut
+
       - name: Static validation
         run: |
           node --check demonic-ai-studio-hut/app/src/main/assets/app.js
+          node --check demonic-ai-studio-hut/app/src/main/assets/bookwriter/app.js
+          test -f demonic-ai-studio-hut/app/src/main/assets/bookwriter/index.html
+          test -f demonic-ai-studio-hut/app/src/main/assets/bookwriter/core.mjs
+          test -f demonic-ai-studio-hut/app/src/main/assets/bookwriter/houses.js
           grep -q 'Demonic AI Studio Hut' demonic-ai-studio-hut/app/src/main/res/values/strings.xml
-          grep -q 'versionName = "2.1.1"' demonic-ai-studio-hut/app/build.gradle.kts
+          grep -q 'versionName = "2.1.2"' demonic-ai-studio-hut/app/build.gradle.kts
+          grep -q 'versionCode = 212' demonic-ai-studio-hut/app/build.gradle.kts
           grep -q 'android:resizeableActivity="true"' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
           grep -q 'android:supportsPictureInPicture="true"' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
           grep -q 'BackgroundPlaybackService' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
@@ -58,25 +68,39 @@ jobs:
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BackgroundPlaybackService.java
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BrowserActivity.java
           test -f demonic-ai-studio-hut/app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          for room in 'Book Writer' 'Creator AI' 'Demonic DAW' 'Scripture Writer' 'Game Maker' 'Development Room' 'Beat Maker' 'Tools' 'FME Library' 'Audit Archive' 'Settings'; do
+            grep -q "$room" demonic-ai-studio-hut/app/src/main/assets/app.js || { echo "Missing room in merged app.js: $room"; exit 1; }
+          done
+          grep -q 'FME BOOKWRITER OPENAI STUDIOS' demonic-ai-studio-hut/app/src/main/assets/bookwriter/index.html
+          grep -q 'Book Planning Command Center' demonic-ai-studio-hut/app/src/main/assets/bookwriter/index.html
+          grep -q 'Story Bible / Continuity Authority' demonic-ai-studio-hut/app/src/main/assets/bookwriter/index.html
 
       - name: Build debug APK
         run: gradle -p demonic-ai-studio-hut :app:assembleDebug --stacktrace
 
-      - name: APK structural smoke test
+      - name: APK structural and room smoke test
         run: |
           APK='demonic-ai-studio-hut/app/build/outputs/apk/debug/app-debug.apk'
           test -s "$APK"
           unzip -t "$APK" >/dev/null
-          cp "$APK" Demonic_AI_Studio_Hut_v2.1.1-debug.apk
-          sha256sum Demonic_AI_Studio_Hut_v2.1.1-debug.apk > Demonic_AI_Studio_Hut_v2.1.1-debug.apk.sha256
+          unzip -l "$APK" | grep -q 'assets/bookwriter/index.html'
+          unzip -l "$APK" | grep -q 'assets/bookwriter/core.mjs'
+          unzip -l "$APK" | grep -q 'assets/bookwriter/houses.js'
+          unzip -p "$APK" assets/app.js > packaged-app.js
+          for room in 'Book Writer' 'Creator AI' 'Demonic DAW' 'Scripture Writer' 'Game Maker' 'Development Room' 'Beat Maker' 'Tools' 'FME Library' 'Audit Archive' 'Settings'; do
+            grep -q "$room" packaged-app.js || { echo "Missing room from packaged APK: $room"; exit 1; }
+          done
+          unzip -p "$APK" assets/bookwriter/index.html | grep -q 'Book Planning Command Center'
+          cp "$APK" Demonic_AI_Studio_Hut_v2.1.2_FULL_STUDIO-debug.apk
+          sha256sum Demonic_AI_Studio_Hut_v2.1.2_FULL_STUDIO-debug.apk > Demonic_AI_Studio_Hut_v2.1.2_FULL_STUDIO-debug.apk.sha256
 
       - name: Upload compiled APK before runtime QA
         uses: actions/upload-artifact@v4
         with:
-          name: Demonic-AI-Studio-Hut-v2.1.1-debug
+          name: Demonic-AI-Studio-Hut-v2.1.2-FULL-STUDIO-debug
           path: |
-            Demonic_AI_Studio_Hut_v2.1.1-debug.apk
-            Demonic_AI_Studio_Hut_v2.1.1-debug.apk.sha256
+            Demonic_AI_Studio_Hut_v2.1.2_FULL_STUDIO-debug.apk
+            Demonic_AI_Studio_Hut_v2.1.2_FULL_STUDIO-debug.apk.sha256
           if-no-files-found: error
 
       - name: Enable KVM
@@ -116,7 +140,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Demonic-AI-Studio-Hut-v2.1.1-emulator-QA
+          name: Demonic-AI-Studio-Hut-v2.1.2-FULL-STUDIO-emulator-QA
           path: |
             emulator-smoke-report.txt
             adb-devices.txt
