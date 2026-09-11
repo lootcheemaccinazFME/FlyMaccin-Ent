@@ -57,6 +57,108 @@ jobs:
           cp "$APK" Demonic_AI_Studio_Hut_v2.1.0-debug.apk
           sha256sum Demonic_AI_Studio_Hut_v2.1.0-debug.apk > Demonic_AI_Studio_Hut_v2.1.0-debug.apk.sha256
 
+      - name: Install Android emulator image
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'emulator' 'system-images;android-35;google_apis;x86_64'
+
+      - name: Create and boot Android 35 emulator
+        run: |
+          IMAGE='system-images;android-35;google_apis;x86_64'
+          echo no | avdmanager create avd -n demonic_ci -k "$IMAGE" --force
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            -avd demonic_ci \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-snapshot \
+            -gpu swiftshader_indirect \
+            > emulator.log 2>&1 &
+          adb wait-for-device
+          BOOTED=0
+          for i in $(seq 1 90); do
+            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+              BOOTED=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$BOOTED" != "1" ]; then
+            echo 'Emulator failed to finish booting.'
+            tail -200 emulator.log || true
+            exit 1
+          fi
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb shell input keyevent 82 || true
+          echo 'Android emulator booted.'
+
+      - name: Install and launch smoke test
+        run: |
+          set -euo pipefail
+          PACKAGE='com.flymaccin.pocketpotna'
+          APK='demonic-ai-studio-hut/app/build/outputs/apk/debug/app-debug.apk'
+          : > emulator-smoke-report.txt
+          echo "PACKAGE=$PACKAGE" | tee -a emulator-smoke-report.txt
+          echo "APK_SHA256=$(sha256sum "$APK" | awk '{print $1}')" | tee -a emulator-smoke-report.txt
+          adb install -r "$APK" | tee -a emulator-smoke-report.txt
+          adb shell pm path "$PACKAGE" | tee -a emulator-smoke-report.txt
+          adb shell dumpsys package "$PACKAGE" | grep -E 'versionName=|versionCode=' | head -4 | tee -a emulator-smoke-report.txt
+          adb logcat -c
+          adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 | tee -a emulator-smoke-report.txt
+          sleep 10
+          PID="$(adb shell pidof "$PACKAGE" | tr -d '\r')"
+          echo "PID_AFTER_FIRST_LAUNCH=$PID" | tee -a emulator-smoke-report.txt
+          if [ -z "$PID" ]; then
+            echo 'FAIL: package process did not survive first launch.' | tee -a emulator-smoke-report.txt
+            adb logcat -d > logcat.txt
+            exit 1
+          fi
+          adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity' | head -5 | tee -a emulator-smoke-report.txt || true
+          adb logcat -d > logcat.txt
+          if grep -A30 -B10 -E "Process: ${PACKAGE}|FATAL EXCEPTION" logcat.txt | grep -q "$PACKAGE"; then
+            echo 'FAIL: app-specific fatal exception detected.' | tee -a emulator-smoke-report.txt
+            grep -A40 -B15 -E "Process: ${PACKAGE}|FATAL EXCEPTION" logcat.txt | tail -120 | tee fatal-app.txt
+            exit 1
+          fi
+          adb shell am force-stop "$PACKAGE"
+          sleep 2
+          adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 | tee -a emulator-smoke-report.txt
+          sleep 6
+          PID2="$(adb shell pidof "$PACKAGE" | tr -d '\r')"
+          echo "PID_AFTER_RELAUNCH=$PID2" | tee -a emulator-smoke-report.txt
+          if [ -z "$PID2" ]; then
+            echo 'FAIL: package process did not survive relaunch.' | tee -a emulator-smoke-report.txt
+            adb logcat -d > logcat.txt
+            exit 1
+          fi
+          echo 'PASS: install, launch, process survival, and relaunch smoke test.' | tee -a emulator-smoke-report.txt
+
+      - name: Capture emulator QA diagnostics
+        if: always()
+        run: |
+          adb logcat -d > logcat-final.txt 2>/dev/null || true
+          adb shell dumpsys activity activities > activity-final.txt 2>/dev/null || true
+          adb shell dumpsys package com.flymaccin.pocketpotna > package-final.txt 2>/dev/null || true
+          test -f emulator-smoke-report.txt || echo 'Smoke test did not reach report creation.' > emulator-smoke-report.txt
+          test -f emulator.log || touch emulator.log
+
+      - name: Upload emulator QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Demonic-AI-Studio-Hut-v2.1.0-emulator-QA
+          path: |
+            emulator-smoke-report.txt
+            emulator.log
+            logcat.txt
+            logcat-final.txt
+            activity-final.txt
+            package-final.txt
+            fatal-app.txt
+          if-no-files-found: warn
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
