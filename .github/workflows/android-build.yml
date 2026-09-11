@@ -35,8 +35,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/66a79f01-0d7d-4a0b-bd65-bb4f36fadc95-Pocket_Potna_FME_v1.9.0_DEVICE_HUB_SOURCE_FIXED2.zip' -o /tmp/pocket-potna-fme.zip
-          echo 'c3be93985feeb3cd3b9eaf47dd13f37fbb453042075c8729a9d07c0be399e2c4  /tmp/pocket-potna-fme.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/5467619d-71ca-4c58-8cbd-2098e62dcbe7-Pocket_Potna_FME_v1.9.0_DEVICE_HUB_SOURCE_FINAL.zip' -o /tmp/pocket-potna-fme.zip
+          echo '19c53a0efb6fbca5364d307f48fac5ade3b7f1b512a009018abb5f15d0d1b72b  /tmp/pocket-potna-fme.zip' | sha256sum -c -
           unzip -oq /tmp/pocket-potna-fme.zip -d .
           chmod +x gradlew
 
@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           grep -q 'applicationId = "com.flymaccin.pocketpotna"' app/build.gradle.kts
           grep -q 'versionName = "1.9.0"' app/build.gradle.kts
-          grep -q 'android.permission.QUERY_ALL_PACKAGES' app/src/main/AndroidManifest.xml
+          grep -q 'android.intent.category.LAUNCHER' app/src/main/AndroidManifest.xml
           grep -q 'AppLauncherActivity' app/src/main/AndroidManifest.xml
           grep -q 'MediaPlayerActivity' app/src/main/AndroidManifest.xml
           test -f app/src/main/java/com/flymaccin/bookwriter/AppLauncherActivity.java
