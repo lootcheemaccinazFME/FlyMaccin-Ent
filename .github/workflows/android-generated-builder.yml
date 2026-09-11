@@ -2,6 +2,10 @@ name: Pocket Potna Generated Android Builder
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/android-generated-builder.yml'
   schedule:
     - cron: '*/5 * * * *'
 
@@ -66,7 +70,7 @@ jobs:
           set -euo pipefail
           mkdir -p generated
           python - <<'PY'
-          import json, os, pathlib
+          import json, pathlib
           job=json.load(open('/tmp/job.json'))['job']
           root=pathlib.Path('generated').resolve()
           files=job['files']
