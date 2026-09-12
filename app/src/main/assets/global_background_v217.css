@@ -1,0 +1,76 @@
+/* FME_GLOBAL_BACKGROUND_V217 */
+:root {
+  --fme-global-bg-image: url("fme_qr_hub_bg.jpg");
+  --fme-global-bg-overlay: rgba(3, 0, 10, 0.58);
+  --fme-panel-glass: rgba(8, 3, 16, 0.72);
+}
+
+html, body {
+  min-height: 100%;
+  background-color: #050108 !important;
+}
+
+body {
+  background-image: linear-gradient(var(--fme-global-bg-overlay), var(--fme-global-bg-overlay)), var(--fme-global-bg-image) !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+}
+
+/* Keep the uploaded FME QR Hub visible behind every studio room while preserving readable controls. */
+body > :not(script):not(style):not(link) {
+  position: relative;
+  z-index: 1;
+}
+
+#app,
+#root,
+.app,
+.app-shell,
+.studio-shell,
+.workspace,
+.main-shell,
+.main-content,
+.page-shell,
+.bookwriter-shell,
+[class*="workspace"],
+[class*="studio-shell"],
+[class*="room-shell"] {
+  background-color: rgba(4, 1, 10, 0.30) !important;
+  background-image: none !important;
+}
+
+/* Existing cards stay legible without replacing the global artwork. */
+.panel,
+.card,
+.modal,
+.dialog,
+.drawer,
+.sidebar,
+.toolbar,
+.topbar,
+.bottom-bar,
+[class*="panel"],
+[class*="card"] {
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+input,
+textarea,
+select,
+button,
+pre,
+code,
+canvas {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 720px) {
+  body {
+    background-position: center top !important;
+    background-attachment: scroll !important;
+  }
+}
