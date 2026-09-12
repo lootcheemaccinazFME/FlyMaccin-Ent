@@ -1,0 +1,160 @@
+/* FME_GLOBAL_BACKGROUND_V218_VISIBLE */
+:root {
+  --fme-bg-glass-strong: rgba(5, 1, 12, 0.72);
+  --fme-bg-glass: rgba(5, 1, 12, 0.58);
+  --fme-bg-glass-light: rgba(5, 1, 12, 0.42);
+}
+
+html,
+body {
+  min-height: 100%;
+  background: transparent !important;
+}
+
+body {
+  position: relative;
+  isolation: isolate;
+}
+
+/* The artwork itself is a fixed UI layer, not merely a body paint that child shells can cover. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(1, 0, 5, 0.30), rgba(1, 0, 5, 0.44)),
+    url("fme_qr_hub_bg.jpg") !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+}
+
+body > :not(script):not(style):not(link) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Full-screen shells must stop painting solid black over the global art. */
+#app,
+#root,
+.app,
+.app-shell,
+.studio-shell,
+.workspace,
+.workspace-shell,
+.main-shell,
+.main-content,
+.page-shell,
+.page,
+.screen,
+.room,
+.room-shell,
+.bookwriter-shell,
+main,
+[class*="app-shell"],
+[class*="studio-shell"],
+[class*="workspace"],
+[class*="main-shell"],
+[class*="page-shell"],
+[class*="room-shell"],
+[class*="screen-shell"] {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Navigation and major chrome remain readable while clearly exposing the artwork. */
+header,
+footer,
+nav,
+.sidebar,
+.toolbar,
+.topbar,
+.bottom-bar,
+.bottom-nav,
+.tabbar,
+.tabs,
+[class*="sidebar"],
+[class*="toolbar"],
+[class*="topbar"],
+[class*="bottom"],
+[class*="nav"] {
+  background-color: var(--fme-bg-glass-strong) !important;
+  background-image: none !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+/* Cards/panels become real glass instead of opaque slabs. */
+section,
+article,
+aside,
+.panel,
+.card,
+.box,
+.tile,
+.module,
+.pane,
+.dialog,
+.drawer,
+.modal,
+[class*="panel"],
+[class*="card"],
+[class*="tile"],
+[class*="module"],
+[class*="pane"] {
+  background-color: var(--fme-bg-glass) !important;
+  background-image: none !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* Functional Core had its own full-screen opaque layers. Override those explicitly. */
+#fc-panel {
+  background: rgba(2, 0, 8, 0.34) !important;
+}
+#fc-panel .fc-shell {
+  background: var(--fme-bg-glass-strong) !important;
+}
+#fc-panel .fc-shell > header,
+#fc-panel .fc-shell section {
+  background: var(--fme-bg-glass) !important;
+}
+
+/* Keep controls themselves solid enough to use. */
+input,
+textarea,
+select,
+button,
+pre,
+code {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Canvases/media need their own rendering surfaces. */
+canvas,
+video,
+img,
+iframe,
+webview {
+  background-color: transparent;
+}
+
+@media (max-width: 720px) {
+  body::before {
+    background-position: center top !important;
+    background-size: cover !important;
+  }
+
+  section,
+  article,
+  aside,
+  .panel,
+  .card,
+  [class*="panel"],
+  [class*="card"] {
+    background-color: rgba(5, 1, 12, 0.54) !important;
+  }
+}
