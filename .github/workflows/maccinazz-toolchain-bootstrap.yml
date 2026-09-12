@@ -33,16 +33,14 @@ jobs:
         run: |
           rm -rf /tmp/maccin-warmup
           mkdir -p /tmp/maccin-warmup/app/src/main/java/com/flymaccin/warmup
-          mkdir -p /tmp/maccin-warmup/app/src/main
+          mkdir -p /tmp/maccin-warmup/app/src/main/res/values
           cat > /tmp/maccin-warmup/gradle.properties <<'EOF'
           android.useAndroidX=true
           android.nonTransitiveRClass=true
           org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
           EOF
           cat > /tmp/maccin-warmup/settings.gradle.kts <<'EOF'
-          pluginManagement {
-              repositories { google(); mavenCentral(); gradlePluginPortal() }
-          }
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories { google(); mavenCentral() }
@@ -102,7 +100,6 @@ jobs:
           cat > /tmp/maccin-warmup/app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:theme="@style/AppTheme"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>
           EOF
-          mkdir -p /tmp/maccin-warmup/app/src/main/res/values
           cat > /tmp/maccin-warmup/app/src/main/res/values/styles.xml <<'EOF'
           <resources><style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar"/></resources>
           EOF
@@ -119,33 +116,30 @@ jobs:
         working-directory: /tmp/maccin-warmup
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
-      - name: Package toolchain
+      - name: Package and split Gradle cache
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p /tmp/export/gradle /tmp/export/android-sdk /tmp/export/gradle-home
-          GRADLE_BIN="$(readlink -f "$(command -v gradle)")"
-          GRADLE_ROOT="$(cd "$(dirname "$GRADLE_BIN")/.." && pwd)"
-          tar -C "$(dirname "$GRADLE_ROOT")" -czf /tmp/export/gradle/gradle-8.9.tar.gz "$(basename "$GRADLE_ROOT")"
-          tar -C "$ANDROID_HOME" -czf /tmp/export/android-sdk/android-sdk35.tar.gz \
-            build-tools/35.0.0 platforms/android-35 platform-tools licenses
-          tar -C "$HOME/.gradle" -czf /tmp/export/gradle-home/gradle-cache.tar.gz caches
-          ls -lh /tmp/export/gradle/* /tmp/export/android-sdk/* /tmp/export/gradle-home/*
+          mkdir -p /tmp/export/cache
+          tar -C "$HOME/.gradle" -czf /tmp/export/cache/gradle-cache.tar.gz caches
+          split -b 300M -d -a 2 /tmp/export/cache/gradle-cache.tar.gz /tmp/export/cache/gradle-cache.part.
+          ls -lh /tmp/export/cache/gradle-cache.part.*
 
       - uses: actions/upload-artifact@v4
         with:
-          name: maccin-gradle-8.9
-          path: /tmp/export/gradle/gradle-8.9.tar.gz
+          name: maccin-gradle-cache-part-00
+          path: /tmp/export/cache/gradle-cache.part.00
           compression-level: 0
 
       - uses: actions/upload-artifact@v4
         with:
-          name: maccin-android-sdk35
-          path: /tmp/export/android-sdk/android-sdk35.tar.gz
+          name: maccin-gradle-cache-part-01
+          path: /tmp/export/cache/gradle-cache.part.01
           compression-level: 0
 
       - uses: actions/upload-artifact@v4
         with:
-          name: maccin-gradle-cache
-          path: /tmp/export/gradle-home/gradle-cache.tar.gz
+          name: maccin-gradle-cache-part-02
+          path: /tmp/export/cache/gradle-cache.part.02
           compression-level: 0
+          if-no-files-found: ignore
