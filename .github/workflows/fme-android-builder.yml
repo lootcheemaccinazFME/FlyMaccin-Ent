@@ -1,0 +1,65 @@
+name: FME Android Builder
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        required: true
+        type: string
+      build_path:
+        required: true
+        type: string
+      task:
+        required: true
+        default: assembleDebug
+        type: string
+      compile_sdk:
+        required: true
+        default: '35'
+        type: string
+      gradle_version:
+        required: true
+        default: '8.9'
+        type: string
+      java_version:
+        required: true
+        default: '17'
+        type: string
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java_version }}
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-${{ inputs.compile_sdk }}" "build-tools;35.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ inputs.gradle_version }}
+      - name: Build APK
+        working-directory: ${{ inputs.build_path }}
+        run: |
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew "${{ inputs.task }}" --stacktrace
+          else
+            gradle "${{ inputs.task }}" --stacktrace
+          fi
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          find "${{ inputs.build_path }}" -type f -name '*.apk' -exec cp {} out/ \;
+          test -n "$(find out -type f -name '*.apk' -print -quit)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fme-apk
+          path: out/*.apk
+          if-no-files-found: error
