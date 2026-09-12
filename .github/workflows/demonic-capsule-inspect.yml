@@ -1,0 +1,29 @@
+name: Inspect Demonic Source Capsule
+
+on:
+  push:
+    branches:
+      - release/demonic-v2.1.11
+    paths:
+      - '.github/workflows/demonic-capsule-inspect.yml'
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rehydrate capsule and report identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .pocket-potna/source.b64.part-* | base64 --decode > "$RUNNER_TEMP/pocket-source.zip"
+          unzip -tq "$RUNNER_TEMP/pocket-source.zip"
+          mkdir -p "$RUNNER_TEMP/src"
+          unzip -q "$RUNNER_TEMP/pocket-source.zip" -d "$RUNNER_TEMP/src"
+          echo '=== app/build.gradle.kts identity ==='
+          grep -E 'applicationId|compileSdk|targetSdk|versionCode|versionName' "$RUNNER_TEMP/src/app/build.gradle.kts" || true
+          echo '=== release workflow files ==='
+          find "$RUNNER_TEMP/src/.github/workflows" -maxdepth 1 -type f -printf '%f\n' 2>/dev/null || true
+          echo '=== top-level source markers ==='
+          ls -1 "$RUNNER_TEMP/src" | head -50
