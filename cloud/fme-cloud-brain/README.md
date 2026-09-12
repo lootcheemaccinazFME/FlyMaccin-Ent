@@ -31,6 +31,10 @@ Demonic AI Studio Hut / Pocket Potna
                          +--> vLLM + your selected open-weight model
 ```
 
+## Starter model profile
+
+The checked-in `.env.example` uses `Qwen/Qwen3-8B-AWQ` as the starter model. It is a compact 4-bit Qwen3 model with an Apache-2.0 model license and fits the first-stage goal better than beginning with a giant multi-GPU model. The model ID remains configurable and can be replaced without changing the gateway API.
+
 ## Required secrets
 
 Do not commit real credentials.
@@ -48,7 +52,7 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 ## Run on a GPU host
 
 1. Copy `.env.example` to `.env`.
-2. Set `MODEL_ID` to the exact model repository you are legally permitted to deploy.
+2. Keep the starter `MODEL_ID` or replace it with another model you are legally permitted to deploy.
 3. Set unique `FME_API_KEY` and `MODEL_API_KEY` values.
 4. Ensure Docker, Docker Compose, NVIDIA drivers, and NVIDIA Container Toolkit are installed.
 5. Start:
@@ -93,10 +97,21 @@ This repository intentionally does **not** contain a private signing key, cloud 
 
 The gateway is cloud-provider neutral. The same container can sit in front of a GPU on RunPod, a managed GPU VM, or another Docker-capable host. The app only needs the HTTPS endpoint and its `FME_API_KEY`.
 
+## Verification gates
+
+The GitHub Actions workflow checks:
+
+- Python dependency installation.
+- Python compile integrity.
+- Auth behavior.
+- FME library ingestion/search.
+- `/health` and `/v1/models` smoke behavior.
+- Docker image build.
+- Docker Compose configuration rendering.
+
 ## Next production gates
 
-- Select and license-check the exact open-weight model.
-- Pin the model image by version/digest for repeatable deployment.
+- Pin the vLLM image by version/digest for repeatable deployment.
 - Put the public API behind TLS and a reverse proxy/load balancer.
 - Add persistent encrypted backup for the FME library volume.
 - Add rate limits and structured audit logging.
