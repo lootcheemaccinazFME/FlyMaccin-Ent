@@ -17,7 +17,7 @@ on:
       - '.github/scripts/android_smoke_test_v218.sh'
       - 'app/src/main/assets/functional_v216.js'
       - 'app/src/main/assets/functional_v216.css'
-      - 'app/src/main/assets/fme_qr_hub_bg.jpg'
+      - 'app/src/main/assets/fme_qr_hub_bg.webp'
       - 'app/src/main/assets/global_background_v217.css'
       - 'app/src/main/assets/global_background_v218.css'
   workflow_dispatch:
@@ -76,10 +76,11 @@ jobs:
           grep -q 'global_background_v218.css' demonic-ai-studio-hut/app/src/main/assets/index.html
           grep -q '../global_background_v218.css' demonic-ai-studio-hut/app/src/main/assets/bookwriter/index.html
           grep -q 'FME_GLOBAL_BACKGROUND_V218_VISIBLE' demonic-ai-studio-hut/app/src/main/assets/global_background_v218.css
+          grep -q 'fme_qr_hub_bg.webp' demonic-ai-studio-hut/app/src/main/assets/global_background_v218.css
           grep -q 'body::before' demonic-ai-studio-hut/app/src/main/assets/global_background_v218.css
-          grep -q 'background-color: transparent !important' demonic-ai-studio-hut/app/src/main/assets/global_background_v218.css
           grep -q '#fc-panel' demonic-ai-studio-hut/app/src/main/assets/global_background_v218.css
-          test -s demonic-ai-studio-hut/app/src/main/assets/fme_qr_hub_bg.jpg
+          test -s demonic-ai-studio-hut/app/src/main/assets/fme_qr_hub_bg.webp
+          file demonic-ai-studio-hut/app/src/main/assets/fme_qr_hub_bg.webp | grep -qi 'Web/P\|WebP'
           grep -q 'requestAnimationFrame(gameLoop)' demonic-ai-studio-hut/app/src/main/assets/rooms_v215.js
           grep -q 'Demonic AI Studio Hut' demonic-ai-studio-hut/app/src/main/res/values/strings.xml
           grep -q 'android:supportsPictureInPicture="true"' demonic-ai-studio-hut/app/src/main/AndroidManifest.xml
@@ -92,11 +93,13 @@ jobs:
           APK='demonic-ai-studio-hut/app/build/outputs/apk/debug/app-debug.apk'
           test -s "$APK"
           unzip -t "$APK" >/dev/null
-          unzip -l "$APK" | grep -q 'assets/fme_qr_hub_bg.jpg'
+          unzip -l "$APK" | grep -q 'assets/fme_qr_hub_bg.webp'
+          unzip -p "$APK" assets/fme_qr_hub_bg.webp > packaged-fme-bg.webp
+          file packaged-fme-bg.webp | grep -qi 'Web/P\|WebP'
           unzip -l "$APK" | grep -q 'assets/global_background_v218.css'
           unzip -p "$APK" assets/global_background_v218.css > packaged-global-background-v218.css
           grep -q 'FME_GLOBAL_BACKGROUND_V218_VISIBLE' packaged-global-background-v218.css
-          grep -q 'body::before' packaged-global-background-v218.css
+          grep -q 'fme_qr_hub_bg.webp' packaged-global-background-v218.css
           unzip -p "$APK" assets/index.html | grep -q 'global_background_v218.css'
           unzip -p "$APK" assets/bookwriter/index.html | grep -q '../global_background_v218.css'
           cp "$APK" Demonic_AI_Studio_Hut_v2.1.8_VISIBLE_GLOBAL_BACKGROUND-debug.apk
