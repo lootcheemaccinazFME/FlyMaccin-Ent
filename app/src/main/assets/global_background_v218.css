@@ -2,13 +2,12 @@
 :root {
   --fme-bg-art:
     linear-gradient(rgba(1, 0, 5, 0.34), rgba(1, 0, 5, 0.48)),
-    url("fme_qr_hub_bg.jpg");
+    url("fme_qr_hub_bg.webp");
   --fme-bg-glass-strong: rgba(5, 1, 12, 0.72);
   --fme-bg-glass: rgba(5, 1, 12, 0.58);
   --fme-bg-glass-light: rgba(5, 1, 12, 0.42);
 }
 
-/* Put the art on every full-page paint surface. This avoids Android WebView's native canvas showing through. */
 html,
 body,
 #app,
@@ -42,7 +41,6 @@ body {
   isolation: isolate;
 }
 
-/* Fixed art layer remains behind scrolled content as a second line of defense. */
 body::before {
   content: "";
   position: fixed;
@@ -61,7 +59,6 @@ body > :not(script):not(style):not(link) {
   z-index: 1;
 }
 
-/* Unknown wrappers may fill the viewport, but they must not return to opaque black/gray. */
 [class*="app-shell"],
 [class*="studio-shell"],
 [class*="workspace"],
@@ -75,7 +72,6 @@ body > :not(script):not(style):not(link) {
   background-image: none !important;
 }
 
-/* Navigation and app chrome: dark glass, not solid slabs. */
 header,
 footer,
 nav,
@@ -98,7 +94,6 @@ nav,
   -webkit-backdrop-filter: blur(3px);
 }
 
-/* Cards and major work surfaces expose the art while preserving readable text. */
 section,
 article,
 aside,
@@ -131,7 +126,6 @@ aside,
   -webkit-backdrop-filter: blur(2px);
 }
 
-/* Functional Core, Studio OS, and Playable Rooms each had their own opaque full-screen layers. */
 #fc-panel,
 #dso-panel,
 #dr-panel {
@@ -153,7 +147,6 @@ aside,
   background: var(--fme-bg-glass) !important;
 }
 
-/* Keep actual controls solid enough to use. */
 input,
 textarea,
 select,
@@ -165,7 +158,6 @@ code {
   -webkit-backdrop-filter: none;
 }
 
-/* Canvases/media retain their own rendering surfaces. */
 canvas,
 video,
 img,
