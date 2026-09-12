@@ -1,0 +1,36 @@
+name: FME Cloud Brain CI
+
+on:
+  push:
+    branches:
+      - fme-cloud-brain-v0.1.0
+    paths:
+      - 'cloud/fme-cloud-brain/**'
+      - '.github/workflows/fme-cloud-brain-ci.yml'
+  pull_request:
+    paths:
+      - 'cloud/fme-cloud-brain/**'
+      - '.github/workflows/fme-cloud-brain-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud/fme-cloud-brain
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: cloud/fme-cloud-brain/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Python compile check
+        run: python -m py_compile main.py test_smoke.py
+      - name: API smoke tests
+        run: pytest -q test_smoke.py
+      - name: Docker build
+        run: docker build -t fme-cloud-brain:${{ github.sha }} .
