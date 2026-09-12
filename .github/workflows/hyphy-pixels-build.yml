@@ -1,0 +1,67 @@
+name: Hyphy Pixels APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ hyphy-pixels-apk-v01 ]
+    paths:
+      - 'Hyphy_Pixels_v0.1.0-source.zip'
+      - '.github/workflows/hyphy-pixels-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout game branch
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Unpack Hyphy Pixels source
+        run: |
+          rm -rf hyphy-pixels-source
+          unzip -q Hyphy_Pixels_v0.1.0-source.zip
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Lint game
+        working-directory: hyphy-pixels-source
+        run: gradle --no-daemon :app:lintDebug
+
+      - name: Build debug APK
+        working-directory: hyphy-pixels-source
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Package APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp hyphy-pixels-source/app/build/outputs/apk/debug/app-debug.apk Hyphy_Pixels_v0.1.0-debug.apk
+          sha256sum Hyphy_Pixels_v0.1.0-debug.apk > Hyphy_Pixels_v0.1.0-debug.apk.sha256
+
+      - name: Upload Hyphy Pixels APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hyphy-Pixels-v0.1.0-APK
+          path: |
+            Hyphy_Pixels_v0.1.0-debug.apk
+            Hyphy_Pixels_v0.1.0-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
