@@ -15,9 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      SOURCE_ZIP_URL: https://6695b8fc-4876-4314-857d-5c694b0de995.sandbox.floot.app/_cdn/static/51a717f5-436c-48d4-90b7-898cba6419e5-MaccinAzz_GameOS_Demonic_FME_Phase7_REPAIRED_R4.zip
+      SOURCE_ZIP_URL: https://6695b8fc-4876-4314-857d-5c694b0de995.sandbox.floot.app/_cdn/static/e92b37c5-a0d0-447f-9f92-956954e97aac-MaccinAzz_GameOS_Demonic_FME_Phase7_R7_COMPILER_GATE.zip
       EXPECTED_PACKAGE: com.flymaccin.creatoros
-      EXPECTED_VERSION: 0.7.0-phase7-merged
+      EXPECTED_VERSION: 0.7.0-phase7
     steps:
       - uses: actions/checkout@v4
 
@@ -38,13 +38,14 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Download exact merged Phase 7 source
+      - name: Download exact Phase 7 source
         shell: bash
         run: |
           set -euo pipefail
           curl -fL --retry 3 "$SOURCE_ZIP_URL" -o /tmp/phase7.zip
           test -s /tmp/phase7.zip
           unzip -tq /tmp/phase7.zip
+          rm -rf /tmp/phase7src
           mkdir -p /tmp/phase7src
           unzip -q /tmp/phase7.zip -d /tmp/phase7src
           root=$(find /tmp/phase7src -mindepth 1 -maxdepth 1 -type d | head -1)
@@ -66,33 +67,52 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Verify APK structure and metadata
+      - name: Collect APK
         if: steps.compile.outputs.code == '0'
         shell: bash
         run: |
           set -euo pipefail
           apk="$PROJECT_ROOT/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$apk"
+          cp "$apk" "$GITHUB_WORKSPACE/MaccinAzzOS-Phase7-debug.apk"
+
+      - name: Verify APK structure and metadata
+        if: steps.compile.outputs.code == '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$GITHUB_WORKSPACE/MaccinAzzOS-Phase7-debug.apk"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+          test -x "$ZIPALIGN"
+          test -s "$apk"
           unzip -tq "$apk"
-          aapt dump badging "$apk" | tee "$GITHUB_WORKSPACE/apk-badging.txt"
+          "$ZIPALIGN" -c -v 4 "$apk" | tee "$GITHUB_WORKSPACE/apk-zipalign.txt"
+          "$AAPT" dump badging "$apk" | tee "$GITHUB_WORKSPACE/apk-badging.txt"
           grep -F "package: name='$EXPECTED_PACKAGE'" "$GITHUB_WORKSPACE/apk-badging.txt"
           grep -F "versionName='$EXPECTED_VERSION'" "$GITHUB_WORKSPACE/apk-badging.txt"
-          aapt dump badging "$apk" | grep -q "launchable-activity:"
-          apksigner verify --verbose --print-certs "$apk" | tee "$GITHUB_WORKSPACE/apk-signature.txt"
+          grep -q "launchable-activity:" "$GITHUB_WORKSPACE/apk-badging.txt"
+          "$AAPT" dump xmltree "$apk" AndroidManifest.xml > "$GITHUB_WORKSPACE/apk-manifest.txt"
+          grep -q "android.intent.action.MAIN" "$GITHUB_WORKSPACE/apk-manifest.txt"
+          "$APKSIGNER" verify --verbose --print-certs "$apk" | tee "$GITHUB_WORKSPACE/apk-signature.txt"
           sha256sum "$apk" | tee "$GITHUB_WORKSPACE/apk-sha256.txt"
-          cp "$apk" "$GITHUB_WORKSPACE/MaccinAzzOS-Phase7-debug.apk"
 
       - name: Upload compiler evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase7-compiler-evidence
+          name: phase7-r7-compiler-evidence
           if-no-files-found: warn
           path: |
             build.log
             apk-badging.txt
+            apk-manifest.txt
             apk-signature.txt
             apk-sha256.txt
+            apk-zipalign.txt
             MaccinAzzOS-Phase7-debug.apk
             phase7-source-input.zip
 
