@@ -1,15 +1,50 @@
 /* FME_GLOBAL_BACKGROUND_V218_VISIBLE */
 :root {
-  --fme-bg-art:
-    linear-gradient(rgba(1, 0, 5, 0.34), rgba(1, 0, 5, 0.48)),
-    url("fme_qr_hub_bg.webp");
   --fme-bg-glass-strong: rgba(5, 1, 12, 0.72);
   --fme-bg-glass: rgba(5, 1, 12, 0.58);
   --fme-bg-glass-light: rgba(5, 1, 12, 0.42);
 }
 
 html,
-body,
+body {
+  min-height: 100%;
+  background: #050108 !important;
+}
+
+body {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Real image layer. Avoid CSS-background/WebView quirks entirely. */
+#fme-global-bg-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+  background: #050108 !important;
+}
+
+#fme-global-bg-layer img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center top !important;
+  opacity: 0.78 !important;
+  filter: saturate(1.08) contrast(1.04) brightness(0.82) !important;
+  background: transparent !important;
+}
+
+body > :not(script):not(style):not(link):not(#fme-global-bg-layer) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Full page shells must be transparent so the real image layer remains visible. */
 #app,
 #root,
 .app,
@@ -26,39 +61,7 @@ body,
 .room,
 .room-shell,
 .bookwriter-shell,
-main {
-  min-height: 100%;
-  background-color: #050108 !important;
-  background-image: var(--fme-bg-art) !important;
-  background-position: center top !important;
-  background-repeat: no-repeat !important;
-  background-size: cover !important;
-  background-attachment: fixed !important;
-}
-
-body {
-  position: relative;
-  isolation: isolate;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-color: #050108;
-  background-image: var(--fme-bg-art) !important;
-  background-position: center top !important;
-  background-repeat: no-repeat !important;
-  background-size: cover !important;
-}
-
-body > :not(script):not(style):not(link) {
-  position: relative;
-  z-index: 1;
-}
-
+main,
 [class*="app-shell"],
 [class*="studio-shell"],
 [class*="workspace"],
@@ -160,25 +163,12 @@ code {
 
 canvas,
 video,
-img,
 iframe,
 webview {
   background-color: transparent;
 }
 
 @media (max-width: 720px) {
-  html,
-  body,
-  #app,
-  #root,
-  .app,
-  .shell,
-  main {
-    background-position: center top !important;
-    background-size: cover !important;
-    background-attachment: scroll !important;
-  }
-
   section,
   article,
   aside,
