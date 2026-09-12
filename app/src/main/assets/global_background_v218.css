@@ -1,46 +1,21 @@
 /* FME_GLOBAL_BACKGROUND_V218_VISIBLE */
 :root {
+  --fme-bg-art:
+    linear-gradient(rgba(1, 0, 5, 0.34), rgba(1, 0, 5, 0.48)),
+    url("fme_qr_hub_bg.jpg");
   --fme-bg-glass-strong: rgba(5, 1, 12, 0.72);
   --fme-bg-glass: rgba(5, 1, 12, 0.58);
   --fme-bg-glass-light: rgba(5, 1, 12, 0.42);
 }
 
+/* Put the art on every full-page paint surface. This avoids Android WebView's native canvas showing through. */
 html,
-body {
-  min-height: 100%;
-  background: transparent !important;
-}
-
-body {
-  position: relative;
-  isolation: isolate;
-}
-
-/* The artwork itself is a fixed UI layer, not merely a body paint that child shells can cover. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(1, 0, 5, 0.30), rgba(1, 0, 5, 0.44)),
-    url("fme_qr_hub_bg.jpg") !important;
-  background-position: center top !important;
-  background-repeat: no-repeat !important;
-  background-size: cover !important;
-}
-
-body > :not(script):not(style):not(link) {
-  position: relative;
-  z-index: 1;
-}
-
-/* Full-screen shells must stop painting solid black over the global art. */
+body,
 #app,
 #root,
 .app,
 .app-shell,
+.shell,
 .studio-shell,
 .workspace,
 .workspace-shell,
@@ -52,19 +27,55 @@ body > :not(script):not(style):not(link) {
 .room,
 .room-shell,
 .bookwriter-shell,
-main,
+main {
+  min-height: 100%;
+  background-color: #050108 !important;
+  background-image: var(--fme-bg-art) !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+}
+
+body {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Fixed art layer remains behind scrolled content as a second line of defense. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: #050108;
+  background-image: var(--fme-bg-art) !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+}
+
+body > :not(script):not(style):not(link) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Unknown wrappers may fill the viewport, but they must not return to opaque black/gray. */
 [class*="app-shell"],
 [class*="studio-shell"],
 [class*="workspace"],
 [class*="main-shell"],
 [class*="page-shell"],
 [class*="room-shell"],
-[class*="screen-shell"] {
+[class*="screen-shell"],
+.content,
+[class*="content"] {
   background-color: transparent !important;
   background-image: none !important;
 }
 
-/* Navigation and major chrome remain readable while clearly exposing the artwork. */
+/* Navigation and app chrome: dark glass, not solid slabs. */
 header,
 footer,
 nav,
@@ -75,6 +86,7 @@ nav,
 .bottom-nav,
 .tabbar,
 .tabs,
+#dr-launchbar,
 [class*="sidebar"],
 [class*="toolbar"],
 [class*="topbar"],
@@ -86,7 +98,7 @@ nav,
   -webkit-backdrop-filter: blur(3px);
 }
 
-/* Cards/panels become real glass instead of opaque slabs. */
+/* Cards and major work surfaces expose the art while preserving readable text. */
 section,
 article,
 aside,
@@ -99,6 +111,15 @@ aside,
 .dialog,
 .drawer,
 .modal,
+.hero,
+.status,
+.bubble,
+.creatorTile,
+.creatorStation,
+.dawTrack,
+.timeline .bar,
+.dr-card,
+.lib-item,
 [class*="panel"],
 [class*="card"],
 [class*="tile"],
@@ -110,30 +131,41 @@ aside,
   -webkit-backdrop-filter: blur(2px);
 }
 
-/* Functional Core had its own full-screen opaque layers. Override those explicitly. */
-#fc-panel {
+/* Functional Core, Studio OS, and Playable Rooms each had their own opaque full-screen layers. */
+#fc-panel,
+#dso-panel,
+#dr-panel {
   background: rgba(2, 0, 8, 0.34) !important;
 }
-#fc-panel .fc-shell {
+
+#fc-panel .fc-shell,
+#dso-panel .dso-shell,
+#dr-panel .dr-shell {
   background: var(--fme-bg-glass-strong) !important;
 }
+
 #fc-panel .fc-shell > header,
-#fc-panel .fc-shell section {
+#fc-panel .fc-shell section,
+#dso-panel .dso-shell > header,
+#dso-panel .dso-shell section,
+#dr-panel .dr-shell > header,
+#dr-panel .dr-card {
   background: var(--fme-bg-glass) !important;
 }
 
-/* Keep controls themselves solid enough to use. */
+/* Keep actual controls solid enough to use. */
 input,
 textarea,
 select,
 button,
+.button,
 pre,
 code {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
-/* Canvases/media need their own rendering surfaces. */
+/* Canvases/media retain their own rendering surfaces. */
 canvas,
 video,
 img,
@@ -143,9 +175,16 @@ webview {
 }
 
 @media (max-width: 720px) {
-  body::before {
+  html,
+  body,
+  #app,
+  #root,
+  .app,
+  .shell,
+  main {
     background-position: center top !important;
     background-size: cover !important;
+    background-attachment: scroll !important;
   }
 
   section,
@@ -153,6 +192,8 @@ webview {
   aside,
   .panel,
   .card,
+  .hero,
+  .dr-card,
   [class*="panel"],
   [class*="card"] {
     background-color: rgba(5, 1, 12, 0.54) !important;
