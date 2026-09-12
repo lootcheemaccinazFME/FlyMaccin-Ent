@@ -34,3 +34,5 @@ jobs:
         run: pytest -q test_smoke.py
       - name: Docker build
         run: docker build -t fme-cloud-brain:${{ github.sha }} .
+      - name: Docker Compose config validation
+        run: cp .env.example .env && docker compose -f docker-compose.yml config > /tmp/fme-cloud-brain-compose.yml
