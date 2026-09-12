@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      SOURCE_ZIP_URL: https://6695b8fc-4876-4314-857d-5c694b0de995.sandbox.floot.app/_cdn/static/af278409-3d3b-4f8d-918c-27860a611b56-MaccinAzz_GameOS_Demonic_FME_Phase7_REPAIRED_R3.zip
+      SOURCE_ZIP_URL: https://6695b8fc-4876-4314-857d-5c694b0de995.sandbox.floot.app/_cdn/static/51a717f5-436c-48d4-90b7-898cba6419e5-MaccinAzz_GameOS_Demonic_FME_Phase7_REPAIRED_R4.zip
       EXPECTED_PACKAGE: com.flymaccin.creatoros
       EXPECTED_VERSION: 0.7.0-phase7-merged
     steps:
