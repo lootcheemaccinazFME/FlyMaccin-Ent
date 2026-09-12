@@ -34,6 +34,11 @@ jobs:
           rm -rf /tmp/maccin-warmup
           mkdir -p /tmp/maccin-warmup/app/src/main/java/com/flymaccin/warmup
           mkdir -p /tmp/maccin-warmup/app/src/main
+          cat > /tmp/maccin-warmup/gradle.properties <<'EOF'
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+          EOF
           cat > /tmp/maccin-warmup/settings.gradle.kts <<'EOF'
           pluginManagement {
               repositories { google(); mavenCentral(); gradlePluginPortal() }
