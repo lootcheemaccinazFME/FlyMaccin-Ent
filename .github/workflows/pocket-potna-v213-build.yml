@@ -1,15 +1,20 @@
-name: Pocket Potna v2.1.14 FME Visual Branding
+name: Pocket Potna v2.1.14 Canonical FME Release
+
 on:
   push:
     branches:
       - build/pocket-potna-v2.1.14-fme-visual
+
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      EXPECTED_FME_SIGNER_SHA256: 93bcafc7947054445eea0bb54492a9067996b100648d0136a838c2e1a310adbb
     steps:
       - name: Checkout build branch
         uses: actions/checkout@v4
@@ -33,7 +38,7 @@ jobs:
           mkdir pocket-potna-v2.1.14
           unzip -q pocket-potna-base.zip -d pocket-potna-v2.1.14
 
-      - name: Apply approved FME visual branding
+      - name: Apply approved FME visual branding and UMD-030 signing law
         run: |
           set -euo pipefail
           SRC="pocket-potna-v2.1.14"
@@ -60,85 +65,199 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import re
-          root=Path('pocket-potna-v2.1.14')
-          app=root/'app/src/main'
 
-          p=root/'app/build.gradle.kts'
-          s=p.read_text()
-          s=s.replace('versionCode = 223','versionCode = 224')
-          s=s.replace('versionName = "2.1.13"','versionName = "2.1.14"')
+          root = Path('pocket-potna-v2.1.14')
+          app = root / 'app/src/main'
+
+          p = root / 'app/build.gradle.kts'
+          s = p.read_text()
+          s = s.replace('versionCode = 223', 'versionCode = 224')
+          s = s.replace('versionName = "2.1.13"', 'versionName = "2.1.14"')
+
+          old_signing = '''    signingConfigs {
+        create("release") {
+            val storePath = System.getenv("FME_KEYSTORE_PATH")
+            if (!storePath.isNullOrBlank()) {
+                storeFile = file(storePath)
+                storePassword = System.getenv("FME_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("FME_KEY_ALIAS")
+                keyPassword = System.getenv("FME_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        debug { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            if (!System.getenv("FME_KEYSTORE_PATH").isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+'''
+          new_signing = '''    val releaseTaskRequested = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+    fun requiredReleaseEnv(name: String): String {
+        val value = System.getenv(name)?.trim().orEmpty()
+        if (releaseTaskRequested && value.isBlank()) {
+            throw GradleException("UMD-030 BLOCKED: missing required release signing input: $name")
+        }
+        return value
+    }
+
+    signingConfigs {
+        create("release") {
+            val storePath = requiredReleaseEnv("FME_KEYSTORE_PATH")
+            if (releaseTaskRequested) {
+                val keyFile = file(storePath)
+                if (!keyFile.isFile) {
+                    throw GradleException("UMD-030 BLOCKED: FME release keystore file is unavailable")
+                }
+                storeFile = keyFile
+                storePassword = requiredReleaseEnv("FME_KEYSTORE_PASSWORD")
+                keyAlias = requiredReleaseEnv("FME_KEY_ALIAS")
+                keyPassword = requiredReleaseEnv("FME_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        debug { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+'''
+          if old_signing not in s:
+              raise SystemExit('Expected signing block not found; refusing unsafe patch')
+          s = s.replace(old_signing, new_signing)
           p.write_text(s)
 
-          for rel in ['res/values/themes.xml','res/values/persona_os_theme.xml']:
-              p=app/rel
-              s=p.read_text()
+          for rel in ['res/values/themes.xml', 'res/values/persona_os_theme.xml']:
+              p = app / rel
+              s = p.read_text()
               if '<item name="android:windowBackground">' in s:
-                  s=re.sub(r'<item name="android:windowBackground">.*?</item>', '<item name="android:windowBackground">@drawable/app_window_background</item>', s)
+                  s = re.sub(r'<item name="android:windowBackground">.*?</item>', '<item name="android:windowBackground">@drawable/app_window_background</item>', s)
               else:
-                  s=s.replace('</style>', '        <item name="android:windowBackground">@drawable/app_window_background</item>\n    </style>')
+                  s = s.replace('</style>', '        <item name="android:windowBackground">@drawable/app_window_background</item>\n    </style>')
               p.write_text(s)
 
-          p=app/'assets/styles.css'
-          s=p.read_text()+'''\n\n/* FME v2.1.14 approved Nulli Secundus app wallpaper */\nhtml{background:#090a0d}\nbody{background-image:linear-gradient(rgba(5,3,10,.58),rgba(5,3,10,.78)),url("fme_app_background.jpg");background-position:center top;background-size:cover;background-repeat:no-repeat;background-attachment:fixed}\nheader{background:rgba(9,10,13,.88)}\nnav{background:rgba(13,16,22,.92);backdrop-filter:blur(14px)}\n.card{background:linear-gradient(180deg,rgba(23,27,36,.91),rgba(17,20,27,.91));backdrop-filter:blur(8px)}\n.hero{background:radial-gradient(circle at 80% 0%,#40206b77,transparent 40%),linear-gradient(135deg,rgba(21,24,36,.90),rgba(13,17,24,.90));backdrop-filter:blur(8px)}\n'''
-          p.write_text(s)
+          p = app / 'assets/styles.css'
+          p.write_text(p.read_text() + '''\n\n/* FME v2.1.14 approved Nulli Secundus app wallpaper */\nhtml{background:#090a0d}\nbody{background-image:linear-gradient(rgba(5,3,10,.58),rgba(5,3,10,.78)),url("fme_app_background.jpg");background-position:center top;background-size:cover;background-repeat:no-repeat;background-attachment:fixed}\nheader{background:rgba(9,10,13,.88)}\nnav{background:rgba(13,16,22,.92);backdrop-filter:blur(14px)}\n.card{background:linear-gradient(180deg,rgba(23,27,36,.91),rgba(17,20,27,.91));backdrop-filter:blur(8px)}\n.hero{background:radial-gradient(circle at 80% 0%,#40206b77,transparent 40%),linear-gradient(135deg,rgba(21,24,36,.90),rgba(13,17,24,.90));backdrop-filter:blur(8px)}\n''')
 
-          p=app/'assets/bookwriter/styles.css'
-          s=p.read_text()+'''\n\n/* FME v2.1.14 approved Nulli Secundus app wallpaper */\nbody{background-image:linear-gradient(rgba(6,4,11,.72),rgba(6,4,11,.84)),url("../fme_app_background.jpg");background-position:center top;background-size:cover;background-repeat:no-repeat;background-attachment:fixed}\nheader{background:rgba(17,19,26,.92);backdrop-filter:blur(12px)}\nnav{background:rgba(14,16,21,.92);backdrop-filter:blur(12px)}\n.panel,.planCard,.stageCard,.card,.houseRoomCard,.housePatternCard{backdrop-filter:blur(8px)}\n'''
-          p.write_text(s)
+          p = app / 'assets/bookwriter/styles.css'
+          p.write_text(p.read_text() + '''\n\n/* FME v2.1.14 approved Nulli Secundus app wallpaper */\nbody{background-image:linear-gradient(rgba(6,4,11,.72),rgba(6,4,11,.84)),url("../fme_app_background.jpg");background-position:center top;background-size:cover;background-repeat:no-repeat;background-attachment:fixed}\nheader{background:rgba(17,19,26,.92);backdrop-filter:blur(12px)}\nnav{background:rgba(14,16,21,.92);backdrop-filter:blur(12px)}\n.panel,.planCard,.stageCard,.card,.houseRoomCard,.housePatternCard{backdrop-filter:blur(8px)}\n''')
 
-          p=app/'java/com/flymaccin/creatoros/app/CreatorOsApp.kt'
-          s=p.read_text()
-          s=s.replace('import androidx.compose.foundation.background\n','import androidx.compose.foundation.Image\nimport androidx.compose.foundation.background\n')
-          s=s.replace('import androidx.compose.ui.Modifier\n','import androidx.compose.ui.Modifier\nimport androidx.compose.ui.layout.ContentScale\nimport androidx.compose.ui.res.painterResource\n')
-          s=s.replace('import com.flymaccin.creatoros.CreatorOsApplication\n','import com.flymaccin.creatoros.CreatorOsApplication\nimport com.flymaccin.bookwriter.R\n')
-          old='        BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF0D0D11))) {'
-          new='''        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {\n            Image(\n                painter = painterResource(id = R.drawable.fme_app_background),\n                contentDescription = null,\n                modifier = Modifier.fillMaxSize(),\n                contentScale = ContentScale.Crop,\n                alpha = 0.46f\n            )\n            Box(modifier = Modifier.fillMaxSize().background(Color(0x990D0D11)))\n'''
+          p = app / 'java/com/flymaccin/creatoros/app/CreatorOsApp.kt'
+          s = p.read_text()
+          s = s.replace('import androidx.compose.foundation.background\n', 'import androidx.compose.foundation.Image\nimport androidx.compose.foundation.background\n')
+          s = s.replace('import androidx.compose.ui.Modifier\n', 'import androidx.compose.ui.Modifier\nimport androidx.compose.ui.layout.ContentScale\nimport androidx.compose.ui.res.painterResource\n')
+          s = s.replace('import com.flymaccin.creatoros.CreatorOsApplication\n', 'import com.flymaccin.creatoros.CreatorOsApplication\nimport com.flymaccin.bookwriter.R\n')
+          old = '        BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF0D0D11))) {'
+          new = '''        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {\n            Image(\n                painter = painterResource(id = R.drawable.fme_app_background),\n                contentDescription = null,\n                modifier = Modifier.fillMaxSize(),\n                contentScale = ContentScale.Crop,\n                alpha = 0.46f\n            )\n            Box(modifier = Modifier.fillMaxSize().background(Color(0x990D0D11)))\n'''
           if old not in s:
-              raise SystemExit('CreatorOs root marker not found')
-          s=s.replace(old,new)
-          s=s.replace('containerColor = Color(0xFF0D0D11)','containerColor = Color.Transparent',1)
+              raise SystemExit('CreatorOS root marker not found')
+          s = s.replace(old, new)
+          s = s.replace('containerColor = Color(0xFF0D0D11)', 'containerColor = Color.Transparent', 1)
           p.write_text(s)
 
-          (root/'V2_1_14_VISUAL_BRANDING_AUDIT.md').write_text('''# Pocket Potna v2.1.14 Visual Branding Audit\n\nStatus: APPROVED / ADDED / APPLIED\n\n- versionCode: 224\n- versionName: 2.1.14\n- Approved Nulli Secundus green/purple FME portrait installed as the app wallpaper.\n- Approved square Nulli Secundus FME lion artwork installed as the launcher icon.\n- Main WebView, Bookwriter shell, CreatorOS root shell, and Android window background updated.\n- Existing ChatGPT gateway, OAuth/MCP, Keystore relay, and application logic preserved.\n''')
+          (root / 'V2_1_14_CANONICAL_RELEASE_AUDIT.md').write_text('''# Pocket Potna v2.1.14 Canonical Release Audit\n\nStatus: UMD-030 ENFORCED\n\n- versionCode: 224\n- versionName: 2.1.14\n- Approved FME background and launcher icon applied.\n- ChatGPT OAuth/MCP and Keystore relay bridge preserved.\n- Release tasks fail closed without the private FME release keystore and credentials.\n- Canonical signer fingerprint must match before artifact promotion.\n''')
           PY
 
-      - name: Verify v2.1.14 visual branding source
+      - name: Verify patched source before secrets are touched
         run: |
           set -euo pipefail
           SRC="pocket-potna-v2.1.14"
           grep -q 'versionCode = 224' "$SRC/app/build.gradle.kts"
           grep -q 'versionName = "2.1.14"' "$SRC/app/build.gradle.kts"
+          grep -q 'UMD-030 BLOCKED' "$SRC/app/build.gradle.kts"
           grep -q 'requestChatGPTConnectorCode' "$SRC/app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java"
           grep -q 'fme_app_background.jpg' "$SRC/app/src/main/assets/styles.css"
           grep -q 'R.drawable.fme_app_background' "$SRC/app/src/main/java/com/flymaccin/creatoros/app/CreatorOsApp.kt"
           test -s "$SRC/app/src/main/res/drawable/ic_launcher.png"
           test -s "$SRC/app/src/main/assets/fme_app_background.jpg"
-          python - <<'PY'
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
-          root=Path('pocket-potna-v2.1.14/app/src/main')
-          ET.parse(root/'AndroidManifest.xml')
-          for p in (root/'res').rglob('*.xml'):
-              ET.parse(p)
-          print('XML validation PASS')
-          PY
 
-      - name: Build debug APK
+      - name: Validate protected production secrets
+        env:
+          FME_RELEASE_KEYSTORE_BASE64: ${{ secrets.FME_RELEASE_KEYSTORE_BASE64 }}
+          FME_KEYSTORE_PASSWORD: ${{ secrets.FME_KEYSTORE_PASSWORD }}
+          FME_KEY_ALIAS: ${{ secrets.FME_KEY_ALIAS }}
+          FME_KEY_PASSWORD: ${{ secrets.FME_KEY_PASSWORD }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          for v in FME_RELEASE_KEYSTORE_BASE64 FME_KEYSTORE_PASSWORD FME_KEY_ALIAS FME_KEY_PASSWORD GOOGLE_WEB_CLIENT_ID; do
+            test -n "${!v:-}" || { echo "UMD-030 BLOCKED: missing protected secret $v"; exit 1; }
+          done
+          printf '%s' "$FME_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/fme-release.jks"
+          chmod 600 "$RUNNER_TEMP/fme-release.jks"
+          test -s "$RUNNER_TEMP/fme-release.jks"
+
+      - name: Validate canonical keystore certificate before build
+        env:
+          FME_KEYSTORE_PASSWORD: ${{ secrets.FME_KEYSTORE_PASSWORD }}
+          FME_KEY_ALIAS: ${{ secrets.FME_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          ACTUAL=$(keytool -list -v -keystore "$RUNNER_TEMP/fme-release.jks" -storepass "$FME_KEYSTORE_PASSWORD" -alias "$FME_KEY_ALIAS" 2>/dev/null | sed -n 's/^SHA256: //p' | tr -d ':' | tr '[:upper:]' '[:lower:]' | head -1)
+          test -n "$ACTUAL"
+          test "$ACTUAL" = "$EXPECTED_FME_SIGNER_SHA256" || { echo "UMD-030 BLOCKED: signer fingerprint mismatch"; exit 1; }
+
+      - name: Lint, unit test, build signed APK and AAB
         working-directory: pocket-potna-v2.1.14
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          FME_KEYSTORE_PATH: ${{ runner.temp }}/fme-release.jks
+          FME_KEYSTORE_PASSWORD: ${{ secrets.FME_KEYSTORE_PASSWORD }}
+          FME_KEY_ALIAS: ${{ secrets.FME_KEY_ALIAS }}
+          FME_KEY_PASSWORD: ${{ secrets.FME_KEY_PASSWORD }}
         run: |
           chmod +x ./gradlew
-          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+          ./gradlew --no-daemon :app:lintRelease :app:testReleaseUnitTest :app:assembleRelease :app:bundleRelease
 
-      - name: Collect APK and hashes
+      - name: Verify release artifact identity, signer and alignment
         run: |
-          mkdir -p out
-          cp pocket-potna-v2.1.14/app/build/outputs/apk/debug/*.apk out/Pocket_Potna_v2.1.14_FME_VISUAL_BRANDING_DEBUG.apk
-          sha256sum out/*.apk | tee out/SHA256SUMS.txt
-          cp pocket-potna-v2.1.14/V2_1_14_VISUAL_BRANDING_AUDIT.md out/
+          set -euo pipefail
+          SRC="pocket-potna-v2.1.14"
+          APK="$SRC/app/build/outputs/apk/release/app-release.apk"
+          AAB="$SRC/app/build/outputs/bundle/release/app-release.aab"
+          test -s "$APK"
+          test -s "$AAB"
+          BADGING=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | head -1)
+          echo "$BADGING" | grep -q "name='com.flymaccin.pocketpotna'"
+          echo "$BADGING" | grep -q "versionCode='224'"
+          echo "$BADGING" | grep -q "versionName='2.1.14'"
+          ACTUAL=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]' | head -1)
+          test "$ACTUAL" = "$EXPECTED_FME_SIGNER_SHA256" || { echo "UMD-030 BLOCKED: final APK signer mismatch"; exit 1; }
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 "$APK"
+          unzip -tq "$APK"
+          unzip -tq "$AAB"
 
-      - name: Upload APK artifact
+      - name: Collect canonical release receipts
+        run: |
+          set -euo pipefail
+          SRC="pocket-potna-v2.1.14"
+          mkdir -p out
+          cp "$SRC/app/build/outputs/apk/release/app-release.apk" out/Pocket_Potna_v2.1.14_FME_CANONICAL_RELEASE.apk
+          cp "$SRC/app/build/outputs/bundle/release/app-release.aab" out/Pocket_Potna_v2.1.14_FME_CANONICAL_RELEASE.aab
+          cp "$SRC/V2_1_14_CANONICAL_RELEASE_AUDIT.md" out/
+          sha256sum out/*.apk out/*.aab | tee out/SHA256SUMS.txt
+          {
+            echo 'release_status=PASS'
+            echo 'package=com.flymaccin.pocketpotna'
+            echo 'versionName=2.1.14'
+            echo 'versionCode=224'
+            echo "signer_sha256=$EXPECTED_FME_SIGNER_SHA256"
+          } > out/RELEASE_ACCEPTANCE.txt
+
+      - name: Upload canonical release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Pocket-Potna-v2.1.14-FME-Visual-Branding-APK
+          name: Pocket-Potna-v2.1.14-FME-Canonical-Release
           path: out/*
           if-no-files-found: error
