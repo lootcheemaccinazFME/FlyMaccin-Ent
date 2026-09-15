@@ -1,4 +1,4 @@
-name: Pocket Potna v2.1.13 ChatGPT Gateway
+name: Pocket Potna v2.1.14 FME Visual Branding
 on:
   push:
     branches:
@@ -13,42 +13,132 @@ jobs:
     steps:
       - name: Checkout build branch
         uses: actions/checkout@v4
+
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Install Android SDK 36
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" "platform-tools"
-      - name: Fetch exact Pocket Potna v2.1.13 source archive
+
+      - name: Fetch verified Pocket Potna v2.1.13 base source
         run: |
           curl --fail --location --retry 3 \
             "https://fme-android-compiler.floot.app/_cdn/static/80744c91-9e6f-4f4d-be8b-eedac233be9c-Pocket_Potna_v2.1.13_CHATGPT_GATEWAY_SOURCE.zip" \
-            --output pocket-potna-v2.1.13.zip
-          mkdir pocket-potna-v2.1.13
-          unzip -q pocket-potna-v2.1.13.zip -d pocket-potna-v2.1.13
-      - name: Verify source identity
+            --output pocket-potna-base.zip
+          mkdir pocket-potna-v2.1.14
+          unzip -q pocket-potna-base.zip -d pocket-potna-v2.1.14
+
+      - name: Apply approved FME visual branding
         run: |
-          grep -q 'versionCode = 223' pocket-potna-v2.1.13/app/build.gradle.kts
-          grep -q 'versionName = "2.1.13"' pocket-potna-v2.1.13/app/build.gradle.kts
-          grep -q 'requestChatGPTConnectorCode' pocket-potna-v2.1.13/app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+          set -euo pipefail
+          SRC="pocket-potna-v2.1.14"
+          mkdir -p "$SRC/app/src/main/res/drawable-nodpi"
+          cp build-assets/fme_v214_background.jpg "$SRC/app/src/main/assets/fme_app_background.jpg"
+          cp build-assets/fme_v214_background.jpg "$SRC/app/src/main/res/drawable-nodpi/fme_app_background.jpg"
+          rm -f "$SRC/app/src/main/res/drawable/ic_launcher.xml"
+          cp build-assets/fme_v214_icon.png "$SRC/app/src/main/res/drawable/ic_launcher.png"
+
+          cat > "$SRC/app/src/main/res/drawable/app_window_background.xml" <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item>
+                  <bitmap android:src="@drawable/fme_app_background" android:gravity="fill" />
+              </item>
+              <item>
+                  <shape android:shape="rectangle">
+                      <solid android:color="#66000000" />
+                  </shape>
+              </item>
+          </layer-list>
+          XML
+
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          root=Path('pocket-potna-v2.1.14')
+          app=root/'app/src/main'
+
+          p=root/'app/build.gradle.kts'
+          s=p.read_text()
+          s=s.replace('versionCode = 223','versionCode = 224')
+          s=s.replace('versionName = "2.1.13"','versionName = "2.1.14"')
+          p.write_text(s)
+
+          for rel in ['res/values/themes.xml','res/values/persona_os_theme.xml']:
+              p=app/rel
+              s=p.read_text()
+              if '<item name="android:windowBackground">' in s:
+                  s=re.sub(r'<item name="android:windowBackground">.*?</item>', '<item name="android:windowBackground">@drawable/app_window_background</item>', s)
+              else:
+                  s=s.replace('</style>', '        <item name="android:windowBackground">@drawable/app_window_background</item>\n    </style>')
+              p.write_text(s)
+
+          p=app/'assets/styles.css'
+          s=p.read_text()+'''\n\n/* FME v2.1.14 approved Nulli Secundus app wallpaper */\nhtml{background:#090a0d}\nbody{background-image:linear-gradient(rgba(5,3,10,.58),rgba(5,3,10,.78)),url("fme_app_background.jpg");background-position:center top;background-size:cover;background-repeat:no-repeat;background-attachment:fixed}\nheader{background:rgba(9,10,13,.88)}\nnav{background:rgba(13,16,22,.92);backdrop-filter:blur(14px)}\n.card{background:linear-gradient(180deg,rgba(23,27,36,.91),rgba(17,20,27,.91));backdrop-filter:blur(8px)}\n.hero{background:radial-gradient(circle at 80% 0%,#40206b77,transparent 40%),linear-gradient(135deg,rgba(21,24,36,.90),rgba(13,17,24,.90));backdrop-filter:blur(8px)}\n'''
+          p.write_text(s)
+
+          p=app/'assets/bookwriter/styles.css'
+          s=p.read_text()+'''\n\n/* FME v2.1.14 approved Nulli Secundus app wallpaper */\nbody{background-image:linear-gradient(rgba(6,4,11,.72),rgba(6,4,11,.84)),url("../fme_app_background.jpg");background-position:center top;background-size:cover;background-repeat:no-repeat;background-attachment:fixed}\nheader{background:rgba(17,19,26,.92);backdrop-filter:blur(12px)}\nnav{background:rgba(14,16,21,.92);backdrop-filter:blur(12px)}\n.panel,.planCard,.stageCard,.card,.houseRoomCard,.housePatternCard{backdrop-filter:blur(8px)}\n'''
+          p.write_text(s)
+
+          p=app/'java/com/flymaccin/creatoros/app/CreatorOsApp.kt'
+          s=p.read_text()
+          s=s.replace('import androidx.compose.foundation.background\n','import androidx.compose.foundation.Image\nimport androidx.compose.foundation.background\n')
+          s=s.replace('import androidx.compose.ui.Modifier\n','import androidx.compose.ui.Modifier\nimport androidx.compose.ui.layout.ContentScale\nimport androidx.compose.ui.res.painterResource\n')
+          s=s.replace('import com.flymaccin.creatoros.CreatorOsApplication\n','import com.flymaccin.creatoros.CreatorOsApplication\nimport com.flymaccin.bookwriter.R\n')
+          old='        BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF0D0D11))) {'
+          new='''        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {\n            Image(\n                painter = painterResource(id = R.drawable.fme_app_background),\n                contentDescription = null,\n                modifier = Modifier.fillMaxSize(),\n                contentScale = ContentScale.Crop,\n                alpha = 0.46f\n            )\n            Box(modifier = Modifier.fillMaxSize().background(Color(0x990D0D11)))\n'''
+          if old not in s:
+              raise SystemExit('CreatorOs root marker not found')
+          s=s.replace(old,new)
+          s=s.replace('containerColor = Color(0xFF0D0D11)','containerColor = Color.Transparent',1)
+          p.write_text(s)
+
+          (root/'V2_1_14_VISUAL_BRANDING_AUDIT.md').write_text('''# Pocket Potna v2.1.14 Visual Branding Audit\n\nStatus: APPROVED / ADDED / APPLIED\n\n- versionCode: 224\n- versionName: 2.1.14\n- Approved Nulli Secundus green/purple FME portrait installed as the app wallpaper.\n- Approved square Nulli Secundus FME lion artwork installed as the launcher icon.\n- Main WebView, Bookwriter shell, CreatorOS root shell, and Android window background updated.\n- Existing ChatGPT gateway, OAuth/MCP, Keystore relay, and application logic preserved.\n''')
+          PY
+
+      - name: Verify v2.1.14 visual branding source
+        run: |
+          set -euo pipefail
+          SRC="pocket-potna-v2.1.14"
+          grep -q 'versionCode = 224' "$SRC/app/build.gradle.kts"
+          grep -q 'versionName = "2.1.14"' "$SRC/app/build.gradle.kts"
+          grep -q 'requestChatGPTConnectorCode' "$SRC/app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java"
+          grep -q 'fme_app_background.jpg' "$SRC/app/src/main/assets/styles.css"
+          grep -q 'R.drawable.fme_app_background' "$SRC/app/src/main/java/com/flymaccin/creatoros/app/CreatorOsApp.kt"
+          test -s "$SRC/app/src/main/res/drawable/ic_launcher.png"
+          test -s "$SRC/app/src/main/assets/fme_app_background.jpg"
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          root=Path('pocket-potna-v2.1.14/app/src/main')
+          ET.parse(root/'AndroidManifest.xml')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          print('XML validation PASS')
+          PY
+
       - name: Build debug APK
-        working-directory: pocket-potna-v2.1.13
+        working-directory: pocket-potna-v2.1.14
         run: |
           chmod +x ./gradlew
           ./gradlew :app:assembleDebug --stacktrace --no-daemon
+
       - name: Collect APK and hashes
         run: |
           mkdir -p out
-          cp pocket-potna-v2.1.13/app/build/outputs/apk/debug/*.apk out/
+          cp pocket-potna-v2.1.14/app/build/outputs/apk/debug/*.apk out/Pocket_Potna_v2.1.14_FME_VISUAL_BRANDING_DEBUG.apk
           sha256sum out/*.apk | tee out/SHA256SUMS.txt
+          cp pocket-potna-v2.1.14/V2_1_14_VISUAL_BRANDING_AUDIT.md out/
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Pocket-Potna-v2.1.13-ChatGPT-Gateway-APK
+          name: Pocket-Potna-v2.1.14-FME-Visual-Branding-APK
           path: out/*
           if-no-files-found: error
