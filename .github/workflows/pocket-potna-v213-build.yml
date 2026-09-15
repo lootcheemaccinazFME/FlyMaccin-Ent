@@ -1,0 +1,51 @@
+name: Pocket Potna v2.1.13 ChatGPT Gateway
+on:
+  push:
+    branches:
+      - build/pocket-potna-v2.1.13-chatgpt-gateway
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout build branch
+        uses: actions/checkout@v4
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;35.0.0" "platform-tools"
+      - name: Fetch exact Pocket Potna v2.1.13 source archive
+        run: |
+          curl --fail --location --retry 3 \
+            "https://fme-android-compiler.floot.app/_cdn/static/80744c91-9e6f-4f4d-be8b-eedac233be9c-Pocket_Potna_v2.1.13_CHATGPT_GATEWAY_SOURCE.zip" \
+            --output pocket-potna-v2.1.13.zip
+          mkdir pocket-potna-v2.1.13
+          unzip -q pocket-potna-v2.1.13.zip -d pocket-potna-v2.1.13
+      - name: Verify source identity
+        run: |
+          grep -q 'versionCode = 223' pocket-potna-v2.1.13/app/build.gradle.kts
+          grep -q 'versionName = "2.1.13"' pocket-potna-v2.1.13/app/build.gradle.kts
+          grep -q 'requestChatGPTConnectorCode' pocket-potna-v2.1.13/app/src/main/java/com/flymaccin/bookwriter/BookwriterBridge.java
+      - name: Build debug APK
+        working-directory: pocket-potna-v2.1.13
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+      - name: Collect APK and hashes
+        run: |
+          mkdir -p out
+          cp pocket-potna-v2.1.13/app/build/outputs/apk/debug/*.apk out/
+          sha256sum out/*.apk | tee out/SHA256SUMS.txt
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pocket-Potna-v2.1.13-ChatGPT-Gateway-APK
+          path: out/*
+          if-no-files-found: error
