@@ -2,7 +2,7 @@ name: Pocket Potna v2.1.14 FME Visual Branding
 on:
   push:
     branches:
-      - build/pocket-potna-v2.1.13-chatgpt-gateway
+      - build/pocket-potna-v2.1.14-fme-visual
 jobs:
   build:
     runs-on: ubuntu-latest
