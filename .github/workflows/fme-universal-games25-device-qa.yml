@@ -41,17 +41,19 @@ jobs:
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           printf 'file\tpackage\tversionCode\tversionName\tsignature\tzip\n' > out/static.tsv
-          while IFS= read -r -d '' apk; do
+          mapfile -d '' APKS < <(find input/game-apks -type f -name '*.apk' -print0 | sort -z)
+          test "${#APKS[@]}" -eq 25
+          for apk in "${APKS[@]}"; do
             f=$(basename "$apk")
             unzip -tq "$apk" >/dev/null
             "$APKSIGNER" verify --verbose "$apk" >/dev/null
-            b=$($AAPT dump badging "$apk" | head -1)
+            b=$($AAPT dump badging "$apk" | sed -n '1p')
             pkg=$(printf '%s\n' "$b" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
             vc=$(printf '%s\n' "$b" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
             vn=$(printf '%s\n' "$b" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
             test -n "$pkg"
             printf '%s\t%s\t%s\t%s\tPASS\tPASS\n' "$f" "$pkg" "$vc" "$vn" >> out/static.tsv
-          done < <(find input/game-apks -type f -name '*.apk' -print0 | sort -z)
+          done
       - name: Prepare Android 36 AVD
         shell: bash
         run: |
@@ -80,30 +82,32 @@ jobs:
           test "$READY" = 1
           printf 'file\tpackage\tinstall\tresolve\tlaunch\tprocess\tfatal\tresult\n' > out/runtime.tsv
           FAIL=0; PASS=0
-          while IFS= read -r -d '' apk; do
+          mapfile -d '' APKS < <(find input/game-apks -type f -name '*.apk' -print0 | sort -z)
+          test "${#APKS[@]}" -eq 25
+          for apk in "${APKS[@]}"; do
             f=$(basename "$apk")
-            pkg=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -1 | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            pkg=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | sed -n '1p' | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
             install=PASS; resolve=PASS; launch=PASS; process=PASS; fatal=NONE; result=PASS
-            adb uninstall "$pkg" >/dev/null 2>&1 || true
-            if ! timeout 60 adb install "$apk" > "out/${f}.install.txt" 2>&1; then install=FAIL; resolve=SKIP; launch=SKIP; process=SKIP; fatal=NA; result=FAIL
+            adb uninstall "$pkg" </dev/null >/dev/null 2>&1 || true
+            if ! timeout 60 adb install "$apk" </dev/null > "out/${f}.install.txt" 2>&1; then install=FAIL; resolve=SKIP; launch=SKIP; process=SKIP; fatal=NA; result=FAIL
             else
-              comp=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$pkg" 2>/dev/null | tr -d '\r' | tail -1)
+              comp=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$pkg" </dev/null 2>/dev/null | tr -d '\r' | tail -1)
               if [ -z "$comp" ] || [[ "$comp" == *'No activity found'* ]]; then resolve=FAIL; launch=SKIP; process=SKIP; result=FAIL
               else
-                adb logcat -c
-                timeout 30 adb shell am start -W -n "$comp" > "out/${f}.launch.txt" 2>&1 || { launch=FAIL; result=FAIL; }
-                sleep 4
-                pid=$(adb shell pidof "$pkg" 2>/dev/null | tr -d '\r')
+                adb logcat -c </dev/null
+                timeout 30 adb shell am start -W -n "$comp" </dev/null > "out/${f}.launch.txt" 2>&1 || { launch=FAIL; result=FAIL; }
+                sleep 3
+                pid=$(adb shell pidof "$pkg" </dev/null 2>/dev/null | tr -d '\r' || true)
                 if [ -z "$pid" ]; then process=FAIL; result=FAIL; fi
-                adb logcat -d > "out/${f}.logcat.txt"
+                adb logcat -d </dev/null > "out/${f}.logcat.txt"
                 if grep -q -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "out/${f}.logcat.txt"; then fatal=FOUND; result=FAIL; fi
               fi
             fi
             if [ "$result" = PASS ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
             printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$f" "$pkg" "$install" "$resolve" "$launch" "$process" "$fatal" "$result" | tee -a out/runtime.tsv
-            adb shell am force-stop "$pkg" >/dev/null 2>&1 || true
-            adb uninstall "$pkg" >/dev/null 2>&1 || true
-          done < <(find input/game-apks -type f -name '*.apk' -print0 | sort -z)
+            adb shell am force-stop "$pkg" </dev/null >/dev/null 2>&1 || true
+            adb uninstall "$pkg" </dev/null >/dev/null 2>&1 || true
+          done
           printf 'PASS=%s\nFAIL=%s\n' "$PASS" "$FAIL" | tee out/summary.txt
           test $((PASS+FAIL)) -eq 25
           test "$FAIL" -eq 0
