@@ -1,0 +1,122 @@
+name: FME Universal Games25 Android 36 QA
+on:
+  push:
+    branches: [qa/fme-universal-full-android-audit-2026-09-16]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  games25-device-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Android SDK 36 test tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-36" "build-tools;35.0.0" "system-images;android-36;google_apis;x86_64"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+      - name: Fetch exact current 25-game set
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p input out
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/0cffe219-bb89-4f42-86eb-7ba67120b491-FME_GAMES_25_RELEASE_APKS_v3.0.0_RC1_QA_INPUT.zip' -o input/games25.zip
+          echo 'd96f866273fe0e801028ae75def4a2c0e71f27e99a7ad7adb1a7eeeec5767d0f  input/games25.zip' | sha256sum -c -
+          unzip -q input/games25.zip -d input
+          rm -f input/game-apks/HY_PHYXELS_Arcade_Invasion_v1.0.0-rc1.apk
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/a8ebe88a-f1ca-406c-b7fe-cf9b8d1522a9-HY_PHYXELS_Arcade_Invasion_v1.1.1_hotfix.apk' -o input/game-apks/HY_PHYXELS_Arcade_Invasion_v1.1.1-character-aim-hotfix.apk
+          echo '2e68c5270b5a93ea2e382df5db48e4888ecc9e8ceeccb17f6faed0678712c18a  input/game-apks/HY_PHYXELS_Arcade_Invasion_v1.1.1-character-aim-hotfix.apk' | sha256sum -c -
+          test "$(find input/game-apks -type f -name '*.apk' | wc -l)" -eq 25
+      - name: Static verify all 25
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          printf 'file\tpackage\tversionCode\tversionName\tsignature\tzip\n' > out/static.tsv
+          while IFS= read -r -d '' apk; do
+            f=$(basename "$apk")
+            unzip -tq "$apk" >/dev/null
+            "$APKSIGNER" verify --verbose "$apk" >/dev/null
+            b=$($AAPT dump badging "$apk" | head -1)
+            pkg=$(printf '%s\n' "$b" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            vc=$(printf '%s\n' "$b" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+            vn=$(printf '%s\n' "$b" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+            test -n "$pkg"
+            printf '%s\t%s\t%s\t%s\tPASS\tPASS\n' "$f" "$pkg" "$vc" "$vn" >> out/static.tsv
+          done < <(find input/game-apks -type f -name '*.apk' -print0 | sort -z)
+      - name: Prepare Android 36 AVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVDPATH="$ANDROID_AVD_HOME/FME_Games25_API36.avd"
+          rm -rf "$AVDPATH" "$ANDROID_AVD_HOME/FME_Games25_API36.ini"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n FME_Games25_API36 -k 'system-images;android-36;google_apis;x86_64' -p "$AVDPATH" --force
+          cat > "$ANDROID_AVD_HOME/FME_Games25_API36.ini" <<EOF
+          avd.ini.encoding=UTF-8
+          path=$AVDPATH
+          path.rel=avd/FME_Games25_API36.avd
+          target=android-36
+          EOF
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+      - name: Install and launch all 25 games
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          ACCEL='-accel off'; if [ -e /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          nohup emulator -avd FME_Games25_API36 -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect $ACCEL > out/emulator.log 2>&1 &
+          timeout 180 adb wait-for-device
+          READY=0; for i in $(seq 1 120); do BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r'); if [ "$BOOT" = 1 ]; then READY=1; break; fi; sleep 2; done
+          test "$READY" = 1
+          printf 'file\tpackage\tinstall\tresolve\tlaunch\tprocess\tfatal\tresult\n' > out/runtime.tsv
+          FAIL=0; PASS=0
+          while IFS= read -r -d '' apk; do
+            f=$(basename "$apk")
+            pkg=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -1 | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            install=PASS; resolve=PASS; launch=PASS; process=PASS; fatal=NONE; result=PASS
+            adb uninstall "$pkg" >/dev/null 2>&1 || true
+            if ! timeout 60 adb install "$apk" > "out/${f}.install.txt" 2>&1; then install=FAIL; resolve=SKIP; launch=SKIP; process=SKIP; fatal=NA; result=FAIL
+            else
+              comp=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$pkg" 2>/dev/null | tr -d '\r' | tail -1)
+              if [ -z "$comp" ] || [[ "$comp" == *'No activity found'* ]]; then resolve=FAIL; launch=SKIP; process=SKIP; result=FAIL
+              else
+                adb logcat -c
+                timeout 30 adb shell am start -W -n "$comp" > "out/${f}.launch.txt" 2>&1 || { launch=FAIL; result=FAIL; }
+                sleep 4
+                pid=$(adb shell pidof "$pkg" 2>/dev/null | tr -d '\r')
+                if [ -z "$pid" ]; then process=FAIL; result=FAIL; fi
+                adb logcat -d > "out/${f}.logcat.txt"
+                if grep -q -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "out/${f}.logcat.txt"; then fatal=FOUND; result=FAIL; fi
+              fi
+            fi
+            if [ "$result" = PASS ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$f" "$pkg" "$install" "$resolve" "$launch" "$process" "$fatal" "$result" | tee -a out/runtime.tsv
+            adb shell am force-stop "$pkg" >/dev/null 2>&1 || true
+            adb uninstall "$pkg" >/dev/null 2>&1 || true
+          done < <(find input/game-apks -type f -name '*.apk' -print0 | sort -z)
+          printf 'PASS=%s\nFAIL=%s\n' "$PASS" "$FAIL" | tee out/summary.txt
+          test $((PASS+FAIL)) -eq 25
+          test "$FAIL" -eq 0
+      - name: Checksums
+        if: always()
+        shell: bash
+        run: |
+          find out -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > out/SHA256SUMS.txt || true
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FME-Universal-Games25-Android36-QA
+          path: out/*
+          if-no-files-found: error
+          retention-days: 30
