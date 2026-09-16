@@ -1,0 +1,16 @@
+name: Trigger FME Bay Auto RC02
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/bay-auto-trigger.yml']
+permissions:
+  actions: write
+  contents: read
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Bay Auto build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run bay-auto-rc02-build.yml --repo "$GITHUB_REPOSITORY" --ref main
