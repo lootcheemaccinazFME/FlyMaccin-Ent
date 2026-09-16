@@ -16,21 +16,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
       GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
       FME_KEYSTORE_PASSWORD: ${{ secrets.FME_KEYSTORE_PASSWORD }}
       FME_KEY_ALIAS: ${{ secrets.FME_KEY_ALIAS }}
       FME_KEY_PASSWORD: ${{ secrets.FME_KEY_PASSWORD }}
       FME_RELEASE_KEYSTORE_BASE64: ${{ secrets.FME_RELEASE_KEYSTORE_BASE64 }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - name: Install Android SDK 36
+      - name: Install Android SDK 36 from runner SDK
         shell: bash
-        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+        run: |
+          set -euo pipefail
+          SDKMANAGER=/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;35.0.0"
       - name: Fetch canonical unified source
         shell: bash
         run: |
