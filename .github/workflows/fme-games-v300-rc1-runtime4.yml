@@ -1,0 +1,192 @@
+name: FME Games v3.0.0 RC1 Runtime 4
+
+on:
+  push:
+    branches:
+      - release/fme-games-v3.0.0-rc1
+    paths:
+      - '.github/workflows/fme-games-v300-rc1-runtime4.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  runtime-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download exact Build 3 release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: FME-Games-v3.0.0-RC1-release-package-build3
+          path: out
+          github-token: ${{ github.token }}
+          run-id: 35065851965
+
+      - name: Verify artifact inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f out/FME_GAMES_v3.0.0_RC1-release.apk
+          test -f out/FME_GAMES_v3.0.0_RC1-release.aab
+          test -f out/RELEASE_GAME_CATALOG.json
+          test "$(find out/game-apks -maxdepth 1 -name '*.apk' | wc -l)" -eq 25
+          python3 - <<'PY'
+          import json
+          c=json.load(open('out/RELEASE_GAME_CATALOG.json'))
+          assert len(c)==25
+          print('artifact inventory PASS: 25 game APKs')
+          PY
+
+      - name: Prepare Android 36 emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVDPATH="$ANDROID_AVD_HOME/FME_Games_Runtime_API_36.avd"
+          rm -rf "$AVDPATH" "$ANDROID_AVD_HOME/FME_Games_Runtime_API_36.ini"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n FME_Games_Runtime_API_36 -k 'system-images;android-36;google_apis;x86_64' -p "$AVDPATH" --force
+          cat > "$ANDROID_AVD_HOME/FME_Games_Runtime_API_36.ini" <<EOF
+          avd.ini.encoding=UTF-8
+          path=$AVDPATH
+          path.rel=avd/FME_Games_Runtime_API_36.avd
+          target=android-36
+          EOF
+          ANDROID_AVD_HOME="$ANDROID_AVD_HOME" "$ANDROID_HOME/emulator/emulator" -list-avds | grep -q '^FME_Games_Runtime_API_36$'
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+
+      - name: Boot Android 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          ACCEL='-accel off'
+          if [ -e /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          nohup emulator -avd FME_Games_Runtime_API_36 -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect $ACCEL >/tmp/fme-games-runtime-emulator.log 2>&1 &
+          timeout 180 adb wait-for-device
+          READY=0
+          for i in $(seq 1 120); do
+            BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            if [ "$BOOT" = '1' ]; then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" = '1'
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          echo 'android36_boot=PASS' > out/RUNTIME4_SUMMARY.txt
+
+      - name: Validate parent HOME app
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          adb install -r out/FME_GAMES_v3.0.0_RC1-release.apk >/dev/null
+          ACT=$(adb shell cmd package resolve-activity --brief com.flymaccin.gamespakstudio | tail -1 | tr -d '\r')
+          test -n "$ACT"
+          echo "resolved_activity=$ACT" > out/HUB_START.txt
+          adb logcat -c
+          adb shell am start -W -n "$ACT" >> out/HUB_START.txt
+          sleep 15
+          PID=$(adb shell pidof com.flymaccin.gamespakstudio | tr -d '\r')
+          adb logcat -d > out/HUB_RUNTIME4_LOGCAT.txt
+          adb exec-out screencap -p > out/FME_GAMES_HOME_API36_RUNTIME4.png
+          test -n "$PID"
+          if grep -q 'FATAL EXCEPTION' out/HUB_RUNTIME4_LOGCAT.txt && grep -q 'Process: com.flymaccin.gamespakstudio' out/HUB_RUNTIME4_LOGCAT.txt; then
+            echo 'hub_fatal=FAIL' >> out/RUNTIME4_SUMMARY.txt
+            exit 1
+          fi
+          echo "hub_launch=PASS pid=$PID" >> out/RUNTIME4_SUMMARY.txt
+          adb shell am force-stop com.flymaccin.gamespakstudio
+
+      - name: Validate all 25 game APK launcher builds
+        shell: bash
+        run: |
+          set -u
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          mkdir -p out/child-runtime
+          python3 - <<'PY' > /tmp/games.tsv
+          import json
+          for i,g in enumerate(json.load(open('out/RELEASE_GAME_CATALOG.json')),1):
+              print(f"{i}\t{g['name']}\t{g['package_name']}\t{g['apk_file']}\t{g['mode']}")
+          PY
+          printf 'index\tname\tpackage\tmode\tinstall\tresolve\tlaunch\tpid\tfatal\n' > out/GAME_RUNTIME_RESULTS.tsv
+          PASS=0
+          FAIL=0
+          while IFS=$'\t' read -r IDX NAME PKG APK MODE; do
+            SAFE=$(printf '%02d_%s' "$IDX" "$PKG" | tr -c 'A-Za-z0-9._-' '_')
+            INSTALL=PASS; RESOLVE=PASS; LAUNCH=PASS; PIDSTATE=PASS; FATAL=PASS
+
+            if ! adb install -r "out/game-apks/$APK" >"out/child-runtime/${SAFE}_install.txt" 2>&1; then
+              INSTALL=FAIL; RESOLVE=SKIP; LAUNCH=SKIP; PIDSTATE=SKIP; FATAL=SKIP; FAIL=$((FAIL+1))
+              printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$IDX" "$NAME" "$PKG" "$MODE" "$INSTALL" "$RESOLVE" "$LAUNCH" "$PIDSTATE" "$FATAL" >> out/GAME_RUNTIME_RESULTS.tsv
+              continue
+            fi
+
+            ACT=$(adb shell cmd package resolve-activity --brief "$PKG" 2>/dev/null | tail -1 | tr -d '\r')
+            if [ -z "$ACT" ] || [ "$ACT" = 'No activity found' ]; then
+              RESOLVE=FAIL; LAUNCH=SKIP; PIDSTATE=SKIP; FATAL=SKIP; FAIL=$((FAIL+1))
+              printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$IDX" "$NAME" "$PKG" "$MODE" "$INSTALL" "$RESOLVE" "$LAUNCH" "$PIDSTATE" "$FATAL" >> out/GAME_RUNTIME_RESULTS.tsv
+              continue
+            fi
+            echo "$ACT" > "out/child-runtime/${SAFE}_activity.txt"
+
+            adb logcat -c
+            if ! adb shell am start -W -n "$ACT" >"out/child-runtime/${SAFE}_start.txt" 2>&1; then LAUNCH=FAIL; fi
+            sleep 6
+            PID=$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r')
+            adb logcat -d > "out/child-runtime/${SAFE}_logcat.txt"
+            if [ -z "$PID" ]; then PIDSTATE=FAIL; fi
+            if grep -q 'FATAL EXCEPTION' "out/child-runtime/${SAFE}_logcat.txt" && grep -q "Process: $PKG" "out/child-runtime/${SAFE}_logcat.txt"; then FATAL=FAIL; fi
+
+            if [ "$LAUNCH" = PASS ] && [ "$PIDSTATE" = PASS ] && [ "$FATAL" = PASS ]; then
+              PASS=$((PASS+1))
+            else
+              FAIL=$((FAIL+1))
+            fi
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$IDX" "$NAME" "$PKG" "$MODE" "$INSTALL" "$RESOLVE" "$LAUNCH" "$PIDSTATE" "$FATAL" >> out/GAME_RUNTIME_RESULTS.tsv
+            adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
+          done < /tmp/games.tsv
+
+          echo "game_apk_launch_smoke=$PASS/25 PASS; failures=$FAIL" >> out/RUNTIME4_SUMMARY.txt
+          cat out/GAME_RUNTIME_RESULTS.tsv
+          test "$FAIL" -eq 0
+          test "$PASS" -eq 25
+
+      - name: Capture runtime evidence and checksums
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ -f /tmp/fme-games-runtime-emulator.log ]; then cp /tmp/fme-games-runtime-emulator.log out/EMULATOR_RUNTIME4_HOST.log; fi
+          cd out
+          find . -maxdepth 1 -type f ! -name RUNTIME4_SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > RUNTIME4_SHA256SUMS.txt
+
+      - name: Upload runtime validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FME-Games-v3.0.0-RC1-runtime4-evidence
+          path: |
+            out/RUNTIME4_SUMMARY.txt
+            out/GAME_RUNTIME_RESULTS.tsv
+            out/HUB_START.txt
+            out/HUB_RUNTIME4_LOGCAT.txt
+            out/FME_GAMES_HOME_API36_RUNTIME4.png
+            out/EMULATOR_RUNTIME4_HOST.log
+            out/RUNTIME4_SHA256SUMS.txt
+            out/child-runtime/*
+          if-no-files-found: warn
+          retention-days: 30
