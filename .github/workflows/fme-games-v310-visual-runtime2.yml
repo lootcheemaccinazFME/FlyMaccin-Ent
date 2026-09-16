@@ -1,0 +1,100 @@
+name: FME Games v3.1.0 Visual Runtime2
+on:
+  push:
+    branches: [dev/fme-games-v3.1.0-visual-dev1]
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  runtime2:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: FME-Games-v3.1.0-Visual-Dev1
+          path: out
+          github-token: ${{ github.token }}
+          repository: lootcheemaccinazFME/FlyMaccin-Ent
+          run-id: 35074235529
+      - name: Verify exact visual artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f out/FME_GAMES_v3.1.0_VISUAL_DEV1.apk
+          test -f out/game-apks/8_Bit_Ism_v1.0.0-rc1.apk
+          test -f out/game-apks/HY_PHYXELS_Arcade_Invasion_v1.0.0-rc1.apk
+          test -f out/game-apks/Bay_Carnival3_Parade_v1.0.0-rc1.apk
+          test -f out/game-apks/FME_Aippy_Card_Arcade_v1.0.0-rc1.apk
+          test "$(find out/game-apks -maxdepth 1 -name '*.apk' | wc -l)" -eq 25
+      - name: Install Android 36 emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVDPATH="$ANDROID_AVD_HOME/FME_Visual_Runtime2.avd"
+          rm -rf "$AVDPATH" "$ANDROID_AVD_HOME/FME_Visual_Runtime2.ini"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n FME_Visual_Runtime2 -k 'system-images;android-36;google_apis;x86_64' -p "$AVDPATH" --force
+          cat > "$ANDROID_AVD_HOME/FME_Visual_Runtime2.ini" <<EOF
+          avd.ini.encoding=UTF-8
+          path=$AVDPATH
+          path.rel=avd/FME_Visual_Runtime2.avd
+          target=android-36
+          EOF
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+      - name: Boot and validate hub plus four redesigned games
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          ACCEL='-accel off'; if [ -e /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          nohup emulator -avd FME_Visual_Runtime2 -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect $ACCEL > /tmp/fme-visual-runtime2-emulator.log 2>&1 &
+          timeout 180 adb wait-for-device
+          READY=0; for i in $(seq 1 120); do BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r'); if [ "$BOOT" = '1' ]; then READY=1; break; fi; sleep 2; done
+          test "$READY" = '1'
+          mkdir -p out/runtime2
+          : > out/runtime2/results.txt
+          FAIL=0
+          test_one(){
+            PKG="$1"; APK="$2"; NAME="$3"
+            if ! adb install -r "$APK" > "out/runtime2/${NAME}_install.txt" 2>&1; then echo "$NAME INSTALL FAIL" | tee -a out/runtime2/results.txt; FAIL=$((FAIL+1)); return; fi
+            COMP=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PKG" | tr -d '\r' | tail -1)
+            if [ -z "$COMP" ] || [[ "$COMP" == *"No activity found"* ]]; then echo "$NAME RESOLVE FAIL" | tee -a out/runtime2/results.txt; FAIL=$((FAIL+1)); return; fi
+            adb logcat -c
+            adb shell am start -W -n "$COMP" > "out/runtime2/${NAME}_launch.txt" 2>&1 || true
+            sleep 7
+            PID=$(adb shell pidof "$PKG" | tr -d '\r')
+            adb exec-out screencap -p > "out/runtime2/${NAME}.png"
+            adb logcat -d > "out/runtime2/${NAME}_logcat.txt"
+            if [ -n "$PID" ] && ! grep -q -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "out/runtime2/${NAME}_logcat.txt"; then echo "$NAME PASS pid=$PID component=$COMP" | tee -a out/runtime2/results.txt; else echo "$NAME FAIL pid=${PID:-none} component=$COMP" | tee -a out/runtime2/results.txt; FAIL=$((FAIL+1)); fi
+            adb shell am force-stop "$PKG" || true
+          }
+          test_one com.flymaccin.gamespakstudio out/FME_GAMES_v3.1.0_VISUAL_DEV1.apk HUB
+          test_one com.flymaccin.eightbitism out/game-apks/8_Bit_Ism_v1.0.0-rc1.apk EIGHT_BIT
+          test_one com.flymaccin.hyphyxels out/game-apks/HY_PHYXELS_Arcade_Invasion_v1.0.0-rc1.apk HYPHYXELS
+          test_one com.flymaccin.baycarnival3parade out/game-apks/Bay_Carnival3_Parade_v1.0.0-rc1.apk BAY_CARNIVAL3
+          test_one com.flymaccin.aippycards1 out/game-apks/FME_Aippy_Card_Arcade_v1.0.0-rc1.apk CARD_ARCADE
+          cp /tmp/fme-visual-runtime2-emulator.log out/runtime2/EMULATOR_HOST.log
+          test "$FAIL" -eq 0
+      - name: Runtime checksums
+        if: always()
+        shell: bash
+        run: |
+          find out/runtime2 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > out/runtime2/SHA256SUMS.txt || true
+      - name: Upload runtime2 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FME-Games-v3.1.0-Visual-Dev1-Runtime2
+          path: out/runtime2/*
+          if-no-files-found: error
+          retention-days: 30
