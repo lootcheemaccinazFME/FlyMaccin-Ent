@@ -39,21 +39,24 @@ jobs:
           set -euo pipefail
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
-          : > out/static.tsv
-          printf 'file\tpackage\tversionCode\tversionName\tsignature\tzip\n' >> out/static.tsv
+          printf 'file\tpackage\tversionCode\tversionName\tapksigner\tjar_v1\tzip\n' > out/static.tsv
+          STATIC_FAIL=0
           while IFS= read -r -d '' apk; do
             f=$(basename "$apk")
-            unzip -tq "$apk" >/dev/null
-            sig=PASS; "$APKSIGNER" verify --verbose "$apk" >/dev/null 2>&1 || sig=FAIL
+            zipstate=PASS; unzip -tq "$apk" >/dev/null || zipstate=FAIL
+            aps=PASS; "$APKSIGNER" verify --verbose "$apk" >/dev/null 2>&1 || aps=FAIL
+            jar=PASS; jarsigner -verify "$apk" >/dev/null 2>&1 || jar=FAIL
             badging=$($AAPT dump badging "$apk" | head -1)
             pkg=$(printf '%s\n' "$badging" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
             vc=$(printf '%s\n' "$badging" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
             vn=$(printf '%s\n' "$badging" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
-            test -n "$pkg"
-            printf '%s\t%s\t%s\t%s\t%s\tPASS\n' "$f" "$pkg" "$vc" "$vn" "$sig" >> out/static.tsv
-            test "$sig" = PASS
+            [ -n "$pkg" ] || STATIC_FAIL=$((STATIC_FAIL+1))
+            [ "$zipstate" = PASS ] || STATIC_FAIL=$((STATIC_FAIL+1))
+            if [ "$aps" != PASS ] && [ "$jar" != PASS ]; then STATIC_FAIL=$((STATIC_FAIL+1)); fi
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$f" "$pkg" "$vc" "$vn" "$aps" "$jar" "$zipstate" >> out/static.tsv
           done < <(find input/apks -type f -name '*.apk' -print0 | sort -z)
           test "$(tail -n +2 out/static.tsv | wc -l)" -eq 62
+          test "$STATIC_FAIL" -eq 0
       - name: Prepare Android 36 AVD
         shell: bash
         run: |
