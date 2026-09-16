@@ -10,7 +10,7 @@ android {
         applicationId = "com.flymaccin.demonicaistudio"
         minSdk = 23
         targetSdk = 35
-        versionCode = 100
-        versionName = "1.0.0-native"
+        versionCode = 110
+        versionName = "1.1.0-studio"
     }
 }
