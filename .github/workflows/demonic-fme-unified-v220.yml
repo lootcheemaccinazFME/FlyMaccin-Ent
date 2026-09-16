@@ -5,9 +5,11 @@ on:
     branches:
       - release/demonic-fme-unified-v2.2.0
     paths:
-      - 'release-capsules/demonic-fme-unified-v2.2.0/**'
       - '.github/workflows/demonic-fme-unified-v220.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -26,18 +28,21 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-      - name: Rehydrate source
+      - name: Install Android SDK 36
+        shell: bash
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+      - name: Fetch canonical unified source
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/fme-v220
-          cat release-capsules/demonic-fme-unified-v2.2.0/source.b64.part-* | tr -d '\n' | base64 -d > /tmp/fme-v220/source.zip
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/235a9d76-de17-4fd2-a6ec-2ac463dd3806-Demonic_FME_Unified_Studio_v2.2.0_SOURCE.zip' -o /tmp/fme-v220/source.zip
           echo '635ecfbdf69421c88db72ba02440efe56f4413cab4f4ede2635121ceafbdf2a7  /tmp/fme-v220/source.zip' | sha256sum -c -
           unzip -q /tmp/fme-v220/source.zip -d /tmp/fme-v220/src
           APP_DIR=$(find /tmp/fme-v220/src -maxdepth 1 -type d -name 'Demonic_FME_Unified_Studio_v2.2.0_SOURCE' | head -1)
           test -n "$APP_DIR"
           echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
-      - name: Static checks
+      - name: Validate unified studio identity
         shell: bash
         run: |
           set -euo pipefail
@@ -45,25 +50,34 @@ jobs:
           grep -q 'applicationId = "com.flymaccin.pocketpotna"' "$APP_DIR/app/build.gradle.kts"
           grep -q 'versionName = "2.2.0"' "$APP_DIR/app/build.gradle.kts"
           grep -q 'versionCode = 230' "$APP_DIR/app/build.gradle.kts"
-      - name: Configure release signer if available
+          grep -q 'Demonic DAW' "$APP_DIR/app/src/main/assets/app.js"
+          grep -q 'Unified Backup' "$APP_DIR/app/src/main/assets/app.js"
+      - name: Configure protected FME signer when available
         shell: bash
         run: |
           if [ -n "${FME_RELEASE_KEYSTORE_BASE64:-}" ]; then
-            echo "$FME_RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/fme-release.jks"
+            printf '%s' "$FME_RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/fme-release.jks"
             echo "FME_KEYSTORE_PATH=$RUNNER_TEMP/fme-release.jks" >> "$GITHUB_ENV"
             echo 'RELEASE_SIGNING_AVAILABLE=true' >> "$GITHUB_ENV"
           else
             echo 'RELEASE_SIGNING_AVAILABLE=false' >> "$GITHUB_ENV"
           fi
-      - name: Build and test
+      - name: Build debug and run QA
         shell: bash
         run: |
           set -euo pipefail
           cd "$APP_DIR"
           chmod +x gradlew scripts/*.sh || true
           ./gradlew --no-daemon clean testDebugUnitTest lintDebug assembleDebug
+      - name: Build protected release when signer is available
+        shell: bash
+        run: |
+          set -euo pipefail
           if [ "${RELEASE_SIGNING_AVAILABLE}" = 'true' ]; then
+            cd "$APP_DIR"
             ./gradlew --no-daemon bundleRelease assembleRelease
+          else
+            echo 'Protected FME release signer is not available in this workflow context; debug build still produced.'
           fi
       - name: Collect artifacts
         shell: bash
@@ -72,10 +86,12 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/out"
           find "$APP_DIR/app/build/outputs" -type f \( -name '*.apk' -o -name '*.aab' \) -exec cp {} "$GITHUB_WORKSPACE/out/" \;
           sha256sum "$GITHUB_WORKSPACE"/out/* > "$GITHUB_WORKSPACE/out/SHA256SUMS.txt"
+          printf 'versionName=2.2.0\nversionCode=230\npackage=com.flymaccin.pocketpotna\n' > "$GITHUB_WORKSPACE/out/BUILD_IDENTITY.txt"
           ls -lh "$GITHUB_WORKSPACE/out"
-      - name: Upload binaries
+      - name: Upload unified studio binaries
         uses: actions/upload-artifact@v4
         with:
           name: Demonic-FME-Unified-Studio-v2.2.0
           path: out/*
           if-no-files-found: error
+          retention-days: 30
