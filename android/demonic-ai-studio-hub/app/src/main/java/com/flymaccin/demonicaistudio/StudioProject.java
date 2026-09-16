@@ -174,7 +174,9 @@ final class StudioProject {
 
     private static JSONArray floats(float[] values) {
         JSONArray array = new JSONArray();
-        for (float value : values) array.put((double) value);
+        for (float value : values) {
+            try { array.put((double) value); } catch (Exception ignored) { }
+        }
         return array;
     }
 
