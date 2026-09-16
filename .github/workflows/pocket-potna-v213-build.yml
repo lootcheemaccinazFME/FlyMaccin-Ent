@@ -1,6 +1,7 @@
 name: Pocket Potna v2.1.14 Canonical FME Release
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - build/pocket-potna-v2.1.14-fme-visual
