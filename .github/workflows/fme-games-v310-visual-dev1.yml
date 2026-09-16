@@ -1,0 +1,151 @@
+name: FME Games v3.1.0 Visual Dev1
+on:
+  push:
+    branches: [dev/fme-games-v3.1.0-visual-dev1]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  visual-qa:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+      - name: Fetch exact visual-dev source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/fme-v31 && mkdir -p /tmp/fme-v31
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/d2e3728f-9f04-4284-9e4a-fdc59f2141ff-FME_GAMES_PAK_STUDIO_v3.1.0_VISUAL_DEV1_SOURCE.zip' -o /tmp/fme-v31/source.zip
+          echo '3c260bc554387bead34eec8e7f2191fd752453c4c188aefda9d38e34d609974b  /tmp/fme-v31/source.zip' | sha256sum -c -
+          unzip -q /tmp/fme-v31/source.zip -d /tmp/fme-v31/src
+          APP_DIR=/tmp/fme-v31/src/FME_GAMES_PAK_STUDIO_v3.1.0_VISUAL_DEV1_SOURCE
+          test -f "$APP_DIR/gamewrapper/src/main/assets/fme-game-visual.css"
+          test -f "$APP_DIR/gamewrapper/src/main/assets/fme-game-visual.js"
+          grep -q '3.1.0-visual-dev1' "$APP_DIR/hub/build.gradle.kts"
+          grep -q 'QUEST BOARD' "$APP_DIR/gamewrapper/src/hyphyxelsArcade/assets/game/index.html"
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
+          chmod +x "$APP_DIR/gradlew" "$APP_DIR/tools/package_game_apks.py"
+      - name: Create visual QA signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          PASS=$(openssl rand -hex 18)
+          echo "::add-mask::$PASS"
+          keytool -genkeypair -keystore /tmp/fme-games-visual-dev.jks -storepass "$PASS" -keypass "$PASS" -alias fmevisualdev -keyalg RSA -keysize 3072 -validity 3650 -dname 'CN=FME Games Visual Dev, O=FlyMaccin Ent, OU=Visual QA, C=US' >/dev/null 2>&1
+          echo "FME_KEYSTORE_PATH=/tmp/fme-games-visual-dev.jks" >> "$GITHUB_ENV"
+          echo "FME_KEYSTORE_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          echo "FME_KEY_ALIAS=fmevisualdev" >> "$GITHUB_ENV"
+          echo "FME_KEY_PASSWORD=$PASS" >> "$GITHUB_ENV"
+      - name: Build 25 game APKs and package into hub
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR"
+          ./gradlew --no-daemon :gamewrapper:assembleRelease
+          python3 tools/package_game_apks.py
+          test "$(find hub/src/main/assets/game_apks -maxdepth 1 -name '*.apk' | wc -l)" -eq 25
+      - name: Lint four locally edited games
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR"
+          ./gradlew --no-daemon \
+            :gamewrapper:lintEightBitIsmRelease \
+            :gamewrapper:lintHyphyxelsArcadeRelease \
+            :gamewrapper:lintBayCarnival3Release \
+            :gamewrapper:lintFmeCardArcadeRelease
+      - name: Build and lint visual-dev hub
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR"
+          ./gradlew --no-daemon :hub:lintRelease :hub:assembleRelease :hub:bundleRelease
+          mkdir -p "$GITHUB_WORKSPACE/out/game-apks"
+          HUB_APK=$(find hub/build/outputs/apk/release -name '*.apk' | head -1)
+          HUB_AAB=$(find hub/build/outputs/bundle/release -name '*.aab' | head -1)
+          cp "$HUB_APK" "$GITHUB_WORKSPACE/out/FME_GAMES_v3.1.0_VISUAL_DEV1.apk"
+          cp "$HUB_AAB" "$GITHUB_WORKSPACE/out/FME_GAMES_v3.1.0_VISUAL_DEV1.aab"
+          cp hub/src/main/assets/game_apks/*.apk "$GITHUB_WORKSPACE/out/game-apks/"
+          cp VISUAL_DEV1_AUDIT.md "$GITHUB_WORKSPACE/out/"
+          cp /tmp/fme-v31/source.zip "$GITHUB_WORKSPACE/out/FME_GAMES_PAK_STUDIO_v3.1.0_VISUAL_DEV1_SOURCE.zip"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$GITHUB_WORKSPACE/out/FME_GAMES_v3.1.0_VISUAL_DEV1.apk" > "$GITHUB_WORKSPACE/out/HUB_SIGNATURE.txt"
+      - name: Prepare Android 36 emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$SDKMANAGER" "emulator" "system-images;android-36;google_apis;x86_64"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVDPATH="$ANDROID_AVD_HOME/FME_Visual_API_36.avd"
+          rm -rf "$AVDPATH" "$ANDROID_AVD_HOME/FME_Visual_API_36.ini"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n FME_Visual_API_36 -k 'system-images;android-36;google_apis;x86_64' -p "$AVDPATH" --force
+          cat > "$ANDROID_AVD_HOME/FME_Visual_API_36.ini" <<EOF
+          avd.ini.encoding=UTF-8
+          path=$AVDPATH
+          path.rel=avd/FME_Visual_API_36.avd
+          target=android-36
+          EOF
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+      - name: Android 36 smoke and screenshots for four edited games
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          ACCEL='-accel off'; if [ -e /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          nohup emulator -avd FME_Visual_API_36 -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect $ACCEL >/tmp/fme-visual-emulator.log 2>&1 &
+          timeout 180 adb wait-for-device
+          READY=0; for i in $(seq 1 120); do BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r'); if [ "$BOOT" = '1' ]; then READY=1; break; fi; sleep 2; done
+          test "$READY" = '1'
+          mkdir -p "$GITHUB_WORKSPACE/out/runtime"
+          FAIL=0
+          test_one(){
+            PKG="$1"; APK="$2"; NAME="$3"
+            adb install -r "$APK" >/dev/null || { echo "$NAME INSTALL FAIL" | tee -a "$GITHUB_WORKSPACE/out/runtime/results.txt"; FAIL=$((FAIL+1)); return; }
+            COMP=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PKG" | tr -d '\r' | tail -1)
+            adb logcat -c
+            adb shell am start -W -n "$COMP" > "$GITHUB_WORKSPACE/out/runtime/${NAME}_launch.txt" || true
+            sleep 5
+            PID=$(adb shell pidof "$PKG" | tr -d '\r')
+            adb exec-out screencap -p > "$GITHUB_WORKSPACE/out/runtime/${NAME}.png"
+            adb logcat -d > "$GITHUB_WORKSPACE/out/runtime/${NAME}_logcat.txt"
+            if [ -n "$PID" ] && ! grep -q -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "$GITHUB_WORKSPACE/out/runtime/${NAME}_logcat.txt"; then echo "$NAME PASS pid=$PID" | tee -a "$GITHUB_WORKSPACE/out/runtime/results.txt"; else echo "$NAME FAIL" | tee -a "$GITHUB_WORKSPACE/out/runtime/results.txt"; FAIL=$((FAIL+1)); fi
+            adb shell am force-stop "$PKG"
+          }
+          test_one com.flymaccin.gamespakstudio "$GITHUB_WORKSPACE/out/FME_GAMES_v3.1.0_VISUAL_DEV1.apk" HUB
+          test_one com.flymaccin.eightbitism "$GITHUB_WORKSPACE/out/game-apks/8-Bit_Ism_v1.1.0-visual-dev1.apk" EIGHT_BIT
+          test_one com.flymaccin.hyphyxels "$GITHUB_WORKSPACE/out/game-apks/HY-PHYXELS_Arcade_Invasion_v1.1.0-visual-dev1.apk" HYPHYXELS
+          test_one com.flymaccin.baycarnival3parade "$GITHUB_WORKSPACE/out/game-apks/Bay_Carnival3_Parade_v1.1.0-visual-dev1.apk" BAY_CARNIVAL3
+          test_one com.flymaccin.aippycards1 "$GITHUB_WORKSPACE/out/game-apks/FME_Aippy_Card_Arcade_v1.1.0-visual-dev1.apk" CARD_ARCADE
+          cp /tmp/fme-visual-emulator.log "$GITHUB_WORKSPACE/out/runtime/EMULATOR_HOST.log"
+          test "$FAIL" -eq 0
+      - name: Checksums
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cd "$GITHUB_WORKSPACE/out"
+          find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt
+      - name: Upload visual development package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FME-Games-v3.1.0-Visual-Dev1
+          path: out/*
+          if-no-files-found: error
+          retention-days: 30
