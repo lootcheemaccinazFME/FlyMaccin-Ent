@@ -13,4 +13,19 @@ android {
         versionCode = 110
         versionName = "1.1.0-studio"
     }
+
+    signingConfigs {
+        create("studioDebug") {
+            storeFile = file("studio-debug.keystore")
+            storePassword = "demonicdebug"
+            keyAlias = "demonicdebug"
+            keyPassword = "demonicdebug"
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("studioDebug")
+        }
+    }
 }
