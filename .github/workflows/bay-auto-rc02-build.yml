@@ -1,0 +1,149 @@
+name: FME Bay Auto RP RC02 Build
+
+on:
+  push:
+    branches: [bay-auto-rc02-build]
+    paths: ['.github/workflows/bay-auto-rc02-build.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Install Android SDK 36
+        run: yes | sdkmanager --licenses >/dev/null || true; sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
+      - name: Generate isolated Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf bay-auto-ci
+          mkdir -p bay-auto-ci/app/src/main/java/com/flymaccinent/bayauto
+          mkdir -p bay-auto-ci/app/src/main/res/values bay-auto-ci/app/src/main/res/xml
+          cat > bay-auto-ci/settings.gradle.kts <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name = "FMEBayAutoRP"
+          include(":app")
+          EOF
+          cat > bay-auto-ci/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "8.13.2" apply false
+              id("org.jetbrains.kotlin.android") version "2.2.21" apply false
+          }
+          EOF
+          cat > bay-auto-ci/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          EOF
+          cat > bay-auto-ci/app/build.gradle.kts <<'EOF'
+          plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
+          android {
+              namespace = "com.flymaccinent.bayauto"
+              compileSdk = 36
+              defaultConfig { applicationId = "com.flymaccinent.bayauto"; minSdk = 26; targetSdk = 36; versionCode = 60002; versionName = "0.6.1-rc02" }
+              signingConfigs {
+                  create("rc") {
+                      storeFile = file(System.getenv("RC_KEYSTORE"))
+                      storePassword = "FME-RC02-TEST"
+                      keyAlias = "fmebayauto"
+                      keyPassword = "FME-RC02-TEST"
+                  }
+              }
+              buildTypes {
+                  debug { applicationIdSuffix = ".debug"; versionNameSuffix = "-debug" }
+                  release { isDebuggable = false; isMinifyEnabled = true; isShrinkResources = true; signingConfig = signingConfigs.getByName("rc"); proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro") }
+              }
+              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          EOF
+          touch bay-auto-ci/app/proguard-rules.pro
+          cat > bay-auto-ci/app/src/main/res/values/strings.xml <<'EOF'
+          <resources><string name="app_name">FME Bay Auto RP</string></resources>
+          EOF
+          cat > bay-auto-ci/app/src/main/res/values/styles.xml <<'EOF'
+          <resources><style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:windowFullscreen">true</item><item name="android:colorAccent">#D4AF37</item></style></resources>
+          EOF
+          cat > bay-auto-ci/app/src/main/res/xml/network_security_config.xml <<'EOF'
+          <network-security-config><base-config cleartextTrafficPermitted="false" /></network-security-config>
+          EOF
+          cat > bay-auto-ci/app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-feature android:name="android.hardware.gamepad" android:required="false"/><application android:theme="@style/AppTheme" android:label="FME Bay Auto RP" android:allowBackup="false" android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/network_security_config"><activity android:name=".MainActivity" android:screenOrientation="landscape" android:configChanges="keyboard|keyboardHidden|orientation|screenSize" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>
+          EOF
+          cat > bay-auto-ci/app/src/main/java/com/flymaccinent/bayauto/MainActivity.kt <<'EOF'
+          package com.flymaccinent.bayauto
+          import android.app.Activity
+          import android.os.Bundle
+          import android.view.*
+          class MainActivity: Activity(){
+            private lateinit var game: BayGameView
+            override fun onCreate(b:Bundle?){super.onCreate(b); window.decorView.systemUiVisibility=5894; game=BayGameView(this); setContentView(game)}
+            override fun dispatchKeyEvent(e:KeyEvent)=if(game.onKey(e)) true else super.dispatchKeyEvent(e)
+            override fun dispatchGenericMotionEvent(e:MotionEvent)=if(game.onPad(e)) true else super.dispatchGenericMotionEvent(e)
+            override fun onPause(){game.save();super.onPause()}
+          }
+          EOF
+          cat > bay-auto-ci/app/src/main/java/com/flymaccinent/bayauto/BayGameView.kt <<'EOF'
+          package com.flymaccinent.bayauto
+          import android.content.*
+          import android.graphics.*
+          import android.view.*
+          import kotlin.math.*
+          class BayGameView(c:Context):View(c){
+            enum class Screen{MENU,GARAGE,DRIVE}
+            data class Car(val name:String,val ref:String)
+            private val cars=listOf(Car("Box Coupe","Square-body direction"),Car("Pony Coupe","Pony-car direction"),Car("Big Body Coupe","Mercury-style old school"),Car("Glasshouse","Full-size glasshouse"),Car("Luxury Old School","Buick-style luxury"),Car("Big Luxury Brougham","Cadillac-style brougham"),Car("Executive Land Yacht","Lincoln-style full size"))
+            private val p=Paint(1); private val prefs=c.getSharedPreferences("fme_bay_auto",0)
+            private var screen=Screen.MENU; private var car=prefs.getInt("car",0); private var hue=prefs.getFloat("hue",285f)
+            private var x=prefs.getFloat("x",600f); private var y=prefs.getFloat("y",350f); private var a=prefs.getFloat("a",-1.57f); private var speed=0f
+            private var fuel=prefs.getFloat("fuel",100f); private var tires=prefs.getFloat("tires",100f); private var heat=prefs.getFloat("heat",0f); private var cash=prefs.getInt("cash",4500); private var rep=prefs.getInt("rep",0)
+            private var steer=0f; private var gas=0f; private var brake=0f; private var hand=false; private var last=System.nanoTime(); private var input="TOUCH"
+            init{isFocusable=true;keepScreenOn=true}
+            override fun onDraw(cv:Canvas){super.onDraw(cv); val now=System.nanoTime(); val dt=((now-last)/1e9f).coerceIn(0f,.05f); last=now; if(screen==Screen.DRIVE) update(dt); when(screen){Screen.MENU->menu(cv);Screen.GARAGE->garage(cv);Screen.DRIVE->drive(cv)}; postInvalidateOnAnimation()}
+            private fun bg(cv:Canvas){cv.drawColor(Color.rgb(7,8,12));p.color=Color.rgb(212,175,55);p.textAlign=Paint.Align.CENTER;p.typeface=Typeface.DEFAULT_BOLD;p.textSize=44f;cv.drawText("FLYMACCIN ENT",width/2f,62f,p);p.textSize=20f;p.color=Color.LTGRAY;cv.drawText("FME BAY AUTO RP  •  0.6.1 RC02",width/2f,94f,p)}
+            private fun menu(cv:Canvas){bg(cv);p.textSize=30f;p.color=Color.WHITE;cv.drawText("RICHMOND STARTUP SLICE",width/2f,160f,p);button(cv,width/2f-210,210f,420f,90f,"DRIVE");button(cv,width/2f-210,325f,420f,90f,"GARAGE");p.textSize=17f;p.color=Color.GRAY;cv.drawText("Touch • keyboard • Android HID/Bluetooth gamepad",width/2f,height-45f,p)}
+            private fun garage(cv:Canvas){bg(cv);p.color=Color.WHITE;p.textSize=34f;cv.drawText(cars[car].name,width/2f,165f,p);p.textSize=18f;p.color=Color.LTGRAY;cv.drawText(cars[car].ref,width/2f,195f,p); val col=Color.HSVToColor(floatArrayOf(hue, .75f,.9f));p.color=col;cv.drawRoundRect(width/2f-180,235f,width/2f+180,355f,28f,28f,p);p.color=Color.DKGRAY;cv.drawRect(width/2f-130,260f,width/2f+130,315f,p);button(cv,80f,height-110f,180f,70f,"PREV");button(cv,280f,height-110f,180f,70f,"PAINT");button(cv,480f,height-110f,180f,70f,"NEXT");button(cv,width-260f,height-110f,180f,70f,"DRIVE")}
+            private fun drive(cv:Canvas){cv.drawColor(Color.rgb(18,18,20));p.style=Paint.Style.STROKE;p.strokeWidth=8f;p.color=Color.rgb(210,210,210);cv.drawCircle(width*.58f,height*.48f,min(width,height)*.28f,p);p.color=Color.rgb(255,190,0);p.strokeWidth=4f;cv.drawCircle(width*.58f,height*.48f,min(width,height)*.18f,p);p.style=Paint.Style.FILL;cv.save();cv.translate(x,y);cv.rotate(a*180f/PI.toFloat()+90f);p.color=Color.HSVToColor(floatArrayOf(hue,.8f,.95f));cv.drawRoundRect(-22f,-45f,22f,45f,9f,9f,p);p.color=Color.BLACK;cv.drawRect(-15f,-25f,15f,8f,p);cv.restore();p.textAlign=Paint.Align.LEFT;p.color=Color.WHITE;p.textSize=18f;cv.drawText("${cars[car].name}   ${speed.roundToInt()} mph   $input",20f,32f,p);cv.drawText("FUEL ${fuel.roundToInt()}   TIRES ${tires.roundToInt()}   HEAT ${heat.roundToInt()}   REP $rep   CASH $$cash",20f,58f,p);control(cv,25f,height-155f,105f,105f,"LEFT");control(cv,145f,height-155f,105f,105f,"RIGHT");control(cv,width-365f,height-155f,105f,105f,"BRAKE");control(cv,width-245f,height-155f,105f,105f,"GAS");control(cv,width-125f,height-155f,105f,105f,"SWING")}
+            private fun update(dt:Float){if(fuel<=0)gas=0f;speed+=(gas*58f-brake*75f-sign(speed)*7f)*dt;speed=speed.coerceIn(-18f,105f);if(brake>.2f&&abs(speed)<3f)speed=-brake*15f;a+=steer*speed*.012f*dt*(if(hand)1.8f else 1f);val px=cos(a)*speed*2.4f*dt;val py=sin(a)*speed*2.4f*dt;x=(x+px).coerceIn(30f,width-30f);y=(y+py).coerceIn(80f,height-30f);fuel=(fuel-abs(speed)*.0007f*dt*60f).coerceAtLeast(0f);if(hand&&abs(speed)>12){tires=(tires-.06f*dt*60f).coerceAtLeast(0f);heat=(heat+.08f*dt*60f).coerceAtMost(100f);rep+=(dt*2f).roundToInt()}else heat=(heat-.04f*dt*60f).coerceAtLeast(0f)}
+            private fun button(cv:Canvas,l:Float,t:Float,w:Float,h:Float,s:String){p.color=Color.rgb(36,37,42);cv.drawRoundRect(l,t,l+w,t+h,18f,18f,p);p.style=Paint.Style.STROKE;p.strokeWidth=3f;p.color=Color.rgb(212,175,55);cv.drawRoundRect(l,t,l+w,t+h,18f,18f,p);p.style=Paint.Style.FILL;p.textAlign=Paint.Align.CENTER;p.textSize=24f;p.color=Color.WHITE;cv.drawText(s,l+w/2,t+h*.62f,p)}
+            private fun control(cv:Canvas,l:Float,t:Float,w:Float,h:Float,s:String)=button(cv,l,t,w,h,s)
+            override fun onTouchEvent(e:MotionEvent):Boolean{input="TOUCH";if(e.action==MotionEvent.ACTION_DOWN){val X=e.x;val Y=e.y;if(screen==Screen.MENU){if(Y in 200f..310f)screen=Screen.DRIVE else if(Y in 315f..435f)screen=Screen.GARAGE}else if(screen==Screen.GARAGE&&Y>height-150){when{X<270->car=(car+cars.size-1)%cars.size;X<470->hue=(hue+45)%360;X<700->car=(car+1)%cars.size;else->screen=Screen.DRIVE};save()}else if(screen==Screen.DRIVE){touch(X,Y,true)}}else if(e.action==MotionEvent.ACTION_UP||e.action==MotionEvent.ACTION_CANCEL){steer=0f;gas=0f;brake=0f;hand=false};return true}
+            private fun touch(X:Float,Y:Float,d:Boolean){if(Y<height-190)return;when{X<135->steer=-1f;X<270->steer=1f;X>width-140->hand=d;X>width-260->gas=1f;X>width-380->brake=1f}}
+            fun onKey(e:KeyEvent):Boolean{val d=e.action==KeyEvent.ACTION_DOWN;input=if(e.device?.name?.contains("Nintendo",true)==true)"SWITCH PAD" else if(e.source and InputDevice.SOURCE_GAMEPAD!=0)"GAMEPAD" else "KEYBOARD";when(e.keyCode){KeyEvent.KEYCODE_A,KeyEvent.KEYCODE_DPAD_LEFT->steer=if(d)-1f else 0f;KeyEvent.KEYCODE_D,KeyEvent.KEYCODE_DPAD_RIGHT->steer=if(d)1f else 0f;KeyEvent.KEYCODE_W,KeyEvent.KEYCODE_DPAD_UP->gas=if(d)1f else 0f;KeyEvent.KEYCODE_S,KeyEvent.KEYCODE_DPAD_DOWN->brake=if(d)1f else 0f;KeyEvent.KEYCODE_SPACE,KeyEvent.KEYCODE_BUTTON_R1,KeyEvent.KEYCODE_BUTTON_B->hand=d;KeyEvent.KEYCODE_BACK,KeyEvent.KEYCODE_ESCAPE->{if(d)screen=Screen.MENU};else->return false};return true}
+            fun onPad(e:MotionEvent):Boolean{if(e.action!=MotionEvent.ACTION_MOVE)return false;if(e.source and InputDevice.SOURCE_JOYSTICK==0)return false;input="GAMEPAD";steer=e.getAxisValue(MotionEvent.AXIS_X);gas=max(e.getAxisValue(MotionEvent.AXIS_RTRIGGER),e.getAxisValue(MotionEvent.AXIS_GAS)).coerceIn(0f,1f);brake=max(e.getAxisValue(MotionEvent.AXIS_LTRIGGER),e.getAxisValue(MotionEvent.AXIS_BRAKE)).coerceIn(0f,1f);return true}
+            fun save(){prefs.edit().putInt("car",car).putFloat("hue",hue).putFloat("x",x).putFloat("y",y).putFloat("a",a).putFloat("fuel",fuel).putFloat("tires",tires).putFloat("heat",heat).putInt("cash",cash).putInt("rep",rep).apply()}
+          }
+          EOF
+      - name: Generate RC signing key
+        run: |
+          keytool -genkeypair -v -keystore "$RUNNER_TEMP/fme-bay-auto-rc02.jks" -storepass FME-RC02-TEST -keypass FME-RC02-TEST -alias fmebayauto -keyalg RSA -keysize 2048 -validity 3650 -dname 'CN=FME Bay Auto RC02,O=FlyMaccin Ent,C=US'
+          echo "RC_KEYSTORE=$RUNNER_TEMP/fme-bay-auto-rc02.jks" >> "$GITHUB_ENV"
+      - name: Lint and compile
+        working-directory: bay-auto-ci
+        run: gradle --no-daemon lintDebug assembleDebug assembleRelease
+      - name: Verify APKs
+        run: |
+          set -e
+          ls -lh bay-auto-ci/app/build/outputs/apk/debug/app-debug.apk bay-auto-ci/app/build/outputs/apk/release/app-release.apk
+          $ANDROID_HOME/build-tools/36.0.0/apksigner verify --verbose --print-certs bay-auto-ci/app/build/outputs/apk/release/app-release.apk
+          sha256sum bay-auto-ci/app/build/outputs/apk/debug/app-debug.apk bay-auto-ci/app/build/outputs/apk/release/app-release.apk > bay-auto-ci/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FME-Bay-Auto-RP-v0.6.1-rc02-APK
+          path: |
+            bay-auto-ci/app/build/outputs/apk/release/app-release.apk
+            bay-auto-ci/app/build/outputs/apk/debug/app-debug.apk
+            bay-auto-ci/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
