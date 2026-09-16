@@ -1,0 +1,129 @@
+name: Runtime Only Demonic FME Unified Studio v2.2.0
+
+on:
+  push:
+    branches:
+      - release/demonic-fme-unified-v2.2.0
+    paths:
+      - '.github/workflows/demonic-fme-unified-v220-runtime-only.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ARTIFACT_ID: '10430016264'
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare Android 36 emulator and KVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          AVD_HOME="$RUNNER_TEMP/fme-avd-home"
+          AVD_PATH="$AVD_HOME/fme_api36_fixed.avd"
+          mkdir -p "$AVD_HOME"
+          echo "ANDROID_AVD_HOME=$AVD_HOME" >> "$GITHUB_ENV"
+          echo "AVD_PATH=$AVD_PATH" >> "$GITHUB_ENV"
+      - name: Download exact hardened APK artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/out" /tmp/hardened-artifact
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o /tmp/hardened-artifact/artifact.zip
+          unzip -q /tmp/hardened-artifact/artifact.zip -d /tmp/hardened-artifact/files
+          SRC=$(find /tmp/hardened-artifact/files -name 'Demonic_FME_Unified_Studio_v2.2.0_HARDENED-debug.apk' | head -1)
+          test -f "$SRC"
+          cp "$SRC" "$GITHUB_WORKSPACE/out/Demonic_FME_Unified_Studio_v2.2.0_HARDENED-debug.apk"
+          echo 'b324c6a4545aee6c850e6766f1e46141b9972cd54ea8d7739afff411e32873f9  out/Demonic_FME_Unified_Studio_v2.2.0_HARDENED-debug.apk' | sha256sum -c -
+      - name: Create explicit Android 36 AVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_AVD_HOME
+          rm -rf "$AVD_PATH" "$ANDROID_AVD_HOME/fme_api36_fixed.ini"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+            -n fme_api36_fixed \
+            -k 'system-images;android-36;google_apis;x86_64' \
+            --path "$AVD_PATH" --force
+          cat > "$ANDROID_AVD_HOME/fme_api36_fixed.ini" <<EOF
+          avd.ini.encoding=UTF-8
+          path=$AVD_PATH
+          target=android-36
+          EOF
+          test -f "$ANDROID_AVD_HOME/fme_api36_fixed.ini"
+          test -d "$AVD_PATH"
+          "$ANDROID_HOME/emulator/emulator" -list-avds | tee "$GITHUB_WORKSPACE/out/avd-list.txt"
+          grep -q '^fme_api36_fixed$' "$GITHUB_WORKSPACE/out/avd-list.txt"
+      - name: Boot install launch and inspect
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_AVD_HOME
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          ACCEL='-accel off'
+          if [ -e /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          nohup emulator -avd fme_api36_fixed -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect $ACCEL >/tmp/fme-emulator-fixed.log 2>&1 &
+          EMUPID=$!
+          echo "emulator_pid=$EMUPID" > "$GITHUB_WORKSPACE/out/runtime-smoke.txt"
+          if ! timeout 150 adb wait-for-device; then
+            echo 'adb=TIMEOUT' >> "$GITHUB_WORKSPACE/out/runtime-smoke.txt"
+            exit 1
+          fi
+          READY=0
+          for i in $(seq 1 100); do
+            BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            if [ "$BOOT" = '1' ]; then READY=1; break; fi
+            sleep 2
+          done
+          if [ "$READY" != '1' ]; then echo 'boot=TIMEOUT' >> "$GITHUB_WORKSPACE/out/runtime-smoke.txt"; exit 1; fi
+          echo 'boot=PASS' >> "$GITHUB_WORKSPACE/out/runtime-smoke.txt"
+          APK="$GITHUB_WORKSPACE/out/Demonic_FME_Unified_Studio_v2.2.0_HARDENED-debug.apk"
+          adb install -r "$APK" | tee "$GITHUB_WORKSPACE/out/adb-install.txt"
+          grep -q 'Success' "$GITHUB_WORKSPACE/out/adb-install.txt"
+          echo 'install=PASS' >> "$GITHUB_WORKSPACE/out/runtime-smoke.txt"
+          adb logcat -c
+          adb shell monkey -p com.flymaccin.pocketpotna -c android.intent.category.LAUNCHER 1 | tee "$GITHUB_WORKSPACE/out/monkey-launch.txt"
+          sleep 10
+          PID=$(adb shell pidof com.flymaccin.pocketpotna | tr -d '\r')
+          echo "app_pid=$PID" >> "$GITHUB_WORKSPACE/out/runtime-smoke.txt"
+          adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/out/dumpsys-activity.txt"
+          adb logcat -d > "$GITHUB_WORKSPACE/out/logcat.txt"
+          adb exec-out screencap -p > "$GITHUB_WORKSPACE/out/emulator-launch.png" || true
+          if [ -z "$PID" ]; then echo 'launch=FAIL_NO_PID' >> "$GITHUB_WORKSPACE/out/runtime-smoke.txt"; exit 1; fi
+          if grep -q -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "$GITHUB_WORKSPACE/out/logcat.txt"; then
+            echo 'launch=FAIL_FATAL' >> "$GITHUB_WORKSPACE/out/runtime-smoke.txt"
+            grep -A15 -B3 -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "$GITHUB_WORKSPACE/out/logcat.txt" || true
+            exit 1
+          fi
+          echo 'launch=PASS' >> "$GITHUB_WORKSPACE/out/runtime-smoke.txt"
+      - name: Always collect diagnostics and hashes
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          if [ -f /tmp/fme-emulator-fixed.log ]; then cp /tmp/fme-emulator-fixed.log "$GITHUB_WORKSPACE/out/emulator-host.log"; fi
+          cd "$GITHUB_WORKSPACE/out"
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt
+      - name: Upload runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Demonic-FME-Unified-Studio-v2.2.0-runtime-fixed
+          path: out/*
+          if-no-files-found: error
+          retention-days: 30
