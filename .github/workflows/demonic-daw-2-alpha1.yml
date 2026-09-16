@@ -86,6 +86,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export PATH="$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          ADB="$ANDROID_SDK_ROOT/platform-tools/adb"
+          test -x "$ADB"
+          "$ADB" version
           export ANDROID_AVD_HOME="$RUNNER_TEMP/demonic2-avd"
           mkdir -p "$ANDROID_AVD_HOME"
           echo no | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" create avd \
@@ -100,24 +104,24 @@ jobs:
           "$ANDROID_SDK_ROOT/emulator/emulator" -avd demonic2_api36 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect > /tmp/emulator.log 2>&1 &
           EMU_PID=$!
           trap 'kill $EMU_PID || true' EXIT
-          timeout 180 adb wait-for-device
-          timeout 180 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done'
-          adb shell input keyevent 82 || true
+          timeout 180 "$ADB" wait-for-device
+          timeout 180 bash -c 'until [ "$("$ANDROID_SDK_ROOT/platform-tools/adb" shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done'
+          "$ADB" shell input keyevent 82 || true
           APK=/tmp/demonic2/app/build/outputs/apk/debug/app-debug.apk
-          adb install -r "$APK" | tee /tmp/install.txt
+          "$ADB" install -r "$APK" | tee /tmp/install.txt
           grep -q 'Success' /tmp/install.txt
-          adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/tmp/launch.txt 2>&1
+          "$ADB" shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/tmp/launch.txt 2>&1
           sleep 7
-          PID=$(adb shell pidof "$PKG" | tr -d '\r')
+          PID=$("$ADB" shell pidof "$PKG" | tr -d '\r')
           test -n "$PID"
           echo "PID=$PID" | tee /tmp/runtime.txt
-          adb shell dumpsys package "$PKG" | grep -E 'versionName|versionCode' | head -10 | tee -a /tmp/runtime.txt
-          adb logcat -d > /tmp/logcat.txt
+          "$ADB" shell dumpsys package "$PKG" | grep -E 'versionName|versionCode' | head -10 | tee -a /tmp/runtime.txt
+          "$ADB" logcat -d > /tmp/logcat.txt
           if grep -A12 'FATAL EXCEPTION' /tmp/logcat.txt | grep -q "$PKG"; then
             echo 'App-specific fatal exception detected' >&2
             exit 1
           fi
-          adb exec-out screencap -p > /tmp/demonic2-alpha1.png
+          "$ADB" exec-out screencap -p > /tmp/demonic2-alpha1.png
 
       - name: Collect artifact
         if: always()
