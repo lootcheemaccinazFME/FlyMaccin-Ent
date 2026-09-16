@@ -16,8 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      SRC_URL: https://pocket-potna-remote.floot.app/_cdn/static/6f3993d3-460e-4027-a79b-da6ff4489adb-Demonic_DAW_2_v0.1.0_ALPHA1_SOURCE.zip
-      SRC_SHA256: ae22da0c133dfc753347ea24ce3b971a66b0801e161b2b957915898982e44756
+      SRC_URL: https://pocket-potna-remote.floot.app/_cdn/static/7a8dbabe-7800-4d49-89a0-5986e7a1cf3b-Demonic_DAW_2_v0.1.0_ALPHA1_SOURCE_build2.zip
+      SRC_SHA256: 3439c829865bde9413b312ac5feb3140ace2aa1e6940aadc58fc7294a39ec161
       PKG: com.flymaccin.demonicdaw2
     steps:
       - uses: actions/checkout@v5
