@@ -37,8 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/fme-v220-hard
-          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/eb931350-73ed-4f6a-bd78-52aa1feeb7d4-Demonic_FME_Unified_Studio_v2.2.0_HARDENED_SOURCE.zip' -o /tmp/fme-v220-hard/source.zip
-          echo 'b3016306197efbf6243255701ad946d8ec148994b37ce0a4e65f8b9f71789dc8  /tmp/fme-v220-hard/source.zip' | sha256sum -c -
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/6c26f580-023f-4758-a682-207113ef792a-Demonic_FME_Unified_Studio_v2.2.0_HARDENED2_SOURCE.zip' -o /tmp/fme-v220-hard/source.zip
+          echo '3c606a0986a5d949bd281690e08f9439976cceb1ef689a75f4d23e70ff8bbe35  /tmp/fme-v220-hard/source.zip' | sha256sum -c -
           unzip -q /tmp/fme-v220-hard/source.zip -d /tmp/fme-v220-hard/src
           APP_DIR=/tmp/fme-v220-hard/src/Demonic_FME_Unified_Studio_v2.2.0_SOURCE
           echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
