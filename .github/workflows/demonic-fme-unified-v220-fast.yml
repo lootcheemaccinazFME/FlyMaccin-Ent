@@ -1,0 +1,66 @@
+name: Fast APK Demonic FME Unified Studio v2.2.0
+
+on:
+  push:
+    branches:
+      - release/demonic-fme-unified-v2.2.0
+    paths:
+      - '.github/workflows/demonic-fme-unified-v220-fast.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;35.0.0"
+      - name: Fetch source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fme-v220
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/235a9d76-de17-4fd2-a6ec-2ac463dd3806-Demonic_FME_Unified_Studio_v2.2.0_SOURCE.zip' -o /tmp/fme-v220/source.zip
+          echo '635ecfbdf69421c88db72ba02440efe56f4413cab4f4ede2635121ceafbdf2a7  /tmp/fme-v220/source.zip' | sha256sum -c -
+          unzip -q /tmp/fme-v220/source.zip -d /tmp/fme-v220/src
+          APP_DIR=/tmp/fme-v220/src/Demonic_FME_Unified_Studio_v2.2.0_SOURCE
+          test -d "$APP_DIR/app"
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
+      - name: Build installable APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR"
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug --stacktrace
+      - name: Package APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$APP_DIR/app/build/outputs/apk/debug/app-debug.apk" "$GITHUB_WORKSPACE/Demonic_FME_Unified_Studio_v2.2.0-debug.apk"
+          sha256sum "$GITHUB_WORKSPACE/Demonic_FME_Unified_Studio_v2.2.0-debug.apk" > "$GITHUB_WORKSPACE/Demonic_FME_Unified_Studio_v2.2.0-debug.apk.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Demonic-FME-Unified-Studio-v2.2.0-debug-APK
+          path: |
+            Demonic_FME_Unified_Studio_v2.2.0-debug.apk
+            Demonic_FME_Unified_Studio_v2.2.0-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
