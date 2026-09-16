@@ -1,0 +1,236 @@
+name: FME Games v3.0.0 RC1 Build 2
+
+on:
+  push:
+    branches:
+      - release/fme-games-v3.0.0-rc1
+    paths:
+      - '.github/workflows/fme-games-v300-rc1-build2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Prepare Android API 36 build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Fetch and validate checksum-locked RC source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/fme-games && mkdir -p /tmp/fme-games
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/53b9caf7-cc91-4f2e-aa15-dc0318dcbc59-FME_GAMES_PAK_STUDIO_v3.0.0_RC1_SOURCE.zip' -o /tmp/fme-games/source.zip
+          echo 'cd0ae66002c95914092cca3bddd4a9c5a3417121d20a621bdbe23af736dbd360  /tmp/fme-games/source.zip' | sha256sum -c -
+          unzip -q /tmp/fme-games/source.zip -d /tmp/fme-games/src
+          APP_DIR=/tmp/fme-games/src/FME_GAMES_PAK_STUDIO_v3.0.0_RC1_SOURCE
+          test -f "$APP_DIR/hub/src/main/assets/index.html"
+          test -f "$APP_DIR/RELEASE_GAME_CATALOG.json"
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
+          chmod +x "$APP_DIR/gradlew" "$APP_DIR/tools/package_game_apks.py"
+          python3 - <<'PY'
+          import re, pathlib
+          p=pathlib.Path('/tmp/fme-games/src/FME_GAMES_PAK_STUDIO_v3.0.0_RC1_SOURCE/hub/src/main/assets/index.html')
+          s=p.read_text()
+          m=re.search(r'<script[^>]*>(.*?)</script>',s,re.S|re.I)
+          assert m
+          pathlib.Path('/tmp/fme-games/hub-inline.js').write_text(m.group(1))
+          PY
+          node --check /tmp/fme-games/hub-inline.js
+          python3 - <<'PY'
+          import json
+          c=json.load(open('/tmp/fme-games/src/FME_GAMES_PAK_STUDIO_v3.0.0_RC1_SOURCE/RELEASE_GAME_CATALOG.json'))
+          assert len(c)==25
+          assert sum(g['mode']=='local' for g in c)==4
+          assert sum(g['mode']=='online' for g in c)==21
+          print('source validation PASS: 25 games')
+          PY
+
+      - name: Create temporary RC signing identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          PASS=$(openssl rand -hex 18)
+          keytool -genkeypair -keystore /tmp/fme-games-rc.jks -storepass "$PASS" -keypass "$PASS" -alias fmegamesrc -keyalg RSA -keysize 3072 -validity 3650 -dname 'CN=FME Games RC, O=FlyMaccin Ent, OU=Release Candidate, C=US' >/dev/null 2>&1
+          echo "FME_KEYSTORE_PATH=/tmp/fme-games-rc.jks" >> "$GITHUB_ENV"
+          echo "FME_KEYSTORE_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          echo "FME_KEY_ALIAS=fmegamesrc" >> "$GITHUB_ENV"
+          echo "FME_KEY_PASSWORD=$PASS" >> "$GITHUB_ENV"
+
+      - name: Build 25 release game APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR"
+          ./gradlew --no-daemon :gamewrapper:assembleRelease
+          python3 tools/package_game_apks.py
+          test "$(find hub/src/main/assets/game_apks -maxdepth 1 -name '*.apk' | wc -l)" -eq 25
+
+      - name: Lint game wrappers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR"
+          ./gradlew --no-daemon :gamewrapper:lint
+
+      - name: Build and lint FME Games hub APK and AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR"
+          ./gradlew --no-daemon :hub:lintRelease :hub:assembleRelease :hub:bundleRelease
+          HUB_APK=$(find hub/build/outputs/apk/release -name '*.apk' | head -1)
+          HUB_AAB=$(find hub/build/outputs/bundle/release -name '*.aab' | head -1)
+          test -f "$HUB_APK" && test -f "$HUB_AAB"
+          mkdir -p "$GITHUB_WORKSPACE/out/game-apks"
+          cp "$HUB_APK" "$GITHUB_WORKSPACE/out/FME_GAMES_v3.0.0_RC1-release.apk"
+          cp "$HUB_AAB" "$GITHUB_WORKSPACE/out/FME_GAMES_v3.0.0_RC1-release.aab"
+          cp hub/src/main/assets/game_apks/*.apk "$GITHUB_WORKSPACE/out/game-apks/"
+          cp RELEASE_GAME_CATALOG.json "$GITHUB_WORKSPACE/out/RELEASE_GAME_CATALOG.json"
+          cp /tmp/fme-games/source.zip "$GITHUB_WORKSPACE/out/FME_GAMES_PAK_STUDIO_v3.0.0_RC1_SOURCE.zip"
+
+      - name: Verify signatures, contents, and restricted permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$APKSIGNER" verify --verbose --print-certs "$GITHUB_WORKSPACE/out/FME_GAMES_v3.0.0_RC1-release.apk" > "$GITHUB_WORKSPACE/out/HUB_SIGNATURE.txt"
+          for apk in "$GITHUB_WORKSPACE"/out/game-apks/*.apk; do "$APKSIGNER" verify --verbose "$apk" >/dev/null; done
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, zipfile
+          out=Path('out'); catalog=json.loads((out/'RELEASE_GAME_CATALOG.json').read_text())
+          assert len(catalog)==25
+          assert len(list((out/'game-apks').glob('*.apk')))==25
+          with zipfile.ZipFile(out/'FME_GAMES_v3.0.0_RC1-release.apk') as z:
+              names=set(z.namelist())
+              assert 'assets/index.html' in names
+              assert sum(n.startswith('assets/game_apks/') and n.endswith('.apk') for n in names)==25
+              assert 'assets/legacy_apks/Hyphy_Pixels_v0.1.0-debug.apk' in names
+          print('package contents PASS')
+          PY
+          if grep -R -E 'REQUEST_INSTALL_PACKAGES|RECORD_AUDIO|BLUETOOTH_SCAN|POST_NOTIFICATIONS|FOREGROUND_SERVICE' "$APP_DIR/hub/src/main/AndroidManifest.xml" "$APP_DIR/gamewrapper/src/main/AndroidManifest.xml"; then exit 1; fi
+
+      - name: Package release outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/out"
+          zip -qr FME_GAMES_25_RELEASE_APKS_v3.0.0_RC1.zip game-apks RELEASE_GAME_CATALOG.json
+          cat > RELEASE_STATUS.txt <<EOF
+          FME Games Pak Studio v3.0.0 RC1
+          package=com.flymaccin.gamespakstudio
+          compileSdk=36
+          targetSdk=36
+          promoted_game_apks=25
+          offline_embedded_games=4
+          online_games=21
+          home_screen_games=25
+          hub_release_apk=PASS
+          hub_release_aab=PASS
+          lint_release=PASS
+          apk_signatures=PASS
+          restricted_permissions_removed=PASS
+          signer=TEMPORARY_RC_NOT_GOOGLE_PLAY_PRODUCTION
+          production_signing=PENDING_OWNER_CONTROLLED_KEY
+          EOF
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+
+      - name: Install Android 36 emulator image
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$SDKMANAGER" "emulator" "system-images;android-36;google_apis;x86_64"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+
+      - name: Create explicit Android 36 AVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVDPATH="$ANDROID_AVD_HOME/FME_Games_API_36.avd"
+          rm -rf "$AVDPATH" "$ANDROID_AVD_HOME/FME_Games_API_36.ini"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n FME_Games_API_36 -k 'system-images;android-36;google_apis;x86_64' -p "$AVDPATH" --force
+          cat > "$ANDROID_AVD_HOME/FME_Games_API_36.ini" <<EOF
+          avd.ini.encoding=UTF-8
+          path=$AVDPATH
+          path.rel=avd/FME_Games_API_36.avd
+          target=android-36
+          EOF
+          ANDROID_AVD_HOME="$ANDROID_AVD_HOME" "$ANDROID_HOME/emulator/emulator" -list-avds | grep -q 'FME_Games_API_36'
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+
+      - name: Smoke test hub and all 25 game APKs on Android 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          ACCEL='-accel off'; if [ -e /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          nohup emulator -avd FME_Games_API_36 -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect $ACCEL >/tmp/fme-games-emulator.log 2>&1 &
+          timeout 180 adb wait-for-device
+          READY=0; for i in $(seq 1 120); do BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r'); if [ "$BOOT" = '1' ]; then READY=1; break; fi; sleep 2; done
+          test "$READY" = '1'
+          adb install -r "$GITHUB_WORKSPACE/out/FME_GAMES_v3.0.0_RC1-release.apk" >/dev/null
+          adb logcat -c
+          adb shell monkey -p com.flymaccin.gamespakstudio -c android.intent.category.LAUNCHER 1 >/dev/null
+          sleep 8
+          PID=$(adb shell pidof com.flymaccin.gamespakstudio | tr -d '\r'); test -n "$PID"
+          adb exec-out screencap -p > "$GITHUB_WORKSPACE/out/FME_GAMES_HOME_API36.png"
+          adb logcat -d > "$GITHUB_WORKSPACE/out/HUB_LOGCAT.txt"
+          ! grep -q -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "$GITHUB_WORKSPACE/out/HUB_LOGCAT.txt"
+          echo "hub_launch=PASS pid=$PID" > "$GITHUB_WORKSPACE/out/ANDROID_RUNTIME_RESULT.txt"
+          python3 - <<'PY' > /tmp/game_install_rows.tsv
+          import json
+          for g in json.load(open('out/RELEASE_GAME_CATALOG.json')): print(g['package_name']+'\t'+g['apk_file'])
+          PY
+          PASS=0
+          while IFS=$'\t' read -r PKG APK; do
+            adb install -r "$GITHUB_WORKSPACE/out/game-apks/$APK" >/dev/null
+            adb logcat -c
+            adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
+            sleep 2
+            CPID=$(adb shell pidof "$PKG" | tr -d '\r'); test -n "$CPID"
+            ! adb logcat -d | grep -q -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL'
+            adb shell am force-stop "$PKG"; PASS=$((PASS+1))
+          done < /tmp/game_install_rows.tsv
+          test "$PASS" -eq 25
+          echo "game_apk_launch_smoke=$PASS/25 PASS" >> "$GITHUB_WORKSPACE/out/ANDROID_RUNTIME_RESULT.txt"
+          cp /tmp/fme-games-emulator.log "$GITHUB_WORKSPACE/out/EMULATOR_HOST.log"
+
+      - name: Collect diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          if [ -f /tmp/fme-games-emulator.log ] && [ ! -f "$GITHUB_WORKSPACE/out/EMULATOR_HOST.log" ]; then cp /tmp/fme-games-emulator.log "$GITHUB_WORKSPACE/out/EMULATOR_HOST.log"; fi
+          cd "$GITHUB_WORKSPACE/out"
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt
+
+      - name: Upload FME Games RC release package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FME-Games-v3.0.0-RC1-release-package-build2
+          path: out/*
+          if-no-files-found: error
+          retention-days: 30
