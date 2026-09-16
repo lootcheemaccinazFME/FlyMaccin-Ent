@@ -1,0 +1,175 @@
+name: FME Universal Aippy62 Repair + Android 36 QA
+on:
+  push:
+    branches: [qa/fme-universal-full-android-audit-2026-09-16]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  repair-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 36 tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-36" "build-tools;35.0.0" "system-images;android-36;google_apis;x86_64"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+      - name: Fetch exact failing preprod set
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p input repaired out
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/13dcdcbe-aa8f-4c81-8774-cca53e20f74e-AIPPY_LIVE_APK_COLLECTION_2026-09-15_QA_INPUT.zip' -o input/aippy62.zip
+          echo '1bc812964750cd3ddf1bc148a95a865855266f7c28bc8423ac6638cff5ff2823  input/aippy62.zip' | sha256sum -c -
+          unzip -q input/aippy62.zip -d input/apks
+          test "$(find input/apks -type f -name '*.apk' | wc -l)" -eq 62
+      - name: Create QA release-candidate signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          PASS=$(openssl rand -hex 18)
+          echo "::add-mask::$PASS"
+          keytool -genkeypair -keystore /tmp/fme-aippy62-rc.jks -storepass "$PASS" -keypass "$PASS" -alias fmeaippy62rc -keyalg RSA -keysize 3072 -validity 3650 -dname 'CN=FME Aippy62 Release Candidate, O=FlyMaccin Ent, OU=Android QA, C=US' >/dev/null 2>&1
+          echo "RC_PASS=$PASS" >> "$GITHUB_ENV"
+      - name: Repackage resources.arsc correctly, align, and sign
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
+          import os, shutil
+          srcs=sorted(Path('input/apks').rglob('*.apk'))
+          out=Path('repaired/unsigned'); out.mkdir(parents=True,exist_ok=True)
+          for src in srcs:
+              dst=out/src.name
+              with ZipFile(src,'r') as zin, ZipFile(dst,'w',allowZip64=True) as zout:
+                  for info in zin.infolist():
+                      name=info.filename
+                      if name.upper().startswith('META-INF/'):
+                          continue
+                      data=zin.read(name)
+                      ni=type(info)(name, date_time=info.date_time)
+                      ni.external_attr=info.external_attr
+                      ni.comment=info.comment
+                      ni.extra=b''
+                      ni.create_system=info.create_system
+                      ni.compress_type=ZIP_STORED if name=='resources.arsc' else ZIP_DEFLATED
+                      zout.writestr(ni,data)
+          assert len(list(out.glob('*.apk')))==62
+          PY
+          mkdir -p repaired/aligned repaired/signed
+          for apk in repaired/unsigned/*.apk; do
+            f=$(basename "$apk")
+            "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$apk" "repaired/aligned/$f"
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+              --ks /tmp/fme-aippy62-rc.jks --ks-key-alias fmeaippy62rc \
+              --ks-pass env:RC_PASS --key-pass env:RC_PASS \
+              --out "repaired/signed/$f" "repaired/aligned/$f"
+          done
+          test "$(find repaired/signed -type f -name '*.apk' | wc -l)" -eq 62
+      - name: Verify repaired package format and signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          printf 'file\tpackage\tversionCode\tversionName\tsignature\tzipalign\tresourcesStored\n' > out/static_repaired.tsv
+          mapfile -d '' APKS < <(find repaired/signed -type f -name '*.apk' -print0 | sort -z)
+          for apk in "${APKS[@]}"; do
+            f=$(basename "$apk")
+            unzip -tq "$apk" >/dev/null
+            "$APKSIGNER" verify --verbose "$apk" >/dev/null
+            "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -p 4 "$apk"
+            python3 - "$apk" <<'PY'
+          import sys,zipfile
+          z=zipfile.ZipFile(sys.argv[1]); i=z.getinfo('resources.arsc')
+          assert i.compress_type==zipfile.ZIP_STORED, (sys.argv[1],i.compress_type)
+          PY
+            b=$($AAPT dump badging "$apk" | sed -n '1p')
+            pkg=$(printf '%s\n' "$b" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            vc=$(printf '%s\n' "$b" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+            vn=$(printf '%s\n' "$b" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+            printf '%s\t%s\t%s\t%s\tPASS\tPASS\tPASS\n' "$f" "$pkg" "$vc" "$vn" >> out/static_repaired.tsv
+          done
+      - name: Prepare Android 36 AVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_AVD_HOME="$HOME/.android/avd"; mkdir -p "$ANDROID_AVD_HOME"
+          AVDPATH="$ANDROID_AVD_HOME/FME_Aippy62_Repair_API36.avd"
+          rm -rf "$AVDPATH" "$ANDROID_AVD_HOME/FME_Aippy62_Repair_API36.ini"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n FME_Aippy62_Repair_API36 -k 'system-images;android-36;google_apis;x86_64' -p "$AVDPATH" --force
+          cat > "$ANDROID_AVD_HOME/FME_Aippy62_Repair_API36.ini" <<EOF
+          avd.ini.encoding=UTF-8
+          path=$AVDPATH
+          path.rel=avd/FME_Aippy62_Repair_API36.avd
+          target=android-36
+          EOF
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+      - name: Install and launch all 62 repaired APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          ACCEL='-accel off'; if [ -e /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          nohup emulator -avd FME_Aippy62_Repair_API36 -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect $ACCEL > out/emulator.log 2>&1 &
+          timeout 180 adb wait-for-device
+          READY=0; for i in $(seq 1 120); do BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r'); if [ "$BOOT" = 1 ]; then READY=1; break; fi; sleep 2; done
+          test "$READY" = 1
+          printf 'file\tpackage\tinstall\tresolve\tlaunch\tprocess\tfatal\tresult\n' > out/runtime_repaired.tsv
+          FAIL=0; PASS=0
+          mapfile -d '' APKS < <(find repaired/signed -type f -name '*.apk' -print0 | sort -z)
+          for apk in "${APKS[@]}"; do
+            f=$(basename "$apk")
+            pkg=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | sed -n '1p' | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            install=PASS; resolve=PASS; launch=PASS; process=PASS; fatal=NONE; result=PASS
+            adb uninstall "$pkg" </dev/null >/dev/null 2>&1 || true
+            if ! timeout 60 adb install "$apk" </dev/null > "out/${f}.install.txt" 2>&1; then install=FAIL; resolve=SKIP; launch=SKIP; process=SKIP; fatal=NA; result=FAIL
+            else
+              comp=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$pkg" </dev/null 2>/dev/null | tr -d '\r' | tail -1)
+              if [ -z "$comp" ] || [[ "$comp" == *'No activity found'* ]]; then resolve=FAIL; launch=SKIP; process=SKIP; result=FAIL
+              else
+                adb logcat -c </dev/null
+                timeout 30 adb shell am start -W -n "$comp" </dev/null > "out/${f}.launch.txt" 2>&1 || { launch=FAIL; result=FAIL; }
+                sleep 2
+                pid=$(adb shell pidof "$pkg" </dev/null 2>/dev/null | tr -d '\r' || true)
+                if [ -z "$pid" ]; then process=FAIL; result=FAIL; fi
+                adb logcat -d </dev/null > "out/${f}.logcat.txt"
+                if grep -q -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "out/${f}.logcat.txt"; then fatal=FOUND; result=FAIL; fi
+              fi
+            fi
+            if [ "$result" = PASS ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$f" "$pkg" "$install" "$resolve" "$launch" "$process" "$fatal" "$result" | tee -a out/runtime_repaired.tsv
+            adb shell am force-stop "$pkg" </dev/null >/dev/null 2>&1 || true
+            adb uninstall "$pkg" </dev/null >/dev/null 2>&1 || true
+          done
+          printf 'PASS=%s\nFAIL=%s\n' "$PASS" "$FAIL" | tee out/summary.txt
+          test $((PASS+FAIL)) -eq 62
+          test "$FAIL" -eq 0
+      - name: Package repaired install-ready QA set
+        if: always()
+        shell: bash
+        run: |
+          if [ -d repaired/signed ]; then (cd repaired/signed && zip -q -9 "$GITHUB_WORKSPACE/out/FME_AIPPY62_ANDROID36_INSTALL_READY_QA.zip" ./*.apk); fi
+          find out -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > out/SHA256SUMS.txt || true
+      - name: Upload repaired QA package and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FME-Aippy62-Repaired-Android36-QA
+          path: out/*
+          if-no-files-found: error
+          retention-days: 30
