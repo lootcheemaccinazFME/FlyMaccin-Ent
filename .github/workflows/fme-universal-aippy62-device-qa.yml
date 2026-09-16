@@ -1,0 +1,129 @@
+name: FME Universal Aippy62 Android 36 QA
+on:
+  push:
+    branches: [qa/fme-universal-full-android-audit-2026-09-16]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  aippy62-device-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Android SDK 36 test tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-36" "build-tools;35.0.0" "system-images;android-36;google_apis;x86_64"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm || true; fi
+      - name: Fetch exact 62-APK Library collection
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p input/apks out
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/13dcdcbe-aa8f-4c81-8774-cca53e20f74e-AIPPY_LIVE_APK_COLLECTION_2026-09-15_QA_INPUT.zip' -o input/aippy62.zip
+          echo '1bc812964750cd3ddf1bc148a95a865855266f7c28bc8423ac6638cff5ff2823  input/aippy62.zip' | sha256sum -c -
+          unzip -q input/aippy62.zip -d input/apks
+          COUNT=$(find input/apks -type f -name '*.apk' | wc -l)
+          echo "APK_COUNT=$COUNT" | tee out/input_count.txt
+          test "$COUNT" -eq 62
+      - name: Static APK verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          : > out/static.tsv
+          printf 'file\tpackage\tversionCode\tversionName\tsignature\tzip\n' >> out/static.tsv
+          while IFS= read -r -d '' apk; do
+            f=$(basename "$apk")
+            unzip -tq "$apk" >/dev/null
+            sig=PASS; "$APKSIGNER" verify --verbose "$apk" >/dev/null 2>&1 || sig=FAIL
+            badging=$($AAPT dump badging "$apk" | head -1)
+            pkg=$(printf '%s\n' "$badging" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            vc=$(printf '%s\n' "$badging" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+            vn=$(printf '%s\n' "$badging" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+            test -n "$pkg"
+            printf '%s\t%s\t%s\t%s\t%s\tPASS\n' "$f" "$pkg" "$vc" "$vn" "$sig" >> out/static.tsv
+            test "$sig" = PASS
+          done < <(find input/apks -type f -name '*.apk' -print0 | sort -z)
+          test "$(tail -n +2 out/static.tsv | wc -l)" -eq 62
+      - name: Prepare Android 36 AVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVDPATH="$ANDROID_AVD_HOME/FME_Aippy62_API36.avd"
+          rm -rf "$AVDPATH" "$ANDROID_AVD_HOME/FME_Aippy62_API36.ini"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n FME_Aippy62_API36 -k 'system-images;android-36;google_apis;x86_64' -p "$AVDPATH" --force
+          cat > "$ANDROID_AVD_HOME/FME_Aippy62_API36.ini" <<EOF
+          avd.ini.encoding=UTF-8
+          path=$AVDPATH
+          path.rel=avd/FME_Aippy62_API36.avd
+          target=android-36
+          EOF
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+      - name: Install and launch all 62 APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          ACCEL='-accel off'; if [ -e /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          nohup emulator -avd FME_Aippy62_API36 -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect $ACCEL > out/emulator.log 2>&1 &
+          timeout 180 adb wait-for-device
+          READY=0
+          for i in $(seq 1 120); do
+            BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            if [ "$BOOT" = 1 ]; then READY=1; break; fi
+            sleep 2
+          done
+          test "$READY" = 1
+          printf 'file\tpackage\tinstall\tresolve\tlaunch\tprocess\tfatal\tresult\n' > out/runtime.tsv
+          FAIL=0; PASS=0
+          while IFS= read -r -d '' apk; do
+            f=$(basename "$apk")
+            pkg=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -1 | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            install=PASS; resolve=PASS; launch=PASS; process=PASS; fatal=NONE; result=PASS
+            adb uninstall "$pkg" >/dev/null 2>&1 || true
+            if ! timeout 60 adb install "$apk" > "out/${f}.install.txt" 2>&1; then install=FAIL; result=FAIL; resolve=SKIP; launch=SKIP; process=SKIP; fatal=NA
+            else
+              comp=$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$pkg" 2>/dev/null | tr -d '\r' | tail -1)
+              if [ -z "$comp" ] || [[ "$comp" == *'No activity found'* ]]; then resolve=FAIL; launch=SKIP; process=SKIP; result=FAIL
+              else
+                adb logcat -c
+                if ! timeout 30 adb shell am start -W -n "$comp" > "out/${f}.launch.txt" 2>&1; then launch=FAIL; result=FAIL; fi
+                sleep 3
+                pid=$(adb shell pidof "$pkg" 2>/dev/null | tr -d '\r')
+                if [ -z "$pid" ]; then process=FAIL; result=FAIL; fi
+                adb logcat -d > "out/${f}.logcat.txt"
+                if grep -q -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "out/${f}.logcat.txt"; then fatal=FOUND; result=FAIL; fi
+              fi
+            fi
+            if [ "$result" = PASS ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$f" "$pkg" "$install" "$resolve" "$launch" "$process" "$fatal" "$result" | tee -a out/runtime.tsv
+            adb shell am force-stop "$pkg" >/dev/null 2>&1 || true
+            adb uninstall "$pkg" >/dev/null 2>&1 || true
+          done < <(find input/apks -type f -name '*.apk' -print0 | sort -z)
+          printf 'PASS=%s\nFAIL=%s\n' "$PASS" "$FAIL" | tee out/summary.txt
+          test $((PASS+FAIL)) -eq 62
+          test "$FAIL" -eq 0
+      - name: Checksums
+        if: always()
+        shell: bash
+        run: |
+          find out -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > out/SHA256SUMS.txt || true
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FME-Universal-Aippy62-Android36-QA
+          path: out/*
+          if-no-files-found: error
+          retention-days: 30
