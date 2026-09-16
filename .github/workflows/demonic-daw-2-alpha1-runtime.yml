@@ -1,0 +1,120 @@
+name: Demonic DAW 2 Alpha 1 Runtime Only
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev/demonic-daw-2-v0.1.0-alpha1
+    paths:
+      - '.github/workflows/demonic-daw-2-alpha1-runtime.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PKG: com.flymaccin.demonicdaw2
+      SOURCE_RUN_ID: '35145866852'
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download exact Alpha 1 build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Demonic-DAW-2-v0.1.0-alpha1
+          path: /tmp/input
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 35145866852
+
+      - name: Verify APK input
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=/tmp/input/Demonic_DAW_2_v0.1.0-alpha1-debug.apk
+          test -s "$APK"
+          sha256sum "$APK" | tee /tmp/apk-sha256.txt
+
+      - name: Prepare Android 36 emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platform-tools' 'emulator' 'system-images;android-36;google_apis;x86_64'
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/demonic2-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" create avd \
+            -n demonic2_api36 -k 'system-images;android-36;google_apis;x86_64' \
+            --device pixel_6 --force --path "$ANDROID_AVD_HOME/demonic2_api36.avd"
+          cat > "$ANDROID_AVD_HOME/demonic2_api36.ini" <<EOF
+          avd.ini.encoding=UTF-8
+          path=$ANDROID_AVD_HOME/demonic2_api36.avd
+          path.rel=demonic2_api36.avd
+          target=android-36
+          EOF
+          "$ANDROID_SDK_ROOT/emulator/emulator" -list-avds | tee /tmp/avds.txt
+          grep -q '^demonic2_api36$' /tmp/avds.txt
+
+      - name: Install and launch exact Alpha 1 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ADB="$ANDROID_SDK_ROOT/platform-tools/adb"
+          test -x "$ADB"
+          "$ADB" version | tee /tmp/adb-version.txt
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/demonic2-avd"
+          "$ANDROID_SDK_ROOT/emulator/emulator" -avd demonic2_api36 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect > /tmp/emulator.log 2>&1 &
+          EMU_PID=$!
+          trap 'kill $EMU_PID || true' EXIT
+          timeout 180 "$ADB" wait-for-device
+          timeout 180 bash -c 'ADB="$ANDROID_SDK_ROOT/platform-tools/adb"; until [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done'
+          "$ADB" shell input keyevent 82 || true
+          APK=/tmp/input/Demonic_DAW_2_v0.1.0-alpha1-debug.apk
+          "$ADB" install -r "$APK" | tee /tmp/install.txt
+          grep -q 'Success' /tmp/install.txt
+          ACTIVITY=$("$ADB" shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER "$PKG" | tail -1 | tr -d '\r')
+          test -n "$ACTIVITY"
+          echo "ACTIVITY=$ACTIVITY" | tee /tmp/runtime.txt
+          "$ADB" shell am start -W -n "$ACTIVITY" | tee /tmp/launch.txt
+          sleep 8
+          PID=$("$ADB" shell pidof "$PKG" | tr -d '\r')
+          test -n "$PID"
+          echo "PID=$PID" | tee -a /tmp/runtime.txt
+          "$ADB" shell dumpsys package "$PKG" | grep -E 'versionName|versionCode' | head -10 | tee -a /tmp/runtime.txt
+          "$ADB" logcat -d > /tmp/logcat.txt
+          if grep -A15 'FATAL EXCEPTION' /tmp/logcat.txt | grep -q "$PKG"; then
+            echo 'App-specific fatal exception detected' >&2
+            exit 1
+          fi
+          "$ADB" exec-out screencap -p > /tmp/demonic2-alpha1.png
+          echo 'ANDROID_36_INSTALL_LAUNCH=PASS' | tee -a /tmp/runtime.txt
+
+      - name: Collect runtime evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/out
+          cp /tmp/input/Demonic_DAW_2_v0.1.0-alpha1-debug.apk /tmp/out/ 2>/dev/null || true
+          cp /tmp/apk-sha256.txt /tmp/out/ 2>/dev/null || true
+          cp /tmp/adb-version.txt /tmp/out/ 2>/dev/null || true
+          cp /tmp/avds.txt /tmp/out/ 2>/dev/null || true
+          cp /tmp/install.txt /tmp/out/ 2>/dev/null || true
+          cp /tmp/launch.txt /tmp/out/ 2>/dev/null || true
+          cp /tmp/runtime.txt /tmp/out/ 2>/dev/null || true
+          cp /tmp/logcat.txt /tmp/out/ 2>/dev/null || true
+          cp /tmp/emulator.log /tmp/out/ 2>/dev/null || true
+          cp /tmp/demonic2-alpha1.png /tmp/out/ 2>/dev/null || true
+          (cd /tmp/out && sha256sum * > SHA256SUMS.txt || true)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Demonic-DAW-2-v0.1.0-alpha1-runtime
+          path: /tmp/out
+          if-no-files-found: error
+          retention-days: 30
