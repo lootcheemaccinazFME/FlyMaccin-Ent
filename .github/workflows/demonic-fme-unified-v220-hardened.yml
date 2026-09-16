@@ -1,0 +1,124 @@
+name: Hardened QA Demonic FME Unified Studio v2.2.0
+
+on:
+  push:
+    branches:
+      - release/demonic-fme-unified-v2.2.0
+    paths:
+      - '.github/workflows/demonic-fme-unified-v220-hardened.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hardened:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+      - name: Fetch hardened source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fme-v220-hard
+          curl -fL --retry 3 'https://pocket-potna-remote.floot.app/_cdn/static/eb931350-73ed-4f6a-bd78-52aa1feeb7d4-Demonic_FME_Unified_Studio_v2.2.0_HARDENED_SOURCE.zip' -o /tmp/fme-v220-hard/source.zip
+          echo 'b3016306197efbf6243255701ad946d8ec148994b37ce0a4e65f8b9f71789dc8  /tmp/fme-v220-hard/source.zip' | sha256sum -c -
+          unzip -q /tmp/fme-v220-hard/source.zip -d /tmp/fme-v220-hard/src
+          APP_DIR=/tmp/fme-v220-hard/src/Demonic_FME_Unified_Studio_v2.2.0_SOURCE
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
+      - name: Static identity checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check "$APP_DIR/app/src/main/assets/app.js"
+          grep -q 'applicationId = "com.flymaccin.pocketpotna"' "$APP_DIR/app/build.gradle.kts"
+          grep -q 'versionName = "2.2.0"' "$APP_DIR/app/build.gradle.kts"
+          grep -q 'Demonic DAW' "$APP_DIR/app/src/main/assets/app.js"
+          grep -q 'Unified Backup' "$APP_DIR/app/src/main/assets/app.js"
+      - name: Unit tests, lint, and APK assembly
+        id: qa
+        shell: bash
+        run: |
+          set +e
+          cd "$APP_DIR"
+          chmod +x gradlew scripts/*.sh || true
+          ./gradlew --no-daemon clean testDebugUnitTest lintDebug assembleDebug
+          STATUS=$?
+          REPORT="$APP_DIR/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          if [ -f "$REPORT" ]; then cp "$REPORT" "$GITHUB_WORKSPACE/out/lint-results-debug.txt"; fi
+          if [ $STATUS -ne 0 ]; then
+            echo '===== LINT ERRORS ====='
+            if [ -f "$REPORT" ]; then grep -n -B2 -A4 'Error:' "$REPORT" || true; fi
+            exit $STATUS
+          fi
+      - name: Install Android 36 emulator image
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$SDKMANAGER" "emulator" "system-images;android-36;google_apis;x86_64"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n fme_api36 -k 'system-images;android-36;google_apis;x86_64' --force
+      - name: Boot emulator and smoke-test APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          nohup emulator -avd fme_api36 -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect -accel on >/tmp/emulator.log 2>&1 &
+          adb wait-for-device
+          for i in $(seq 1 90); do
+            BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            [ "$BOOT" = '1' ] && break
+            sleep 2
+          done
+          [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = '1' ]
+          APK=$(find "$APP_DIR/app/build/outputs/apk/debug" -name '*.apk' | head -1)
+          test -f "$APK"
+          adb install -r "$APK"
+          adb logcat -c
+          adb shell monkey -p com.flymaccin.pocketpotna -c android.intent.category.LAUNCHER 1
+          sleep 8
+          PID=$(adb shell pidof com.flymaccin.pocketpotna | tr -d '\r')
+          test -n "$PID"
+          adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/out/dumpsys-activity.txt"
+          adb logcat -d > "$GITHUB_WORKSPACE/out/logcat.txt"
+          if grep -A8 -B2 -E 'FATAL EXCEPTION|AndroidRuntime.*FATAL' "$GITHUB_WORKSPACE/out/logcat.txt"; then
+            echo 'Fatal exception detected after launch'
+            exit 1
+          fi
+          adb exec-out screencap -p > "$GITHUB_WORKSPACE/out/emulator-launch.png"
+          cp /tmp/emulator.log "$GITHUB_WORKSPACE/out/emulator-host.log" || true
+          echo "PID=$PID" > "$GITHUB_WORKSPACE/out/runtime-smoke.txt"
+          echo 'launch=PASS' >> "$GITHUB_WORKSPACE/out/runtime-smoke.txt"
+      - name: Collect APK and hashes
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          find "$APP_DIR/app/build/outputs" -type f -name '*.apk' -exec cp {} "$GITHUB_WORKSPACE/out/" \; 2>/dev/null || true
+          cd "$GITHUB_WORKSPACE/out"
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt
+      - name: Upload hardened QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Demonic-FME-Unified-Studio-v2.2.0-hardened-QA
+          path: out/*
+          if-no-files-found: warn
+          retention-days: 30
