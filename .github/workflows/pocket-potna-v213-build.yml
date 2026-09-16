@@ -9,7 +9,7 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
@@ -104,6 +104,52 @@ jobs:
           chmod +x "$SRC/scripts/verify-16kb-native.sh"
           "$SRC/scripts/verify-16kb-native.sh" "$APK"
 
+      - name: Enable KVM for Android Emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
+          ls -l /dev/kvm
+
+      - name: Prepare emulator evidence directory
+        run: |
+          mkdir -p out/emulator
+          printf '%s\n' \
+            'avd_name=fme-pocket-potna-api36' \
+            'api_level=36' \
+            'target=google_apis' \
+            'arch=x86_64' \
+            'profile=pixel_7' \
+            'apk=Pocket Potna v2.1.14 canonical release' \
+            > out/emulator/emulator-config.txt
+
+      - name: Boot functional API 36 emulator and smoke-test signed release
+        uses: ReactiveCircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          avd-name: fme-pocket-potna-api36
+          cores: 2
+          ram-size: 4096
+          heap-size: 512
+          disk-size: 8G
+          emulator-boot-timeout: 900
+          disable-animations: true
+          enable-hw-keyboard: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/emulator_smoke_test_v214.sh pocket-potna-v2.1.14 com.flymaccin.pocketpotna out/emulator
+
+      - name: Upload emulator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pocket-Potna-v2.1.14-Emulator-Evidence
+          path: out/emulator/*
+          if-no-files-found: warn
+
       - name: Collect canonical release receipts
         run: |
           set -euo pipefail
@@ -119,6 +165,8 @@ jobs:
             'versionName=2.1.14' \
             'versionCode=224' \
             "signer_sha256=$EXPECTED_FME_SIGNER_SHA256" \
+            'emulator_api=36' \
+            'emulator_smoke_test=PASS' \
             > out/RELEASE_ACCEPTANCE.txt
 
       - name: Upload canonical release artifacts
