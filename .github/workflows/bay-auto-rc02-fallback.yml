@@ -1,0 +1,60 @@
+name: FME Bay Auto RP RC02 Fallback
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/bay-auto-rc02-fallback.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Inspect preinstalled Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms" || true
+          ls "$ANDROID_HOME/build-tools" || true
+          if [ ! -d "$ANDROID_HOME/platforms/android-36" ]; then yes | sdkmanager --licenses >/dev/null || true; sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'; fi
+      - name: Reuse RC02 project generator
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('.github/workflows/bay-auto-rc02-build.yml').read_text().splitlines()
+          start=next(i for i,x in enumerate(s) if x.strip()=='- name: Generate isolated Android project')
+          run_i=next(i for i in range(start+1,len(s)) if s[i].strip()=='run: |')
+          end=next(i for i in range(run_i+1,len(s)) if s[i].strip()=='- name: Generate RC signing key')
+          lines=s[run_i+1:end]
+          ind=min(len(x)-len(x.lstrip()) for x in lines if x.strip())
+          Path('/tmp/gen.sh').write_text('\n'.join(x[ind:] for x in lines)+'\n')
+          PY
+          bash /tmp/gen.sh
+      - name: Create RC key and build
+        run: |
+          keytool -genkeypair -v -keystore "$RUNNER_TEMP/fme-bay-auto-rc02.jks" -storepass FME-RC02-TEST -keypass FME-RC02-TEST -alias fmebayauto -keyalg RSA -keysize 2048 -validity 3650 -dname 'CN=FME Bay Auto RC02,O=FlyMaccin Ent,C=US'
+          export RC_KEYSTORE="$RUNNER_TEMP/fme-bay-auto-rc02.jks"
+          cd bay-auto-ci
+          gradle --no-daemon lintDebug assembleDebug assembleRelease
+      - name: Verify and checksum
+        run: |
+          $ANDROID_HOME/build-tools/36.0.0/apksigner verify --verbose --print-certs bay-auto-ci/app/build/outputs/apk/release/app-release.apk
+          sha256sum bay-auto-ci/app/build/outputs/apk/debug/app-debug.apk bay-auto-ci/app/build/outputs/apk/release/app-release.apk > bay-auto-ci/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FME-Bay-Auto-RP-v0.6.1-rc02-APK
+          path: |
+            bay-auto-ci/app/build/outputs/apk/release/app-release.apk
+            bay-auto-ci/app/build/outputs/apk/debug/app-debug.apk
+            bay-auto-ci/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
