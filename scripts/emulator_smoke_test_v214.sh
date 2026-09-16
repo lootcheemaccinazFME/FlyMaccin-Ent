@@ -2,9 +2,10 @@
 set -Eeuo pipefail
 
 SRC="${1:-pocket-potna-v2.1.14}"
-APK="${SRC}/app/build/outputs/apk/release/app-release.apk"
 PACKAGE="${2:-com.flymaccin.pocketpotna}"
 OUT="${3:-out/emulator}"
+APK="${4:-${SRC}/app/build/outputs/apk/release/app-release.apk}"
+BUILD_LABEL="${5:-canonical release}"
 mkdir -p "$OUT"
 
 collect_diagnostics() {
@@ -41,11 +42,13 @@ adb shell settings put global transition_animation_scale 0 || true
 adb shell settings put global animator_duration_scale 0 || true
 
 if [[ ! -s "$APK" ]]; then
-  echo "EMULATOR_FAIL: release APK missing: $APK"
+  echo "EMULATOR_FAIL: APK missing: $APK"
   exit 21
 fi
 
-echo "[emulator] Installing signed release APK"
+printf '%s\n' "apk_path=$APK" "build_label=$BUILD_LABEL" > "$OUT/apk-under-test.txt"
+
+echo "[emulator] Installing $BUILD_LABEL APK"
 adb uninstall "$PACKAGE" >/dev/null 2>&1 || true
 INSTALL_OUTPUT="$(adb install --no-streaming -r "$APK" 2>&1)"
 printf '%s\n' "$INSTALL_OUTPUT" | tee "$OUT/install.txt"
@@ -88,7 +91,6 @@ if [[ -z "$PID" ]]; then
 fi
 printf '%s\n' "$PID" > "$OUT/pid-initial.txt"
 
-# A second observation catches immediate startup crashes that briefly create a PID.
 sleep 10
 PID_AFTER="$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r' || true)"
 if [[ -z "$PID_AFTER" ]]; then
@@ -103,10 +105,12 @@ printf '%s\n' "$FOCUS" > "$OUT/focus.txt"
 printf '%s\n' \
   'emulator_status=PASS' \
   "package=$PACKAGE" \
+  "build_label=$BUILD_LABEL" \
+  "apk_path=$APK" \
   "launcher_activity=$ACTIVITY" \
   "pid_initial=$PID" \
   "pid_after_10s=$PID_AFTER" \
   "focus_detected=$([[ -n "$FOCUS" ]] && echo yes || echo no)" \
   > "$OUT/EMULATOR_ACCEPTANCE.txt"
 
-echo "EMULATOR_PASS: $PACKAGE installed, launched, and survived startup on the Android emulator"
+echo "EMULATOR_PASS: $PACKAGE installed, launched, and survived startup on the Android emulator ($BUILD_LABEL)"
