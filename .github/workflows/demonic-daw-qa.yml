@@ -51,6 +51,11 @@ jobs:
             adb shell am start -W -n com.flymaccin.demonicdaw/.MainActivity
             sleep 5
             adb exec-out screencap -p > qa-output/offline-boot.png
+            adb shell uiautomator dump /sdcard/demonic-ui.xml >/dev/null
+            adb pull /sdcard/demonic-ui.xml qa-output/offline-ui.xml >/dev/null
+            grep -q 'FME SAMPLES' qa-output/offline-ui.xml
+            grep -q 'STUDIO' qa-output/offline-ui.xml
+            if grep -q 'Grand Piano' qa-output/offline-ui.xml; then echo 'Legacy Floot instrument UI still visible'; exit 1; fi
             adb shell dumpsys activity activities | grep -q 'com.flymaccin.demonicdaw/.MainActivity'
             adb logcat -d > qa-output/offline-logcat.txt
             if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt; then exit 1; fi
@@ -62,6 +67,11 @@ jobs:
             adb shell am start -W -n com.flymaccin.demonicdaw/.MainActivity
             sleep 5
             adb exec-out screencap -p > qa-output/online-boot.png
+            adb shell uiautomator dump /sdcard/demonic-ui-online.xml >/dev/null
+            adb pull /sdcard/demonic-ui-online.xml qa-output/online-ui.xml >/dev/null
+            grep -q 'FME SAMPLES' qa-output/online-ui.xml
+            grep -q 'STUDIO' qa-output/online-ui.xml
+            if grep -q 'Grand Piano' qa-output/online-ui.xml; then echo 'Legacy Floot instrument UI still visible online'; exit 1; fi
             adb shell dumpsys activity activities | grep -q 'com.flymaccin.demonicdaw/.MainActivity'
             adb logcat -d > qa-output/online-logcat.txt
             if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt; then exit 1; fi
