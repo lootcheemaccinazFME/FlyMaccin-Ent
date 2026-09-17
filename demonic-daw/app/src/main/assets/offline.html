@@ -8,7 +8,7 @@
 <div class="tabs"><button data-tab="drums" class="active">DRUMS</button><button data-tab="bass">BASS</button><button data-tab="sounds">FME SAMPLES</button><button data-tab="studio">STUDIO</button></div>
 <div id="drums" class="screen"><div class="panel"><div class="head"><div><small>BEAT ENGINE</small><strong>Drums 1</strong></div><b id="kitName">BAY KNOCK</b></div><div class="grid" id="drumGrid"></div><div class="kits" id="kits"></div></div></div>
 <div id="bass" class="screen hidden"><div class="panel"><div class="head"><div><small>PIANO ROLL</small><strong>Bass 1</strong></div><b id="soundName">G-FUNK BASS</b></div><div class="grid" id="bassGrid"></div><div class="roll"><small>PIANO ROLL 2 · DRAG ORANGE EDGE TO EXTEND NOTE</small><div id="noteRoll"></div></div></div></div>
-<div id="sounds" class="screen hidden"><div class="panel"><div class="head"><div><small>FME INSTRUMENT LIBRARY</small><strong>Offline Sounds</strong></div><b>LOCAL</b></div><div class="presets" id="presets"></div></div></div>
+<div id="sounds" class="screen hidden"><div class="panel"><div class="head"><div><small>FME INSTRUMENT LIBRARY</small><strong>Offline Sounds</strong></div><b>LOCAL</b></div><div style="padding:10px 12px"><small id="coreState">FME CORE CHECKING...</small><input id="sampleSearch" placeholder="Search FME Core..." style="width:100%;margin-top:8px;padding:10px;background:#09080d;color:white;border:1px solid #3d3450;border-radius:8px"></div><div class="presets" id="coreSamples"></div><div class="presets" id="presets"></div></div></div>
 <div id="studio" class="screen hidden"><div class="panel"><div class="head"><div><small>RECORDING STUDIO</small><strong>Audio / Vocal Takes</strong></div><b>LOCAL</b></div><div class="presets"><button id="rec">● RECORD</button><button id="stopRec">■ STOP</button><button id="uploadAudio">UPLOAD AUDIO</button><button id="importSf2">IMPORT SF2</button><button id="importSfz">IMPORT SFZ</button><button id="newTake">+ NEW TAKE</button></div><div style="padding:12px"><small id="recStatus">READY · MIC PERMISSION REQUIRED</small><div id="takes" style="margin-top:10px"></div></div></div></div><div class="status"><span id="engine">ENGINE READY</span><span class="save">LOCAL AUTOSAVE ACTIVE</span><span>ONLINE FEATURES RETURN WHEN CONNECTED</span></div>
 <script>
 const D=['Kick','Snare','Hat','Clap','Tom','Perc','Rim','Crash']; const N=['E3','D#3','D3','C#3','C3','B2','A#2','A2','G#2','G2','F#2','F2'];
@@ -31,5 +31,13 @@ async function startRecording(){try{let stream=await navigator.mediaDevices.getU
 rec.onclick=startRecording;stopRec.onclick=()=>recorder&&recorder.state!=='inactive'&&recorder.stop();newTake.onclick=startRecording;
 importSf2.onclick=()=>window.DemonicNative?.importSoundFont();importSfz.onclick=()=>window.DemonicNative?.importSfzFolder();
 uploadAudio.onclick=()=>{let i=document.createElement('input');i.type='file';i.accept='audio/*,.wav,.mp3,.flac,.ogg,.m4a';i.onchange=()=>{if(!i.files[0])return;let a=document.createElement('audio');a.controls=true;a.src=URL.createObjectURL(i.files[0]);let d=document.createElement('div');d.innerHTML='<b>UPLOAD · '+i.files[0].name+'</b> ';d.append(a);takes.prepend(d);recStatus.textContent='AUDIO LOADED'};i.click()};
+function loadCoreBrowser(){
+  try{
+    if(!window.DemonicNative||!DemonicNative.hasFmeCore()){coreState.textContent='FME CORE NOT INSTALLED';return}
+    let files=JSON.parse(DemonicNative.listFmeCoreSamples()||'[]'); coreState.textContent='FME CORE · '+files.length+' WAV SAMPLES INSTALLED';
+    function draw(q=''){coreSamples.innerHTML='';files.filter(x=>x.toLowerCase().includes(q.toLowerCase())).slice(0,120).forEach(x=>{let b=document.createElement('button');b.className='preset';let name=x.split('/').pop();b.innerHTML='<strong>'+name+'</strong><span>FME CORE WAV</span>';b.onclick=()=>{let ok=DemonicNative.loadFmeCoreSample(x);if(ok){DemonicNative.noteOn(60,110);setTimeout(()=>DemonicNative.noteOff(60),450);engine.textContent='FME SAMPLE · '+name}else engine.textContent='SAMPLE LOAD FAILED'};coreSamples.append(b)})} draw();sampleSearch.oninput=()=>draw(sampleSearch.value);
+  }catch(e){coreState.textContent='FME CORE ERROR'}
+}
+setTimeout(loadCoreBrowser,350);
 window.addEventListener('beforeunload',store);
 </script></body></html>
