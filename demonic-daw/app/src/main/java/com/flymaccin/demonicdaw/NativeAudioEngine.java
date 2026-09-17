@@ -7,6 +7,10 @@ public final class NativeAudioEngine {
     public static native boolean nativeStart();
     public static native void nativeStop();
     public static native int nativeLoadSoundFont(String path);
+    public static native void nativeClearSampleBank();
+    public static native boolean nativeAddWavRegion(String path, int loKey, int hiKey, int loVel, int hiVel,
+            int keyCenter, float volumeDb, float pan, float tuneCents, int transpose,
+            int loopMode, int loopStart, int loopEnd, int offset, int end, float releaseSeconds);
     public static native void nativeNoteOn(int channel, int key, int velocity);
     public static native void nativeNoteOff(int channel, int key);
     public static native void nativeProgramSelect(int channel, int soundFontId, int bank, int preset);
