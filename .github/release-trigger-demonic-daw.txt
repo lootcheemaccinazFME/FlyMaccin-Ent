@@ -1,2 +1,4 @@
 Demonic DAW signed release approved.
 Trigger: 2026-09-17 release signing build.
+Revision: 2
+Reason: rebuild signed release after ACCESS_NETWORK_STATE startup fix passed QA #6.
