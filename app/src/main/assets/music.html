@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Demonic Song AI</title>
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    window.__fmePending=new Map();
+    window.__fmeAndroidResult=(id,ok,payload)=>{const p=window.__fmePending.get(id);if(!p)return;window.__fmePending.delete(id);ok?p.resolve(payload):p.reject(new Error(payload));};
+  </script>
+</head>
+<body>
+<header>
+  <div><b>DEMONIC SONG AI</b><small>Lyrics → SP3 Performance → Authorized Voice → Stems → DAW</small></div>
+  <div id="saveState">Saved</div>
+</header>
+<nav>
+  <a class="navLink" href="index.html">← Studio Hut</a>
+  <span class="badge">MASTER-FIRST</span>
+  <span id="voiceStatus" class="badge">VOICE NOT CONFIGURED</span>
+</nav>
+<main>
+  <section class="panel wide musicGrid">
+    <aside class="musicRail">
+      <h2>Song Command</h2>
+      <label>Project title<input id="songTitle" value="Untitled SP3 Song"></label>
+      <label>Song brief<textarea id="songBrief" placeholder="Example: Funny grimy Richmond hyphy record about fake people talking too much."></textarea></label>
+      <label>Beat / BPM<input id="beatCode" value="FME_SP3_B10225_104BPM_HYPHYFUNK_808BOUNCE"></label>
+      <label>Delivery mode<select id="deliveryMode"><option>SP3_BAY_PLAYFUL_V1</option><option>SP3_BAY_MOB_V1</option><option>SP3_BAY_COMMAND_V1</option><option>SP3_BAY_WILD_V1</option><option selected>SP3_BAY_PLAYFUL_MOB_V2</option></select></label>
+      <div class="parameterGrid">
+        <label>Register<input id="register" type="number" value="18"></label>
+        <label>Energy %<input id="energy" type="number" value="50" min="0" max="100"></label>
+        <label>Projection %<input id="projection" type="number" value="40" min="0" max="100"></label>
+        <label>Chest weight<input id="chest" type="number" value="-20"></label>
+        <label>Brightness<input id="brightness" type="number" value="18"></label>
+        <label>Ad-lib density<input id="adlibs" type="number" value="38" min="0" max="100"></label>
+      </div>
+      <label>FX<input id="fxCode" value="ECHO_1/4_DELAY_25%FEEDBACK_20%WET"></label>
+      <div class="actions">
+        <button id="generateLyrics">Generate Lyrics</button>
+        <button id="buildPerformance">Build Performance Map</button>
+        <button id="buildPackage">Build Render Package</button>
+      </div>
+      <p class="muted">Master lyrics are never rewritten by provider compatibility actions. The app stores the master first, then derives render jobs from it.</p>
+    </aside>
+
+    <article class="musicWork">
+      <div class="sectionHead"><div><h2>Master Lyrics</h2><p class="muted">Creator-authoritative text. No automatic sanitizing.</p></div><span class="badge">IMMUTABLE BY PROVIDERS</span></div>
+      <textarea id="masterLyrics" class="musicLyrics" placeholder="Write or generate the master lyrics here."></textarea>
+      <div class="actions">
+        <button id="saveMaster">Save Master</button>
+        <button id="copyLyrics">Copy</button>
+        <button id="regenerateSelection">Regenerate Selected Bars</button>
+      </div>
+
+      <h3>SP3 Performance Map</h3>
+      <textarea id="performanceMap" class="codeArea" placeholder="Section/bar timing, stresses, pauses, ad-libs, doubles and underlayers appear here."></textarea>
+
+      <h3>Authorized Voice Render</h3>
+      <div class="voiceConfig">
+        <label>Self-hosted voice endpoint<input id="voiceEndpoint" placeholder="https://your-server.example/render"></label>
+        <label>Endpoint token<input id="voiceToken" type="password" autocomplete="off" placeholder="Stored encrypted on device"></label>
+        <label>Authorized voice profile ID<input id="voiceProfile" value="SP3"></label>
+        <div class="actions">
+          <button id="saveVoiceConfig">Save Voice Config</button>
+          <button id="clearVoiceConfig">Clear Voice Config</button>
+          <button id="renderVoice">Render My Voice</button>
+        </div>
+      </div>
+      <audio id="voicePreview" controls style="width:100%;display:none"></audio>
+      <div id="renderStatus" class="status"></div>
+
+      <h3>Demonic DAW Stem Plan</h3>
+      <div id="stemPlan" class="stemGrid"></div>
+      <label>Render / DAW package<textarea id="renderPackage" class="codeArea"></textarea></label>
+      <div class="actions">
+        <button id="sendToDaw">Mark Ready for Demonic DAW</button>
+        <button id="exportPackage">Export JSON</button>
+      </div>
+      <div id="musicStatus" class="status"></div>
+    </article>
+  </section>
+</main>
+<script type="module" src="music.js"></script>
+</body>
+</html>
