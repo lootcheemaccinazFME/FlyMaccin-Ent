@@ -5,3 +5,5 @@ Trigger revision: 6
 Reason: verify startup after adding ACCESS_NETWORK_STATE permission
 Revision: 7
 Reason: QA FME Core Pack install, native WAV browser, Studio shell, and Piano Roll 2.
+Revision: 8
+Reason: verify local-first FME UI is visible online and offline; reject legacy Floot UI.
