@@ -6,6 +6,10 @@ on:
         description: Release label
         required: false
         default: native-audio-rc
+  push:
+    branches: [ 'build/demonic-daw-apk-20260917' ]
+    paths:
+      - '.github/release-trigger-demonic-daw.txt'
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -46,7 +50,7 @@ jobs:
         working-directory: demonic-daw
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: $ANDROID_HOME
           DEMONIC_KEYSTORE_PATH: ${{ runner.temp }}/demonic-release.jks
           DEMONIC_KEYSTORE_PASSWORD: ${{ secrets.DEMONIC_KEYSTORE_PASSWORD }}
           DEMONIC_KEY_ALIAS: ${{ secrets.DEMONIC_KEY_ALIAS }}
