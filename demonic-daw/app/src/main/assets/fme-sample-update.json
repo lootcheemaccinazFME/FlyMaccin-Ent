@@ -89,5 +89,26 @@
       "touch/pointer right-edge resize",
       "persistent note widths"
     ]
+  },
+  "corePack": {
+    "name": "FME Core Pack v1",
+    "samples": 240,
+    "zipSizeMB": 18.42,
+    "sha256": "afe68660b55970d49ecc6fa4e5a2588adf02623cb14a311a37d628679081f71a",
+    "mode": "bundle with app / first-launch offline core"
+  },
+  "fullLibrary": {
+    "samples": 1782,
+    "mode": "optional installable/importable local expansion",
+    "rememberInstalledPacks": true
+  },
+  "userLibrary": {
+    "persistent": true,
+    "imports": [
+      "WAV/audio",
+      "SF2",
+      "SFZ",
+      "recordings"
+    ]
   }
 }
