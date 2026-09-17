@@ -56,5 +56,38 @@
     "offline engine",
     "4 buses",
     "automation"
-  ]
+  ],
+  "assetIntegration": {
+    "status": "STAGED",
+    "sourceOfTruth": "FME generated sample packs",
+    "packs": [
+      "FME_Original_Drum_Library_v1.zip",
+      "FME_Original_Drum_Library_v2_Expansion.zip",
+      "FME_Original_Instrument_Samples_v1.zip",
+      "FME_Original_Instrument_Samples_v2_Expansion.zip",
+      "FME_Every_Category_Blend_Mutation_Sample_Pack_v1.zip"
+    ],
+    "localPackSizeApproxMB": 182,
+    "repoBinaryUpload": "BLOCKED_BY_CURRENT_GITHUB_CONNECTOR_TEXT_ONLY",
+    "buildTarget": "app/src/main/assets/fme/",
+    "rule": "Do not fall back to fake acoustic factory labels; FME packs are canonical factory sound source."
+  },
+  "recordingStudio": {
+    "status": "SHELL_IMPLEMENTED",
+    "features": [
+      "mic recording",
+      "stop/new take",
+      "take playback",
+      "audio upload",
+      "SF2 import",
+      "SFZ folder import"
+    ]
+  },
+  "pianoRoll2": {
+    "status": "FOUNDATION_IMPLEMENTED",
+    "features": [
+      "touch/pointer right-edge resize",
+      "persistent note widths"
+    ]
+  }
 }
