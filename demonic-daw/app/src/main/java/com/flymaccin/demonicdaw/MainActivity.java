@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
       }
     });
     if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_REQUEST);
-    webView.loadUrl(isOnline() ? ONLINE_URL : OFFLINE_URL);
+    // Demonic DAW 1.2 is local-first so the bundled FME UI is authoritative online or offline.\n    webView.loadUrl(OFFLINE_URL);
   }
 
   private boolean isOnline() {
