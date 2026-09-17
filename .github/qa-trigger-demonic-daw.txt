@@ -1,4 +1,5 @@
 Approved QA trigger
 Build: Demonic DAW native offline/online
 Date: 2026-09-17
-Trigger revision: 2
+Trigger revision: 3
+Reason: reproduce tablet immediate-close startup crash after signed release
