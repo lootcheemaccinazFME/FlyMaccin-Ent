@@ -1,0 +1,63 @@
+name: Demonic DAW Android QA
+on:
+  workflow_dispatch:
+jobs:
+  emulator-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate bundled Demonic Factory samples
+        run: python3 .github/scripts/generate_demonic_factory.py
+      - name: Configure Android SDK
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools' 'cmake;3.22.1' 'ndk;27.2.12479018'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Build QA APK
+        working-directory: demonic-daw
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: gradle assembleDebug --stacktrace
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            mkdir -p qa-output
+            adb install -r demonic-daw/app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell settings put global airplane_mode_on 1
+            adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true
+            adb shell am force-stop com.flymaccin.demonicdaw
+            adb shell am start -W -n com.flymaccin.demonicdaw/.MainActivity
+            sleep 4
+            adb exec-out screencap -p > qa-output/offline-boot.png
+            adb shell dumpsys activity activities | grep -q 'com.flymaccin.demonicdaw/.MainActivity'
+            adb logcat -d > qa-output/offline-logcat.txt
+            if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt; then exit 1; fi
+            adb shell settings put global airplane_mode_on 0
+            adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false
+            sleep 4
+            adb shell am force-stop com.flymaccin.demonicdaw
+            adb shell am start -W -n com.flymaccin.demonicdaw/.MainActivity
+            sleep 5
+            adb exec-out screencap -p > qa-output/online-boot.png
+            adb logcat -d > qa-output/online-logcat.txt
+            if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demonic-daw-qa-evidence
+          path: qa-output/
+          if-no-files-found: error
