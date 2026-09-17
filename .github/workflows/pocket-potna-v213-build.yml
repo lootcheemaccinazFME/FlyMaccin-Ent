@@ -45,6 +45,9 @@ jobs:
       - name: Apply v2.1.14 branding and release policy
         run: python scripts/prepare_pocket_potna_v214_release.py
 
+      - name: Fix native FME startup background drawable
+        run: python scripts/fix_v214_window_background.py
+
       - name: Build NON-RELEASE debug APK for emulator validation
         working-directory: pocket-potna-v2.1.14
         env:
@@ -79,6 +82,7 @@ jobs:
             'arch=x86_64' \
             'profile=pixel_7' \
             'apk=Pocket Potna v2.1.14 NON-RELEASE debug validation build' \
+            'native_window_background=SAFE_FME_DARK_FALLBACK' \
             > out/emulator/emulator-config.txt
 
       - name: Boot functional API 36 emulator and smoke-test debug build
@@ -149,6 +153,9 @@ jobs:
 
       - name: Apply v2.1.14 branding and UMD-030 release law
         run: python scripts/prepare_pocket_potna_v214_release.py
+
+      - name: Fix native FME startup background drawable
+        run: python scripts/fix_v214_window_background.py
 
       - name: Validate protected production secrets
         env:
