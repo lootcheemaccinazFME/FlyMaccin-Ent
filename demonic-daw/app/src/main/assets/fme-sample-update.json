@@ -1,0 +1,60 @@
+{
+  "update": "Demonic DAW 1.2 FME Sample Update",
+  "versionCode": 3,
+  "soundPolicy": "FME_SAMPLE_PACK_ONLY",
+  "factoryCollections": [
+    {
+      "name": "FME Original Drum Library v1",
+      "samples": 31
+    },
+    {
+      "name": "FME Original Drum Library v2 Expansion",
+      "samples": 78
+    },
+    {
+      "name": "FME Original Instrument Samples v1",
+      "samples": 429
+    },
+    {
+      "name": "FME Original Instrument Samples v2 Expansion",
+      "samples": 620
+    },
+    {
+      "name": "FME Every Category Blend & Mutation Sample Pack v1",
+      "samples": 624
+    }
+  ],
+  "totalFmeSamples": 1782,
+  "categories": [
+    "drums",
+    "808s",
+    "bass",
+    "keys",
+    "organ",
+    "guitar-models",
+    "strings-models",
+    "brass-models",
+    "g-funk",
+    "pads",
+    "fx",
+    "104-category-blend-mutation-lanes"
+  ],
+  "disclosure": "Factory audio is original FME synthetic/sample-designed material. Do not label modeled sounds as real acoustic recordings.",
+  "plannedUI": [
+    "FME sample browser",
+    "upload/import section",
+    "recording studio",
+    "resizable piano-roll notes",
+    "audio tracks in arrangement"
+  ],
+  "existingNative": [
+    "Oboe output",
+    "SF2 FluidSynth",
+    "SFZ/WAV regions",
+    "SF2 import",
+    "SFZ folder import",
+    "offline engine",
+    "4 buses",
+    "automation"
+  ]
+}
