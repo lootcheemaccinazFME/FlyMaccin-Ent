@@ -2,36 +2,45 @@ package com.flymaccin.demonicdaw;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.WebSettings;
-import android.content.Context;
-import android.content.pm.PackageManager;
-import android.net.ConnectivityManager;
-import android.net.Network;
-import android.net.NetworkCapabilities;
+import androidx.documentfile.provider.DocumentFile;
+import org.json.JSONObject;
 import java.io.*;
 import java.util.*;
 
 public class MainActivity extends Activity {
   private WebView webView;
   private static final int MIC_REQUEST = 901;
+  private static final int SF2_REQUEST = 902;
+  private static final int SFZ_TREE_REQUEST = 903;
   private static final String ONLINE_URL = "https://demonicaistudiohut.floot.app";
   private static final String OFFLINE_URL = "file:///android_asset/offline.html";
   private boolean nativeReady = false;
   private File factoryDir;
+  private File importDir;
 
   @Override public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     try { nativeReady = NativeAudioEngine.nativeStart(); } catch (Throwable t) { nativeReady = false; }
     factoryDir = new File(getFilesDir(), "factory");
+    importDir = new File(getFilesDir(), "instrument-imports");
     try { copyAssetTree("factory", factoryDir); } catch (Exception ignored) {}
-    if (nativeReady) selectFactory("gfunk-bass");
+    importDir.mkdirs();
+    if (nativeReady && !restoreLastBank()) selectFactory("gfunk-bass");
 
     webView = new WebView(this);
     setContentView(webView);
@@ -56,10 +65,49 @@ public class MainActivity extends Activity {
     ConnectivityManager cm=(ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE); if(cm==null)return false; Network n=cm.getActiveNetwork(); if(n==null)return false; NetworkCapabilities c=cm.getNetworkCapabilities(n); return c!=null&&c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
   }
   private void copyAssetTree(String assetPath, File out) throws IOException {
-    String[] items=getAssets().list(assetPath); if(items==null)return; if(items.length==0){ out.getParentFile().mkdirs(); try(InputStream in=getAssets().open(assetPath); OutputStream os=new FileOutputStream(out)){ byte[]b=new byte[16384];int n;while((n=in.read(b))>0)os.write(b,0,n);} return; }
+    String[] items=getAssets().list(assetPath); if(items==null)return; if(items.length==0){ out.getParentFile().mkdirs(); try(InputStream in=getAssets().open(assetPath); OutputStream os=new FileOutputStream(out)){ copy(in,os); } return; }
     out.mkdirs(); for(String item:items) copyAssetTree(assetPath+"/"+item,new File(out,item));
   }
+  private static void copy(InputStream in, OutputStream out) throws IOException { byte[]b=new byte[32768];int n;while((n=in.read(b))>0)out.write(b,0,n); }
   private int selectFactory(String id){ if(!nativeReady)return 0; try{return SfzBank.load(new File(factoryDir,id+".sfz"));}catch(Exception e){return 0;} }
+
+  private boolean restoreLastBank(){
+    String kind=getPreferences(MODE_PRIVATE).getString("bank_kind",""); String path=getPreferences(MODE_PRIVATE).getString("bank_path","");
+    if(path.isEmpty())return false; File f=new File(path); if(!f.exists())return false;
+    try { if("sf2".equals(kind)) return NativeAudioEngine.nativeLoadSoundFont(path)>=0; if("sfz".equals(kind)) return SfzBank.load(f)>0; } catch(Exception ignored){} return false;
+  }
+  private void rememberBank(String kind, File path){ getPreferences(MODE_PRIVATE).edit().putString("bank_kind",kind).putString("bank_path",path.getAbsolutePath()).apply(); }
+
+  private void launchSf2Picker(){
+    Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*");
+    i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/octet-stream","audio/*","application/x-soundfont"}); startActivityForResult(i,SF2_REQUEST);
+  }
+  private void launchSfzFolderPicker(){ Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION); startActivityForResult(i,SFZ_TREE_REQUEST); }
+
+  @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+    super.onActivityResult(requestCode,resultCode,data); if(resultCode!=RESULT_OK||data==null||data.getData()==null)return; Uri uri=data.getData();
+    if(requestCode==SF2_REQUEST){ importSf2(uri); }
+    else if(requestCode==SFZ_TREE_REQUEST){ importSfzTree(uri,data.getFlags()); }
+  }
+  private void importSf2(Uri uri){
+    try { File dst=new File(importDir,"custom.sf2"); try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(dst)){if(in==null)throw new IOException("No input stream");copy(in,out);} int id=NativeAudioEngine.nativeLoadSoundFont(dst.getAbsolutePath()); boolean ok=id>=0; if(ok)rememberBank("sf2",dst); notifyImport("sf2",ok,dst.getName(),ok?"SoundFont loaded":"FluidSynth rejected the SoundFont"); }
+    catch(Exception e){notifyImport("sf2",false,"",e.getMessage());}
+  }
+  private void importSfzTree(Uri uri,int flags){
+    try {
+      getContentResolver().takePersistableUriPermission(uri,flags&(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION));
+      DocumentFile root=DocumentFile.fromTreeUri(this,uri); if(root==null||!root.isDirectory())throw new IOException("Folder unavailable");
+      File dstRoot=new File(importDir,"sfz-bank"); deleteTree(dstRoot); dstRoot.mkdirs(); List<File> sfzFiles=new ArrayList<>(); copyDocumentTree(root,dstRoot,sfzFiles);
+      if(sfzFiles.isEmpty())throw new IOException("No .sfz file found in selected folder"); File sfz=sfzFiles.get(0); int regions=SfzBank.load(sfz); boolean ok=regions>0; if(ok)rememberBank("sfz",sfz); notifyImport("sfz",ok,sfz.getName(),ok?(regions+" regions loaded"):"No playable regions found");
+    } catch(Exception e){notifyImport("sfz",false,"",e.getMessage());}
+  }
+  private void copyDocumentTree(DocumentFile src,File dst,List<File> sfzFiles)throws IOException{
+    if(src.isDirectory()){dst.mkdirs();for(DocumentFile child:src.listFiles()){String n=safeName(child.getName());copyDocumentTree(child,new File(dst,n),sfzFiles);}return;}
+    dst.getParentFile().mkdirs();try(InputStream in=getContentResolver().openInputStream(src.getUri());OutputStream out=new FileOutputStream(dst)){if(in==null)throw new IOException("Cannot read "+src.getName());copy(in,out);}if(dst.getName().toLowerCase(Locale.US).endsWith(".sfz"))sfzFiles.add(dst);
+  }
+  private static String safeName(String n){ if(n==null||n.trim().isEmpty())return "unnamed";return n.replaceAll("[^A-Za-z0-9._ -]","_"); }
+  private static void deleteTree(File f){if(f==null||!f.exists())return;if(f.isDirectory()){File[]xs=f.listFiles();if(xs!=null)for(File x:xs)deleteTree(x);}f.delete();}
+  private void notifyImport(String kind,boolean ok,String name,String message){ if(webView==null)return; final String js="window.dispatchEvent(new CustomEvent('demonic-native-import',{detail:{kind:"+JSONObject.quote(kind)+",ok:"+ok+",name:"+JSONObject.quote(name==null?"":name)+",message:"+JSONObject.quote(message==null?"":message)+"}}));"; runOnUiThread(()->webView.evaluateJavascript(js,null)); }
 
   public final class NativeBridge {
     @JavascriptInterface public boolean ready(){ return nativeReady; }
@@ -68,6 +116,8 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void noteOff(int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(0,key); }
     @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
     @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"WEB_FALLBACK"; }
+    @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
+    @JavascriptInterface public void importSfzFolder(){ runOnUiThread(()->launchSfzFolderPicker()); }
   }
   private String normalizeInstrument(String s){
     String x=s==null?"gfunk-bass":s.toLowerCase(Locale.US).replace(" / ","-").replace(' ','-');
