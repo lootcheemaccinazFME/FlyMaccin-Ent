@@ -39,7 +39,7 @@ jobs:
           profile: pixel_6
           disable-animations: false
           script: |
-            set -euxo pipefail
+            set -eu
             mkdir -p qa-output
             adb wait-for-device
             until adb shell getprop sys.boot_completed 2>/dev/null | grep -q '1'; do sleep 2; done
