@@ -1,6 +1,10 @@
 name: Demonic DAW Android QA
 on:
   workflow_dispatch:
+  push:
+    branches: [ 'build/demonic-daw-apk-20260917' ]
+    paths:
+      - '.github/qa-trigger-demonic-daw.txt'
 jobs:
   emulator-smoke:
     runs-on: ubuntu-latest
