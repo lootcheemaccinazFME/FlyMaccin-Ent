@@ -1,5 +1,5 @@
 Approved QA trigger
 Build: Demonic DAW native offline/online
 Date: 2026-09-17
-Trigger revision: 5
-Reason: run startup QA after fixing POSIX shell compatibility
+Trigger revision: 6
+Reason: verify startup after adding ACCESS_NETWORK_STATE permission
