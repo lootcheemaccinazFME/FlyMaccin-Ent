@@ -21,6 +21,8 @@ import androidx.documentfile.provider.DocumentFile;
 import org.json.JSONObject;
 import java.io.*;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class MainActivity extends Activity {
   private WebView webView;
@@ -39,6 +41,7 @@ public class MainActivity extends Activity {
     factoryDir = new File(getFilesDir(), "factory");
     importDir = new File(getFilesDir(), "instrument-imports");
     try { copyAssetTree("factory", factoryDir); } catch (Exception ignored) {}
+    try { installBundledFmeCore(); } catch (Exception ignored) {}
     importDir.mkdirs();
     if (nativeReady && !restoreLastBank()) selectFactory("gfunk-bass");
 
@@ -69,6 +72,26 @@ public class MainActivity extends Activity {
     out.mkdirs(); for(String item:items) copyAssetTree(assetPath+"/"+item,new File(out,item));
   }
   private static void copy(InputStream in, OutputStream out) throws IOException { byte[]b=new byte[32768];int n;while((n=in.read(b))>0)out.write(b,0,n); }
+  private void installBundledFmeCore() throws IOException {
+    File root=new File(getFilesDir(),"fme-packs/core-v1");
+    File done=new File(root,".installed");
+    if(done.exists())return;
+    deleteTree(root); root.mkdirs();
+    try(InputStream raw=getAssets().open("FME_Core_Pack_v1.zip"); ZipInputStream zin=new ZipInputStream(new BufferedInputStream(raw))){
+      ZipEntry e; byte[]buf=new byte[32768];
+      String rootPath=root.getCanonicalPath()+File.separator;
+      while((e=zin.getNextEntry())!=null){
+        File dst=new File(root,e.getName());
+        String cp=dst.getCanonicalPath();
+        if(!cp.startsWith(rootPath))throw new IOException("Unsafe core-pack path");
+        if(e.isDirectory()){dst.mkdirs();continue;}
+        File parent=dst.getParentFile(); if(parent!=null)parent.mkdirs();
+        try(OutputStream out=new BufferedOutputStream(new FileOutputStream(dst))){int n;while((n=zin.read(buf))>0)out.write(buf,0,n);}
+      }
+    }
+    try(FileOutputStream o=new FileOutputStream(done)){o.write("FME Core Pack v1".getBytes("UTF-8"));}
+    getSharedPreferences("demonic_packs",MODE_PRIVATE).edit().putBoolean("fme_core_v1",true).putString("fme_core_path",root.getAbsolutePath()).apply();
+  }
   private int selectFactory(String id){ if(!nativeReady)return 0; try{return SfzBank.load(new File(factoryDir,id+".sfz"));}catch(Exception e){return 0;} }
 
   private boolean restoreLastBank(){
@@ -116,6 +139,8 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void noteOff(int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(0,key); }
     @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
     @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"WEB_FALLBACK"; }
+    @JavascriptInterface public boolean hasFmeCore(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getBoolean("fme_core_v1",false); }
+    @JavascriptInterface public String fmeCorePath(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""); }
     @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
     @JavascriptInterface public void importSfzFolder(){ runOnUiThread(()->launchSfzFolderPicker()); }
   }
