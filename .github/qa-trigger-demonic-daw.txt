@@ -7,3 +7,5 @@ Revision: 7
 Reason: QA FME Core Pack install, native WAV browser, Studio shell, and Piano Roll 2.
 Revision: 8
 Reason: verify local-first FME UI is visible online and offline; reject legacy Floot UI.
+Revision: 9
+Reason: activate FME native playback paths, remove legacy oscillator presets, verify rotation/local-first UI.
