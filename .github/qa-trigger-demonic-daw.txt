@@ -3,3 +3,5 @@ Build: Demonic DAW native offline/online
 Date: 2026-09-17
 Trigger revision: 6
 Reason: verify startup after adding ACCESS_NETWORK_STATE permission
+Revision: 7
+Reason: QA FME Core Pack install, native WAV browser, Studio shell, and Piano Roll 2.
