@@ -128,6 +128,12 @@ public class MainActivity extends Activity {
     if(src.isDirectory()){dst.mkdirs();for(DocumentFile child:src.listFiles()){String n=safeName(child.getName());copyDocumentTree(child,new File(dst,n),sfzFiles);}return;}
     dst.getParentFile().mkdirs();try(InputStream in=getContentResolver().openInputStream(src.getUri());OutputStream out=new FileOutputStream(dst)){if(in==null)throw new IOException("Cannot read "+src.getName());copy(in,out);}if(dst.getName().toLowerCase(Locale.US).endsWith(".sfz"))sfzFiles.add(dst);
   }
+  private void collectWavs(File root,File f,org.json.JSONArray out){
+    if(f==null||!f.exists())return;
+    if(f.isDirectory()){File[]xs=f.listFiles();if(xs!=null)for(File x:xs)collectWavs(root,x,out);return;}
+    if(!f.getName().toLowerCase(Locale.US).endsWith(".wav"))return;
+    try{String rp=root.getCanonicalPath()+File.separator,fp=f.getCanonicalPath();if(fp.startsWith(rp))out.put(fp.substring(rp.length()).replace(File.separatorChar,'/'));}catch(Exception ignored){}
+  }
   private static String safeName(String n){ if(n==null||n.trim().isEmpty())return "unnamed";return n.replaceAll("[^A-Za-z0-9._ -]","_"); }
   private static void deleteTree(File f){if(f==null||!f.exists())return;if(f.isDirectory()){File[]xs=f.listFiles();if(xs!=null)for(File x:xs)deleteTree(x);}f.delete();}
   private void notifyImport(String kind,boolean ok,String name,String message){ if(webView==null)return; final String js="window.dispatchEvent(new CustomEvent('demonic-native-import',{detail:{kind:"+JSONObject.quote(kind)+",ok:"+ok+",name:"+JSONObject.quote(name==null?"":name)+",message:"+JSONObject.quote(message==null?"":message)+"}}));"; runOnUiThread(()->webView.evaluateJavascript(js,null)); }
@@ -141,6 +147,21 @@ public class MainActivity extends Activity {
     @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"WEB_FALLBACK"; }
     @JavascriptInterface public boolean hasFmeCore(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getBoolean("fme_core_v1",false); }
     @JavascriptInterface public String fmeCorePath(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""); }
+    @JavascriptInterface public String listFmeCoreSamples(){
+      File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
+      org.json.JSONArray a=new org.json.JSONArray(); collectWavs(root,root,a); return a.toString();
+    }
+    @JavascriptInterface public boolean loadFmeCoreSample(String relative){
+      try{
+        File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
+        File wav=new File(root,relative); String rp=root.getCanonicalPath()+File.separator, wp=wav.getCanonicalPath();
+        if(!wp.startsWith(rp)||!wav.isFile()||!wav.getName().toLowerCase(Locale.US).endsWith(".wav"))return false;
+        File sfz=new File(getCacheDir(),"fme-core-preview.sfz");
+        String txt="<region> sample="+wav.getAbsolutePath().replace("\\","/")+" key=60\n";
+        try(FileOutputStream o=new FileOutputStream(sfz)){o.write(txt.getBytes("UTF-8"));}
+        return SfzBank.load(sfz)>0;
+      }catch(Exception e){return false;}
+    }
     @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
     @JavascriptInterface public void importSfzFolder(){ runOnUiThread(()->launchSfzFolderPicker()); }
   }
