@@ -11,3 +11,5 @@ Revision: 9
 Reason: activate FME native playback paths, remove legacy oscillator presets, verify rotation/local-first UI.
 Revision: 10
 Reason: run QA with repaired emulator framework-readiness gates before APK install.
+Revision: 11
+Reason: verify UI hierarchy capture from shell-accessible temp storage after emulator readiness fix.
