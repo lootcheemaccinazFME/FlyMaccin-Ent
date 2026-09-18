@@ -15,3 +15,5 @@ Revision: 11
 Reason: verify UI hierarchy capture from shell-accessible temp storage after emulator readiness fix.
 Revision: 12
 Reason: retry UI hierarchy capture, preserve screenshot/activity/logcat evidence, and validate app health when accessibility root is unavailable.
+Revision: 13
+Reason: verify QA after replacing multiline UI hierarchy retry loops with runner-safe commands.
