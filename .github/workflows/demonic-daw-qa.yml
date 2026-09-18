@@ -60,11 +60,9 @@ jobs:
             grep -q 'com.flymaccin.demonicdaw/.MainActivity' qa-output/offline-activities.txt
             adb logcat -d > qa-output/offline-logcat.txt
             if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt; then exit 1; fi
-            for attempt in 1 2 3 4 5; do
-              adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true
-              if adb shell test -s /data/local/tmp/demonic-ui.xml; then break; fi
-              sleep 3
-            done
+            adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true
+            adb shell test -s /data/local/tmp/demonic-ui.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true; }
+            adb shell test -s /data/local/tmp/demonic-ui.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true; }
             if adb shell test -s /data/local/tmp/demonic-ui.xml; then
               adb pull /data/local/tmp/demonic-ui.xml qa-output/offline-ui.xml >/dev/null
               grep -q 'FME SAMPLES' qa-output/offline-ui.xml
@@ -87,11 +85,9 @@ jobs:
             grep -q 'com.flymaccin.demonicdaw/.MainActivity' qa-output/online-activities.txt
             adb logcat -d > qa-output/online-logcat.txt
             if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt; then exit 1; fi
-            for attempt in 1 2 3 4 5; do
-              adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true
-              if adb shell test -s /data/local/tmp/demonic-ui-online.xml; then break; fi
-              sleep 3
-            done
+            adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true
+            adb shell test -s /data/local/tmp/demonic-ui-online.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true; }
+            adb shell test -s /data/local/tmp/demonic-ui-online.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true; }
             if adb shell test -s /data/local/tmp/demonic-ui-online.xml; then
               adb pull /data/local/tmp/demonic-ui-online.xml qa-output/online-ui.xml >/dev/null
               grep -q 'FME SAMPLES' qa-output/online-ui.xml
