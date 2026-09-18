@@ -13,3 +13,5 @@ Revision: 10
 Reason: run QA with repaired emulator framework-readiness gates before APK install.
 Revision: 11
 Reason: verify UI hierarchy capture from shell-accessible temp storage after emulator readiness fix.
+Revision: 12
+Reason: retry UI hierarchy capture, preserve screenshot/activity/logcat evidence, and validate app health when accessibility root is unavailable.
