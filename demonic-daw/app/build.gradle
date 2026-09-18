@@ -10,8 +10,8 @@ android {
    applicationId 'com.flymaccin.demonicdaw'
    minSdk 26
    targetSdk 36
-   versionCode 3
-   versionName '1.2.0-fme-sample-update'
+   versionCode 4
+   versionName '1.2.1-fme-local-ui'
    externalNativeBuild {
      cmake {
        cppFlags '-std=c++17 -O3 -ffast-math'
