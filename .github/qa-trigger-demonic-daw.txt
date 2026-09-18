@@ -35,3 +35,5 @@ Revision: 16
 Reason: validate independent native sample channels and channel-scoped SFZ loading for simultaneous track playback.
 Revision: 17
 Reason: rebuild independent sample channels after fixing SFZ emit channel arguments.
+Revision: 18
+Reason: thread-safe native audio readiness after independent-channel compile fix; rerun full APK and runtime QA.
