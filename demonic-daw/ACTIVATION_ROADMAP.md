@@ -45,6 +45,38 @@ Independent instrument/sample channels; FME multi-piece drum mapping; audio/MIDI
 19. Real runtime QA: automated build/startup/audio-state tests plus physical tablet touch/rotation/mic/headphones/Bluetooth/latency/recording/simultaneous-playback/save-reopen/export tests.
 20. Release packaging: versioning; signed APK/AAB; clean-install and upgrade testing; final known-good release artifact.
 
+## Extended DAW architecture scope
+- Clip launcher/live mode: loops, scenes, one-shots, quantized launch, scene chaining, capture to arrangement.
+- Audio-to-MIDI: transient-to-drums, monophonic pitch-to-MIDI, rhythm extraction.
+- Audio analysis: BPM/key/transient/silence detection, waveform peak cache, sample classification.
+- Vocal production: gate, de-esser, compressor, EQ, practical pitch correction, doubling, take alignment, vocal presets.
+- Bus/master processing: parallel compression, grouped buses, reference playback, A/B comparison.
+- Sidechain: compressor sidechain, ducking, envelope-following modulation, selectable triggers.
+- Modulation: LFOs, envelopes, macros and parameter mapping.
+- Advanced automation: curves, points, ramps, copy/paste, automation clips, write/touch/latch and reset.
+- Track folders/groups, linked clips/make-unique, track versions, arrangement snapshots and reference/version history.
+- Sample recording, resampling, reverse/bounce-in-place and crossfades.
+- Audio normalization/analysis: peak normalization, DC-offset handling and clip statistics.
+- Tuning plus scale/chord workflow.
+- Drum-pad performance: touch velocity alternatives, banks, note repeat, rolls and configurable layouts.
+- MPE/expressive MIDI and MIDI clock/sync where platform support permits.
+- External audio interfaces: available I/O, mono/stereo selection and device-specific latency where Android permits.
+- Recording safety: pre-record buffer, automatic take recovery and storage checks.
+- Offline-first library: production, projects, FME packs, recording, editing and export require no network.
+- Portable project package with optional collected assets.
+- Android share workflow for mixes, stems and project packages.
+- Metadata/export tagging and batch stem rendering.
+- Render validation: clipping, missing samples, muted master, zero-length and failed-file detection.
+- Thermal/battery handling under sustained load.
+- Audio-thread safety: no disk I/O or unsafe realtime allocation/locking; safe UI/storage-to-audio communication.
+- Deterministic project state across save/reopen.
+- Testing infrastructure: serialization, edit-command, native audio, render, migration and reproducible demo-project tests.
+- Recovery/safe mode for damaged projects or failing effects/assets.
+- Contextual onboarding/help.
+- Customizable workspace persisted per DD1/DD2 state.
+- Accessibility: scalable controls/text, high contrast, reduced animation, configurable touch sensitivity.
+- Localization architecture with UI strings separated from engine logic.
+
 ## Architecture
 FME Samples/Instruments -> Tracks -> Loops/Patterns -> Arrangement -> Mixer/Automation -> Master -> WAV/Stems
 
