@@ -49,3 +49,5 @@ Revision: 22
 Reason: full production implementation campaign batch: track/clip/project model plus mixer, FME content manager, audio-to-track import integration. Validate build/runtime before deeper DSP and recorder persistence layers.
 Revision: 23
 Reason: validate Demonic Control Protocol v1 command bridge for project, track, clip, MIDI, mixer, transport, history and export control.
+Revision: 24
+Reason: validate Android Demonic Control exposure, runtime UI readiness marker, and melodic FME sample channel-1 routing without clearing drum channel 0.
