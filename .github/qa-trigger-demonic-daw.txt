@@ -25,3 +25,5 @@ Revision: 11
 Reason: pre-grant microphone permission so QA validates the DAW WebView instead of Android permission UI.
 Revision: 12
 Reason: render WebView before native audio/assets, retry FME Core background readiness, validate v1.2.1 local UI.
+Revision: 13
+Reason: replace invalid UIAutomator WebView DOM assertions with packaged-FME UI verification plus live activity/crash evidence.
