@@ -21,3 +21,5 @@ Revision: 14
 Reason: verify emulator QA with multiline shell conditionals eliminated from runner script.
 Revision: 10
 Reason: move 19MB FME Core extraction off UI thread; retest visible local UI startup.
+Revision: 11
+Reason: pre-grant microphone permission so QA validates the DAW WebView instead of Android permission UI.
