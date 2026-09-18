@@ -37,18 +37,32 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_6
-          disable-animations: false
+          disable-animations: true
           emulator-boot-timeout: 600
-          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -cores 2 -memory 4096
+          emulator-options: >-
+            -no-window
+            -no-snapshot
+            -noaudio
+            -no-boot-anim
+            -gpu swiftshader_indirect
+            -cores 2
+            -memory 4096
           script: |
-            set -eu
+            set -euxo pipefail
             mkdir -p qa-output
-            adb wait-for-device
+            adb kill-server || true
+            adb start-server
+            timeout 300 sh -c '
+              until [ "$(adb get-state 2>/dev/null || true)" = "device" ]; do
+                adb devices || true
+                sleep 2
+              done
+            '
             timeout 300 sh -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\\r")" = "1" ]; do sleep 2; done'
             timeout 180 sh -c 'until adb shell service check package 2>/dev/null | grep -q "found"; do sleep 2; done'
             timeout 120 sh -c 'until adb shell service check activity 2>/dev/null | grep -q "found"; do sleep 2; done'
             sleep 10
-            adb install -r demonic-daw/app/build/outputs/apk/debug/app-debug.apk
+            adb install --no-streaming -r demonic-daw/app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
             # Pre-grant microphone so Android's runtime permission dialog cannot mask the WebView during UI QA.
             adb shell pm grant com.flymaccin.demonicdaw android.permission.RECORD_AUDIO || true
