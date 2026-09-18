@@ -9,3 +9,5 @@ Revision: 8
 Reason: verify local-first FME UI is visible online and offline; reject legacy Floot UI.
 Revision: 9
 Reason: activate FME native playback paths, remove legacy oscillator presets, verify rotation/local-first UI.
+Revision: 10
+Reason: run QA with repaired emulator framework-readiness gates before APK install.
