@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
   private File importDir;
   private ProjectStore projectStore;
   private SessionManager sessionManager;
+  private AssetStore assetStore;
 
   @Override public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -45,6 +46,7 @@ public class MainActivity extends Activity {
     importDir.mkdirs();
     projectStore = new ProjectStore(this);
     sessionManager = new SessionManager(this);
+    assetStore = new AssetStore(this,projectStore);
 
     // Render the DAW first. Native audio and pack preparation must never block first paint.
     webView = new WebView(this);
@@ -172,8 +174,10 @@ public class MainActivity extends Activity {
     @JavascriptInterface public boolean saveNativeProject(String id,String json){ try{return projectStore.save(id,json);}catch(Exception e){return false;} }
     @JavascriptInterface public String loadNativeProject(String id){ try{return projectStore.load(id);}catch(Exception e){return "{}";} }
     @JavascriptInterface public String listNativeProjects(){ return projectStore.list(); }
-    @JavascriptInterface public String pairController(String client,String scopesJson){ try{return sessionManager.pair(client,new org.json.JSONArray(scopesJson));}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"pairing failed":e.getMessage())+"}";} }
+    @JavascriptInterface public String pairController(String client,String scopesJson){ try{return sessionManager.requestPairing(client,new org.json.JSONArray(scopesJson));}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"pairing failed":e.getMessage())+"}";} }
+    @JavascriptInterface public String approveController(String pendingId,String scopesJson){ try{return sessionManager.approvePairing(pendingId,new org.json.JSONArray(scopesJson));}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"approval failed":e.getMessage())+"}";} }
     @JavascriptInterface public boolean revokeController(String sessionId){ try{return sessionManager.revoke(sessionId);}catch(Exception e){return false;} }
+    @JavascriptInterface public int revokeAllControllers(){ try{return sessionManager.revokeAll();}catch(Exception e){return 0;} }
     @JavascriptInterface public boolean loadFmeDrumKit(){ return false; /* legacy unrouted entry point intentionally disabled */ }
     @JavascriptInterface public boolean loadFmeDrumKitToChannel(int channel,boolean clearChannel){
       try{
@@ -193,11 +197,18 @@ public class MainActivity extends Activity {
       if(webView==null)return "[]";
       return "[\"project.getState\",\"project.save\",\"project.rename\",\"track.create\",\"track.delete\",\"mixer.set\",\"clip.create\",\"midi.insertNotes\",\"transport.play\",\"transport.stop\",\"history.undo\",\"history.redo\",\"render.exportProject\"]";
     }
-    @JavascriptInterface public void executeControl(String requestJson){
-      if(webView==null)return;
-      final String req=JSONObject.quote(requestJson==null?"{}":requestJson);
-      runOnUiThread(()->webView.evaluateJavascript(
-        "(function(){try{return JSON.stringify(window.DemonicControl.execute(JSON.parse("+req+")));}catch(e){return JSON.stringify({ok:false,error:String(e)})}})()",null));
+    @JavascriptInterface public String executeControl(String requestJson){
+      if(webView==null)return "{\"ok\":false,\"error\":\"UI_UNAVAILABLE\"}";
+      try{
+        JSONObject r=new JSONObject(requestJson==null?"{}":requestJson);
+        String command=r.optString("command",""),scope=scopeForCommand(command);
+        sessionManager.authorize(r.optString("sessionId"),r.optString("token"),scope);
+        final String req=JSONObject.quote(r.toString());
+        runOnUiThread(()->webView.evaluateJavascript(
+          "(function(){try{return JSON.stringify(window.DemonicControl.execute(JSON.parse("+req+")));}catch(e){return JSON.stringify({ok:false,error:String(e)})}})()",null));
+        return "{\"ok\":true,\"accepted\":true}";
+      }catch(SecurityException e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage())+"}";}
+       catch(Exception e){return "{\"ok\":false,\"error\":\"CONTROL_REQUEST_INVALID\"}";}
     }
     @JavascriptInterface public boolean hasFmeCore(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getBoolean("fme_core_v1",false); }
     @JavascriptInterface public String fmeCorePath(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""); }
@@ -220,6 +231,15 @@ public class MainActivity extends Activity {
     }
     @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
     @JavascriptInterface public void importSfzFolder(){ runOnUiThread(()->launchSfzFolderPicker()); }
+  }
+  private static String scopeForCommand(String command){
+    if(command==null)return "READ";
+    if(command.startsWith("recording."))return "RECORD";
+    if(command.startsWith("render."))return "RENDER";
+    if(command.startsWith("file.")||command.startsWith("asset."))return "FILE";
+    if(command.startsWith("publish."))return "PUBLISH";
+    if(command.equals("project.getState")||command.equals("capabilities.get"))return "READ";
+    return "EDIT";
   }
   private String normalizeInstrument(String s){
     String x=s==null?"gfunk-bass":s.toLowerCase(Locale.US).replace(" / ","-").replace(' ','-');
