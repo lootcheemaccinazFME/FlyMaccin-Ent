@@ -43,3 +43,5 @@ Revision: 20
 Reason: validate simultaneous FluidSynth SF2 plus channel-scoped SFZ/WAV native mixing.
 Revision: 20
 Reason: integrated dependency batch: simultaneous SF2+sample mixing, FME drum mapping, channel mixer API, independent drum/bass routing; validate before track-arrangement expansion.
+Revision: 21
+Reason: validate integrated track model, arrangement clips, project persistence, undo redo, and project import export foundation.
