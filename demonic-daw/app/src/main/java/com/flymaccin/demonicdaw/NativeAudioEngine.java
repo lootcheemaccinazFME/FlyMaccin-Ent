@@ -8,7 +8,8 @@ public final class NativeAudioEngine {
     public static native void nativeStop();
     public static native int nativeLoadSoundFont(String path);
     public static native void nativeClearSampleBank();
-    public static native boolean nativeAddWavRegion(String path, int loKey, int hiKey, int loVel, int hiVel,
+    public static native void nativeClearSampleChannel(int channel);
+    public static native boolean nativeAddWavRegion(String path, int channel, int loKey, int hiKey, int loVel, int hiVel,
             int keyCenter, float volumeDb, float pan, float tuneCents, int transpose,
             int loopMode, int loopStart, int loopEnd, int offset, int end, float releaseSeconds);
     public static native void nativeNoteOn(int channel, int key, int velocity);
