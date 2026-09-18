@@ -17,6 +17,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.graphics.Color;
 import androidx.documentfile.provider.DocumentFile;
 import org.json.JSONObject;
 import java.io.*;
@@ -43,6 +44,7 @@ public class MainActivity extends Activity {
 
     // Render the DAW first. Native audio and pack preparation must never block first paint.
     webView = new WebView(this);
+    webView.setBackgroundColor(Color.rgb(5,5,7));
     setContentView(webView);
     WebSettings s = webView.getSettings();
     s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setMediaPlaybackRequiresUserGesture(false); s.setDatabaseEnabled(true); s.setAllowFileAccess(true);
@@ -151,7 +153,8 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void noteOn(int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(0,key,velocity); }
     @JavascriptInterface public void noteOff(int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(0,key); }
     @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
-    @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"WEB_FALLBACK"; }
+    @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"STARTING"; }
+    @JavascriptInterface public String uiProbe(){ return "DEMONIC_DAW_LOCAL_FME_UI_V121"; }
     @JavascriptInterface public boolean hasFmeCore(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getBoolean("fme_core_v1",false); }
     @JavascriptInterface public String fmeCorePath(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""); }
     @JavascriptInterface public String listFmeCoreSamples(){
