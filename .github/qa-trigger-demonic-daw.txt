@@ -51,3 +51,5 @@ Revision: 23
 Reason: validate Demonic Control Protocol v1 command bridge for project, track, clip, MIDI, mixer, transport, history and export control.
 Revision: 24
 Reason: validate Android Demonic Control exposure, runtime UI readiness marker, and melodic FME sample channel-1 routing without clearing drum channel 0.
+Revision: 25
+Reason: validate Demonic Control Protocol v1.1 stable IDs, state sync, event bus, transactions, expanded track/clip/MIDI/FX/automation/FME/recording/transport commands. Channel 0/1 are defaults only, not mandatory routing law.
