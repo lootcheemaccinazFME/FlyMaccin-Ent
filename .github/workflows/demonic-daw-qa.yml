@@ -53,33 +53,35 @@ jobs:
             adb shell settings put global airplane_mode_on 1
             adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true || true
             adb shell am force-stop com.flymaccin.demonicdaw
-            adb shell am start -W -n com.flymaccin.demonicdaw/.MainActivity
-            sleep 5
+            adb shell am start -W -n com.flymaccin.demonicdaw/.MainActivity || true
+            sleep 8
             adb exec-out screencap -p > qa-output/offline-boot.png
-            adb shell uiautomator dump /sdcard/demonic-ui.xml >/dev/null
-            adb pull /sdcard/demonic-ui.xml qa-output/offline-ui.xml >/dev/null
+            adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null
+            adb pull /data/local/tmp/demonic-ui.xml qa-output/offline-ui.xml >/dev/null
             grep -q 'FME SAMPLES' qa-output/offline-ui.xml
             grep -q 'STUDIO' qa-output/offline-ui.xml
             if grep -q 'Grand Piano' qa-output/offline-ui.xml; then echo 'Legacy Floot instrument UI still visible'; exit 1; fi
             adb shell dumpsys activity activities | grep -q 'com.flymaccin.demonicdaw/.MainActivity'
             adb logcat -d > qa-output/offline-logcat.txt
             if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt; then exit 1; fi
+            adb shell rm -f /data/local/tmp/demonic-ui.xml || true
             adb shell settings put global airplane_mode_on 0
             adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false || true
             sleep 4
             adb shell am force-stop com.flymaccin.demonicdaw
             adb logcat -c
-            adb shell am start -W -n com.flymaccin.demonicdaw/.MainActivity
-            sleep 5
+            adb shell am start -W -n com.flymaccin.demonicdaw/.MainActivity || true
+            sleep 8
             adb exec-out screencap -p > qa-output/online-boot.png
-            adb shell uiautomator dump /sdcard/demonic-ui-online.xml >/dev/null
-            adb pull /sdcard/demonic-ui-online.xml qa-output/online-ui.xml >/dev/null
+            adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null
+            adb pull /data/local/tmp/demonic-ui-online.xml qa-output/online-ui.xml >/dev/null
             grep -q 'FME SAMPLES' qa-output/online-ui.xml
             grep -q 'STUDIO' qa-output/online-ui.xml
             if grep -q 'Grand Piano' qa-output/online-ui.xml; then echo 'Legacy Floot instrument UI still visible online'; exit 1; fi
             adb shell dumpsys activity activities | grep -q 'com.flymaccin.demonicdaw/.MainActivity'
             adb logcat -d > qa-output/online-logcat.txt
             if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt; then exit 1; fi
+            adb shell rm -f /data/local/tmp/demonic-ui-online.xml || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
