@@ -50,6 +50,8 @@ jobs:
             sleep 10
             adb install -r demonic-daw/app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
+            # Pre-grant microphone so Android's runtime permission dialog cannot mask the WebView during UI QA.
+            adb shell pm grant com.flymaccin.demonicdaw android.permission.RECORD_AUDIO || true
             adb shell settings put global airplane_mode_on 1
             adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true || true
             adb shell am force-stop com.flymaccin.demonicdaw
