@@ -57,3 +57,5 @@ Revision: 26
 Reason: activate secure external-control architecture: generic channel routing, scoped authenticated sessions, durable native project/audio storage, render jobs, event subscriptions, native capability negotiation, and ChatGPT connector contract.
 Revision: 27
 Reason: activate provider-independent Local AI architecture, deterministic offline automation, optional on-device model adapter, DCP planner/executor, privacy boundaries, AI history and optional authenticated ChatGPT controller.
+Revision: 28
+Reason: native implementation begins: durable ProjectStore, scoped SessionManager, native capability registry, generic sample-to-channel routing, and legacy category-default sample loader disabled.
