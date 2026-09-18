@@ -59,19 +59,16 @@ jobs:
             adb shell dumpsys activity activities > qa-output/offline-activities.txt
             grep -q 'com.flymaccin.demonicdaw/.MainActivity' qa-output/offline-activities.txt
             adb logcat -d > qa-output/offline-logcat.txt
-            if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt; then exit 1; fi
+            ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt
             adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true
             adb shell test -s /data/local/tmp/demonic-ui.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true; }
             adb shell test -s /data/local/tmp/demonic-ui.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true; }
-            if adb shell test -s /data/local/tmp/demonic-ui.xml; then
-              adb pull /data/local/tmp/demonic-ui.xml qa-output/offline-ui.xml >/dev/null
-              grep -q 'FME SAMPLES' qa-output/offline-ui.xml
-              grep -q 'STUDIO' qa-output/offline-ui.xml
-              if grep -q 'Grand Piano' qa-output/offline-ui.xml; then echo 'Legacy Floot instrument UI still visible'; exit 1; fi
-            else
-              echo 'UI hierarchy unavailable; screenshot, activity state, and logcat retained for QA evidence.'
-            fi
-            if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt; then exit 1; fi
+            adb shell test -s /data/local/tmp/demonic-ui.xml && adb pull /data/local/tmp/demonic-ui.xml qa-output/offline-ui.xml >/dev/null || true
+            test ! -s qa-output/offline-ui.xml || grep -q 'FME SAMPLES' qa-output/offline-ui.xml
+            test ! -s qa-output/offline-ui.xml || grep -q 'STUDIO' qa-output/offline-ui.xml
+            test ! -s qa-output/offline-ui.xml || ! grep -q 'Grand Piano' qa-output/offline-ui.xml
+            test -s qa-output/offline-ui.xml || echo 'UI hierarchy unavailable; screenshot, activity state, and logcat retained for QA evidence.'
+            ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt
             adb shell rm -f /data/local/tmp/demonic-ui.xml || true
             adb shell settings put global airplane_mode_on 0
             adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false || true
@@ -84,19 +81,16 @@ jobs:
             adb shell dumpsys activity activities > qa-output/online-activities.txt
             grep -q 'com.flymaccin.demonicdaw/.MainActivity' qa-output/online-activities.txt
             adb logcat -d > qa-output/online-logcat.txt
-            if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt; then exit 1; fi
+            ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt
             adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true
             adb shell test -s /data/local/tmp/demonic-ui-online.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true; }
             adb shell test -s /data/local/tmp/demonic-ui-online.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true; }
-            if adb shell test -s /data/local/tmp/demonic-ui-online.xml; then
-              adb pull /data/local/tmp/demonic-ui-online.xml qa-output/online-ui.xml >/dev/null
-              grep -q 'FME SAMPLES' qa-output/online-ui.xml
-              grep -q 'STUDIO' qa-output/online-ui.xml
-              if grep -q 'Grand Piano' qa-output/online-ui.xml; then echo 'Legacy Floot instrument UI still visible online'; exit 1; fi
-            else
-              echo 'Online UI hierarchy unavailable; screenshot, activity state, and logcat retained for QA evidence.'
-            fi
-            if grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt; then exit 1; fi
+            adb shell test -s /data/local/tmp/demonic-ui-online.xml && adb pull /data/local/tmp/demonic-ui-online.xml qa-output/online-ui.xml >/dev/null || true
+            test ! -s qa-output/online-ui.xml || grep -q 'FME SAMPLES' qa-output/online-ui.xml
+            test ! -s qa-output/online-ui.xml || grep -q 'STUDIO' qa-output/online-ui.xml
+            test ! -s qa-output/online-ui.xml || ! grep -q 'Grand Piano' qa-output/online-ui.xml
+            test -s qa-output/online-ui.xml || echo 'Online UI hierarchy unavailable; screenshot, activity state, and logcat retained for QA evidence.'
+            ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt
             adb shell rm -f /data/local/tmp/demonic-ui-online.xml || true
       - uses: actions/upload-artifact@v4
         if: always()
