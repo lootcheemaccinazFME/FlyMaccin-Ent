@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
     factoryDir = new File(getFilesDir(), "factory");
     importDir = new File(getFilesDir(), "instrument-imports");
     try { copyAssetTree("factory", factoryDir); } catch (Exception ignored) {}
-    try { installBundledFmeCore(); } catch (Exception ignored) {}
+    new Thread(() -> { try { installBundledFmeCore(); } catch (Exception ignored) {} }).start();
     importDir.mkdirs();
     if (nativeReady && !restoreLastBank()) selectFactory("gfunk-bass");
 
@@ -61,7 +61,8 @@ public class MainActivity extends Activity {
       }
     });
     if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_REQUEST);
-    // Demonic DAW 1.2 is local-first so the bundled FME UI is authoritative online or offline.\n    webView.loadUrl(OFFLINE_URL);
+    // Demonic DAW 1.2 is local-first so the bundled FME UI is authoritative online or offline.
+    webView.loadUrl(OFFLINE_URL);
   }
 
   private boolean isOnline() {
