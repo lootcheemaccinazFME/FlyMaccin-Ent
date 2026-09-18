@@ -77,6 +77,25 @@ Independent instrument/sample channels; FME multi-piece drum mapping; audio/MIDI
 - Accessibility: scalable controls/text, high contrast, reduced animation, configurable touch sensitivity.
 - Localization architecture with UI strings separated from engine logic.
 
+## Pro workflow and ecosystem scope
+- Track/channel-strip presets; FX racks/chains with reorder, bypass, wet/dry, parallel chains and rack presets.
+- Searchable patch browser for instruments, sampler setups, drum kits, FX and vocal chains; macro controls.
+- Sampler auto-mapping for note-named FME folders; drum-kit builder with pad assignment, custom kits, duplication, selective randomization and kit-family swaps.
+- Pattern A/B/C/D variations, fills, variation switching/mutation; piano-roll ghost notes; reusable audio/MIDI clip pools.
+- Track delay/offset; polarity/phase controls; mono/stereo utilities; spectrum, oscilloscope and correlation diagnostics.
+- BPM-synced sample audition and optional key-aware preview transposition.
+- Smart FME browser indexing with cached metadata/waveforms; content integrity checks for duplicate, damaged, orphaned and unreferenced assets.
+- Project notes and lyrics panel with sections and take notes.
+- Performance capture for MIDI/controller/automation moves; mix snapshots; track archive mode.
+- Stem re-import; export queue; journaled background autosave; project locking.
+- Asset provenance and pack dependency manifests.
+- Factory-content updater for FME packs independent of APK updates.
+- Benchmark mode for latency, buffer stability, polyphony and safe device limits.
+- Compatibility report for packs/devices/Android capabilities.
+- Privacy-safe debug/session reports for crashes, underruns and engine state.
+- Demo/tutorial projects and first-launch audio capability setup.
+- Future expansion: collaboration/cloud sync, notation/scoring, video scoring timeline, AI-assisted production, live setlists, publishing/distribution integration, social/remix features and desktop project interchange.
+
 ## Architecture
 FME Samples/Instruments -> Tracks -> Loops/Patterns -> Arrangement -> Mixer/Automation -> Master -> WAV/Stems
 
