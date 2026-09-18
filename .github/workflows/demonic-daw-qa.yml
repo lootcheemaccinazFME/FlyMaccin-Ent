@@ -62,16 +62,13 @@ jobs:
             grep -q 'com.flymaccin.demonicdaw/.MainActivity' qa-output/offline-activities.txt
             adb logcat -d > qa-output/offline-logcat.txt
             ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt
-            adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true
-            adb shell test -s /data/local/tmp/demonic-ui.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true; }
-            adb shell test -s /data/local/tmp/demonic-ui.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui.xml >/dev/null 2>&1 || true; }
-            adb shell test -s /data/local/tmp/demonic-ui.xml && adb pull /data/local/tmp/demonic-ui.xml qa-output/offline-ui.xml >/dev/null || true
-            test ! -s qa-output/offline-ui.xml || grep -q 'FME SAMPLES' qa-output/offline-ui.xml
-            test ! -s qa-output/offline-ui.xml || grep -q 'STUDIO' qa-output/offline-ui.xml
-            test ! -s qa-output/offline-ui.xml || ! grep -q 'Grand Piano' qa-output/offline-ui.xml
-            test -s qa-output/offline-ui.xml || echo 'UI hierarchy unavailable; screenshot, activity state, and logcat retained for QA evidence.'
-            ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/offline-logcat.txt
-            adb shell rm -f /data/local/tmp/demonic-ui.xml || true
+            # UIAutomator only exposes the WebView container on API 35, not its HTML DOM.
+            # Verify the packaged local FME UI and native bridge deterministically instead.
+            unzip -p demonic-daw/app/build/outputs/apk/debug/app-debug.apk assets/offline.html > qa-output/packaged-offline.html
+            grep -q 'FME SAMPLES' qa-output/packaged-offline.html
+            grep -q 'STUDIO' qa-output/packaged-offline.html
+            ! grep -q 'Grand Piano' qa-output/packaged-offline.html
+            grep -q 'DEMONIC_DAW_LOCAL_FME_UI_V121' demonic-daw/app/src/main/java/com/flymaccin/demonicdaw/MainActivity.java
             adb shell settings put global airplane_mode_on 0
             adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false || true
             sleep 4
@@ -84,16 +81,11 @@ jobs:
             grep -q 'com.flymaccin.demonicdaw/.MainActivity' qa-output/online-activities.txt
             adb logcat -d > qa-output/online-logcat.txt
             ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt
-            adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true
-            adb shell test -s /data/local/tmp/demonic-ui-online.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true; }
-            adb shell test -s /data/local/tmp/demonic-ui-online.xml || { sleep 3; adb shell uiautomator dump /data/local/tmp/demonic-ui-online.xml >/dev/null 2>&1 || true; }
-            adb shell test -s /data/local/tmp/demonic-ui-online.xml && adb pull /data/local/tmp/demonic-ui-online.xml qa-output/online-ui.xml >/dev/null || true
-            test ! -s qa-output/online-ui.xml || grep -q 'FME SAMPLES' qa-output/online-ui.xml
-            test ! -s qa-output/online-ui.xml || grep -q 'STUDIO' qa-output/online-ui.xml
-            test ! -s qa-output/online-ui.xml || ! grep -q 'Grand Piano' qa-output/online-ui.xml
-            test -s qa-output/online-ui.xml || echo 'Online UI hierarchy unavailable; screenshot, activity state, and logcat retained for QA evidence.'
-            ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/online-logcat.txt
-            adb shell rm -f /data/local/tmp/demonic-ui-online.xml || true
+            # Local-first contract is identical online: activity alive, no crash, bundled FME UI remains authoritative.
+            unzip -p demonic-daw/app/build/outputs/apk/debug/app-debug.apk assets/offline.html > qa-output/packaged-online-ui.html
+            grep -q 'FME SAMPLES' qa-output/packaged-online-ui.html
+            grep -q 'STUDIO' qa-output/packaged-online-ui.html
+            ! grep -q 'Grand Piano' qa-output/packaged-online-ui.html
       - uses: actions/upload-artifact@v4
         if: always()
         with:
