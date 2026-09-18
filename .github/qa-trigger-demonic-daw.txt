@@ -53,3 +53,5 @@ Revision: 24
 Reason: validate Android Demonic Control exposure, runtime UI readiness marker, and melodic FME sample channel-1 routing without clearing drum channel 0.
 Revision: 25
 Reason: validate Demonic Control Protocol v1.1 stable IDs, state sync, event bus, transactions, expanded track/clip/MIDI/FX/automation/FME/recording/transport commands. Channel 0/1 are defaults only, not mandatory routing law.
+Revision: 26
+Reason: activate secure external-control architecture: generic channel routing, scoped authenticated sessions, durable native project/audio storage, render jobs, event subscriptions, native capability negotiation, and ChatGPT connector contract.
