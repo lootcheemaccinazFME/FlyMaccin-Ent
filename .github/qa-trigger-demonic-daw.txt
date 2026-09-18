@@ -61,3 +61,5 @@ Revision: 28
 Reason: native implementation begins: durable ProjectStore, scoped SessionManager, native capability registry, generic sample-to-channel routing, and legacy category-default sample loader disabled.
 Revision: 29
 Reason: validate pairing bridge compile fix 937a0b35 and native ProjectStore SessionManager capability foundation.
+Revision: 30
+Reason: retrigger APK and Android QA after pairing bridge compile fix; verify current native control foundation.
