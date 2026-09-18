@@ -155,6 +155,18 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void noteOnChannel(int channel,int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(Math.max(0,Math.min(15,channel)),key,velocity); }
     @JavascriptInterface public void noteOffChannel(int channel,int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(Math.max(0,Math.min(15,channel)),key); }
     @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
+    @JavascriptInterface public void setChannelMix(int channel,float gain,float pan,boolean mute,boolean solo){ if(nativeReady)NativeAudioEngine.nativeSetChannelMix(Math.max(0,Math.min(15,channel)),gain,pan,mute,solo); }
+    @JavascriptInterface public boolean loadFmeDrumKit(){
+      try{
+        File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
+        org.json.JSONArray a=new org.json.JSONArray(); collectWavs(root,root,a);
+        String[] tags={"kick","rim","snare","clap","hat","tom","perc","crash"}; int[] keys={36,37,38,39,42,45,46,49};
+        StringBuilder z=new StringBuilder(); int mapped=0;
+        for(int i=0;i<tags.length;i++){for(int j=0;j<a.length();j++){String rel=a.optString(j,"");if(rel.toLowerCase(Locale.US).contains(tags[i])){File w=new File(root,rel);z.append("<region> sample=").append(w.getAbsolutePath().replace("\\","/")).append(" key=").append(keys[i]).append(" ampeg_release=0.05\n");mapped++;break;}}}
+        if(mapped==0)return false; File sfz=new File(getCacheDir(),"fme-core-drums.sfz");try(FileOutputStream o=new FileOutputStream(sfz)){o.write(z.toString().getBytes("UTF-8"));}
+        return SfzBank.load(sfz,0,false)>0;
+      }catch(Exception e){return false;}
+    }
     @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"STARTING"; }
     @JavascriptInterface public String uiProbe(){ return "DEMONIC_DAW_LOCAL_FME_UI_V121"; }
     @JavascriptInterface public boolean hasFmeCore(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getBoolean("fme_core_v1",false); }
