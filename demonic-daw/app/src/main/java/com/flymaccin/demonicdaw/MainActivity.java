@@ -37,14 +37,11 @@ public class MainActivity extends Activity {
 
   @Override public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
-    try { nativeReady = NativeAudioEngine.nativeStart(); } catch (Throwable t) { nativeReady = false; }
     factoryDir = new File(getFilesDir(), "factory");
     importDir = new File(getFilesDir(), "instrument-imports");
-    try { copyAssetTree("factory", factoryDir); } catch (Exception ignored) {}
-    new Thread(() -> { try { installBundledFmeCore(); } catch (Exception ignored) {} }).start();
     importDir.mkdirs();
-    if (nativeReady && !restoreLastBank()) selectFactory("gfunk-bass");
 
+    // Render the DAW first. Native audio and pack preparation must never block first paint.
     webView = new WebView(this);
     setContentView(webView);
     WebSettings s = webView.getSettings();
@@ -60,9 +57,18 @@ public class MainActivity extends Activity {
         super.onReceivedError(view, request, error); if (request.isForMainFrame() && (view.getUrl()==null || !view.getUrl().startsWith("file:///android_asset/"))) view.loadUrl(OFFLINE_URL);
       }
     });
-    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_REQUEST);
     // Demonic DAW 1.2 is local-first so the bundled FME UI is authoritative online or offline.
     webView.loadUrl(OFFLINE_URL);
+
+    new Thread(() -> {
+      try { nativeReady = NativeAudioEngine.nativeStart(); } catch (Throwable t) { nativeReady = false; }
+      try { copyAssetTree("factory", factoryDir); } catch (Exception ignored) {}
+      try { installBundledFmeCore(); } catch (Exception ignored) {}
+      if (nativeReady) restoreLastBank();
+      runOnUiThread(() -> {
+        if (webView != null) webView.evaluateJavascript("window.dispatchEvent(new Event('demonic-native-ready'));", null);
+      });
+    }).start();
   }
 
   private boolean isOnline() {
