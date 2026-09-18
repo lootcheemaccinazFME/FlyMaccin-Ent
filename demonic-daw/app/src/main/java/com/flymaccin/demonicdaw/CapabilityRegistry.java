@@ -5,7 +5,8 @@ public final class CapabilityRegistry {
     return new JSONObject().put("protocolVersion","1.1-native-foundation").put("nativeAudio",nativeReady).put("genericChannels",true).put("fmeCoreInstalled",fme)
       .put("permissions",new JSONArray().put("READ").put("EDIT").put("RECORD").put("RENDER").put("FILE").put("PUBLISH"))
       .put("nativeServices",new JSONArray().put("ProjectStore").put("SessionManager").put("CapabilityRegistry"))
-      .put("renderFormats",new JSONArray().put("WAV"))
+      .put("nativeRenderAvailable",false)
+      .put("renderFormats",new JSONArray())
       .put("notes","Channel numbers have no instrument-category defaults.").toString();
   }
 }
