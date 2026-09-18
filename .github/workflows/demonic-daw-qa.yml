@@ -38,11 +38,16 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: false
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -cores 2 -memory 4096
           script: |
             set -eu
             mkdir -p qa-output
             adb wait-for-device
-            until adb shell getprop sys.boot_completed 2>/dev/null | grep -q '1'; do sleep 2; done
+            timeout 300 sh -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\\r")" = "1" ]; do sleep 2; done'
+            timeout 180 sh -c 'until adb shell service check package 2>/dev/null | grep -q "found"; do sleep 2; done'
+            timeout 120 sh -c 'until adb shell service check activity 2>/dev/null | grep -q "found"; do sleep 2; done'
+            sleep 10
             adb install -r demonic-daw/app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
             adb shell settings put global airplane_mode_on 1
