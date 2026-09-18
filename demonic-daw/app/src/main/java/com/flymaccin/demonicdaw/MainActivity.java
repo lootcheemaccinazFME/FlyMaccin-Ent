@@ -35,12 +35,16 @@ public class MainActivity extends Activity {
   private volatile boolean nativeReady = false;
   private File factoryDir;
   private File importDir;
+  private ProjectStore projectStore;
+  private SessionManager sessionManager;
 
   @Override public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     factoryDir = new File(getFilesDir(), "factory");
     importDir = new File(getFilesDir(), "instrument-imports");
     importDir.mkdirs();
+    projectStore = new ProjectStore(this);
+    sessionManager = new SessionManager(this);
 
     // Render the DAW first. Native audio and pack preparation must never block first paint.
     webView = new WebView(this);
@@ -163,6 +167,13 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void noteOffChannel(int channel,int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(Math.max(0,Math.min(15,channel)),key); }
     @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
     @JavascriptInterface public void setChannelMix(int channel,float gain,float pan,boolean mute,boolean solo){ if(nativeReady)NativeAudioEngine.nativeSetChannelMix(Math.max(0,Math.min(15,channel)),gain,pan,mute,solo); }
+    @JavascriptInterface public String nativeCapabilities(){ try{return CapabilityRegistry.snapshot(nativeReady,hasFmeCore());}catch(Exception e){return "{}";} }
+    @JavascriptInterface public String createNativeProject(String name){ try{return projectStore.create(name);}catch(Exception e){return "";} }
+    @JavascriptInterface public boolean saveNativeProject(String id,String json){ try{return projectStore.save(id,json);}catch(Exception e){return false;} }
+    @JavascriptInterface public String loadNativeProject(String id){ try{return projectStore.load(id);}catch(Exception e){return "{}";} }
+    @JavascriptInterface public String listNativeProjects(){ return projectStore.list(); }
+    @JavascriptInterface public String pairController(String client,String scopesJson){ try{return sessionManager.pair(client,new org.json.JSONArray(scopesJson));}catch(Exception e){return new JSONObject().put("error",e.getMessage()).toString();} }
+    @JavascriptInterface public boolean revokeController(String sessionId){ try{return sessionManager.revoke(sessionId);}catch(Exception e){return false;} }
     @JavascriptInterface public boolean loadFmeDrumKit(){
       try{
         File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
@@ -192,7 +203,8 @@ public class MainActivity extends Activity {
       File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
       org.json.JSONArray a=new org.json.JSONArray(); collectWavs(root,root,a); return a.toString();
     }
-    @JavascriptInterface public boolean loadFmeCoreSample(String relative){
+    @JavascriptInterface public boolean loadFmeCoreSample(String relative){ return false; /* legacy category-routing entry point intentionally disabled */ }
+    @JavascriptInterface public boolean loadFmeCoreSampleToChannel(String relative,int channel,boolean clearChannel){
       try{
         File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
         File wav=new File(root,relative); String rp=root.getCanonicalPath()+File.separator, wp=wav.getCanonicalPath();
@@ -201,7 +213,7 @@ public class MainActivity extends Activity {
         // Selected FME samples are playable chromatically across the sequencer range.
         String txt="<region> sample="+wav.getAbsolutePath().replace("\\","/")+" lokey=24 hikey=96 pitch_keycenter=60 ampeg_release=0.08\n";
         try(FileOutputStream o=new FileOutputStream(sfz)){o.write(txt.getBytes("UTF-8"));}
-        return SfzBank.load(sfz,1,false)>0;
+        return SfzBank.load(sfz,Math.max(0,Math.min(15,channel)),clearChannel)>0;
       }catch(Exception e){return false;}
     }
     @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
