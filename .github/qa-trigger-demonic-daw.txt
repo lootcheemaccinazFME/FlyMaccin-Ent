@@ -23,3 +23,5 @@ Revision: 10
 Reason: move 19MB FME Core extraction off UI thread; retest visible local UI startup.
 Revision: 11
 Reason: pre-grant microphone permission so QA validates the DAW WebView instead of Android permission UI.
+Revision: 12
+Reason: render WebView before native audio/assets, retry FME Core background readiness, validate v1.2.1 local UI.
