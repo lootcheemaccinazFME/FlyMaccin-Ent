@@ -29,3 +29,5 @@ Revision: 13
 Reason: replace invalid UIAutomator WebView DOM assertions with packaged-FME UI verification plus live activity/crash evidence.
 Revision: 14
 Reason: validate chromatic FME sample mapping and channel-ready native bridge after QA baseline passed.
+Revision: 15
+Reason: validate SONG arranger for chaining, duplicating, reordering, persisting, and playing connected loops.
