@@ -161,8 +161,8 @@ public class MainActivity extends Activity {
   public final class NativeBridge {
     @JavascriptInterface public boolean ready(){ return nativeReady; }
     @JavascriptInterface public int selectFactoryInstrument(String id){ return selectFactory(normalizeInstrument(id)); }
-    @JavascriptInterface public void noteOn(int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(1,key,velocity); }
-    @JavascriptInterface public void noteOff(int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(1,key); }
+    @JavascriptInterface public void noteOn(int key,int velocity){ /* Legacy unrouted entry point intentionally disabled. */ }
+    @JavascriptInterface public void noteOff(int key){ /* Legacy unrouted entry point intentionally disabled. */ }
     @JavascriptInterface public void noteOnChannel(int channel,int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(Math.max(0,Math.min(15,channel)),key,velocity); }
     @JavascriptInterface public void noteOffChannel(int channel,int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(Math.max(0,Math.min(15,channel)),key); }
     @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
@@ -174,15 +174,17 @@ public class MainActivity extends Activity {
     @JavascriptInterface public String listNativeProjects(){ return projectStore.list(); }
     @JavascriptInterface public String pairController(String client,String scopesJson){ try{return sessionManager.pair(client,new org.json.JSONArray(scopesJson));}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"pairing failed":e.getMessage())+"}";} }
     @JavascriptInterface public boolean revokeController(String sessionId){ try{return sessionManager.revoke(sessionId);}catch(Exception e){return false;} }
-    @JavascriptInterface public boolean loadFmeDrumKit(){
+    @JavascriptInterface public boolean loadFmeDrumKit(){ return false; /* legacy unrouted entry point intentionally disabled */ }
+    @JavascriptInterface public boolean loadFmeDrumKitToChannel(int channel,boolean clearChannel){
       try{
+        int ch=Math.max(0,Math.min(15,channel));
         File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
         org.json.JSONArray a=new org.json.JSONArray(); collectWavs(root,root,a);
         String[] tags={"kick","rim","snare","clap","hat","tom","perc","crash"}; int[] keys={36,37,38,39,42,45,46,49};
         StringBuilder z=new StringBuilder(); int mapped=0;
         for(int i=0;i<tags.length;i++){for(int j=0;j<a.length();j++){String rel=a.optString(j,"");if(rel.toLowerCase(Locale.US).contains(tags[i])){File w=new File(root,rel);z.append("<region> sample=").append(w.getAbsolutePath().replace("\\","/")).append(" key=").append(keys[i]).append(" ampeg_release=0.05\n");mapped++;break;}}}
-        if(mapped==0)return false; File sfz=new File(getCacheDir(),"fme-core-drums.sfz");try(FileOutputStream o=new FileOutputStream(sfz)){o.write(z.toString().getBytes("UTF-8"));}
-        return SfzBank.load(sfz,0,false)>0;
+        if(mapped==0)return false; File sfz=new File(getCacheDir(),"fme-core-kit-"+ch+".sfz");try(FileOutputStream o=new FileOutputStream(sfz)){o.write(z.toString().getBytes("UTF-8"));}
+        return SfzBank.load(sfz,ch,clearChannel)>0;
       }catch(Exception e){return false;}
     }
     @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"STARTING"; }
