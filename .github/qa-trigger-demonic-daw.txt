@@ -37,3 +37,5 @@ Revision: 17
 Reason: rebuild independent sample channels after fixing SFZ emit channel arguments.
 Revision: 18
 Reason: thread-safe native audio readiness after independent-channel compile fix; rerun full APK and runtime QA.
+Revision: 19
+Reason: validate sampler voice pointer-safety fix before simultaneous SF2/SFZ routing work.
