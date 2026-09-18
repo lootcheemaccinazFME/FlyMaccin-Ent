@@ -55,3 +55,5 @@ Revision: 25
 Reason: validate Demonic Control Protocol v1.1 stable IDs, state sync, event bus, transactions, expanded track/clip/MIDI/FX/automation/FME/recording/transport commands. Channel 0/1 are defaults only, not mandatory routing law.
 Revision: 26
 Reason: activate secure external-control architecture: generic channel routing, scoped authenticated sessions, durable native project/audio storage, render jobs, event subscriptions, native capability negotiation, and ChatGPT connector contract.
+Revision: 27
+Reason: activate provider-independent Local AI architecture, deterministic offline automation, optional on-device model adapter, DCP planner/executor, privacy boundaries, AI history and optional authenticated ChatGPT controller.
