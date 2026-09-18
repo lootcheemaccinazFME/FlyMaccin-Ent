@@ -55,6 +55,13 @@ public class MainActivity extends Activity {
       }
     });
     webView.setWebViewClient(new WebViewClient() {
+      @Override public void onPageFinished(WebView view,String url) {
+        super.onPageFinished(view,url);
+        if(url!=null&&url.startsWith("file:///android_asset/")) view.evaluateJavascript(
+          "(function(){return !!(window.DemonicControl&&window.DemonicControl.version)})()",
+          value -> { if("true".equals(value)) view.setContentDescription("DEMONIC_DAW_FME_UI_READY"); }
+        );
+      }
       @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
         super.onReceivedError(view, request, error); if (request.isForMainFrame() && (view.getUrl()==null || !view.getUrl().startsWith("file:///android_asset/"))) view.loadUrl(OFFLINE_URL);
       }
@@ -169,6 +176,16 @@ public class MainActivity extends Activity {
     }
     @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"STARTING"; }
     @JavascriptInterface public String uiProbe(){ return "DEMONIC_DAW_LOCAL_FME_UI_V121"; }
+    @JavascriptInterface public String controlCapabilities(){
+      if(webView==null)return "[]";
+      return "[\"project.getState\",\"project.save\",\"project.rename\",\"track.create\",\"track.delete\",\"mixer.set\",\"clip.create\",\"midi.insertNotes\",\"transport.play\",\"transport.stop\",\"history.undo\",\"history.redo\",\"render.exportProject\"]";
+    }
+    @JavascriptInterface public void executeControl(String requestJson){
+      if(webView==null)return;
+      final String req=JSONObject.quote(requestJson==null?"{}":requestJson);
+      runOnUiThread(()->webView.evaluateJavascript(
+        "(function(){try{return JSON.stringify(window.DemonicControl.execute(JSON.parse("+req+")));}catch(e){return JSON.stringify({ok:false,error:String(e)})}})()",null));
+    }
     @JavascriptInterface public boolean hasFmeCore(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getBoolean("fme_core_v1",false); }
     @JavascriptInterface public String fmeCorePath(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""); }
     @JavascriptInterface public String listFmeCoreSamples(){
@@ -184,7 +201,7 @@ public class MainActivity extends Activity {
         // Selected FME samples are playable chromatically across the sequencer range.
         String txt="<region> sample="+wav.getAbsolutePath().replace("\\","/")+" lokey=24 hikey=96 pitch_keycenter=60 ampeg_release=0.08\n";
         try(FileOutputStream o=new FileOutputStream(sfz)){o.write(txt.getBytes("UTF-8"));}
-        return SfzBank.load(sfz)>0;
+        return SfzBank.load(sfz,1,false)>0;
       }catch(Exception e){return false;}
     }
     @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
