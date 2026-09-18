@@ -19,9 +19,9 @@ let song=load('off-song',[]); let songPos=0,loopPass=0;
 let drums=load('off-drums',D.map((_,r)=>Array.from({length:16},(_,s)=>r===0?[0,4,8,12].includes(s):r===1?[4,12].includes(s):r===2?s%2===0:r===3?[6,14].includes(s):false));
 let bass=load('off-bass',N.map((_,r)=>Array.from({length:16},(_,s)=>r===7&&s%2===0))); let sound=load('off-sound','FME CORE'),kit=load('off-kit','Bay Knock'); bpm.value=load('off-bpm',92); bpmText.textContent=bpm.value;
 let ctx=null,timer=null,step=0,playing=false; function audio(){ctx=ctx||new (window.AudioContext||window.webkitAudioContext)(); if(ctx.state==='suspended')ctx.resume(); return ctx}
-function nativePlay(key=60,vel=110,dur=180){try{if(window.DemonicNative?.ready()){DemonicNative.noteOn(key,vel);setTimeout(()=>DemonicNative.noteOff(key),dur);return true}}catch(e){}return false}
-function hit(r){if(!nativePlay(36+r,118,120))engine.textContent='NATIVE FME SAMPLE REQUIRED'}
-function tone(r){if(!nativePlay(64-r,105,220))engine.textContent='NATIVE FME SAMPLE REQUIRED'}
+function nativePlay(key=60,vel=110,dur=180,ch=1){try{if(window.DemonicNative?.ready()){DemonicNative.noteOnChannel(ch,key,vel);setTimeout(()=>DemonicNative.noteOffChannel(ch,key),dur);return true}}catch(e){}return false}
+function hit(r){const keys=[36,38,42,39,45,46,37,49];if(!nativePlay(keys[r]||36,118,120,0))engine.textContent='NATIVE FME DRUM KIT REQUIRED'}
+function tone(r){if(!nativePlay(64-r,105,220,1))engine.textContent='NATIVE FME SAMPLE REQUIRED'}
 function renderNotes(){noteRoll.innerHTML='';N.slice(0,8).forEach((n,r)=>{let lane=document.createElement('div');lane.className='lane';let lab=document.createElement('span');lab.textContent=n;lane.append(lab);let note=document.createElement('div');note.className='note';let widths=load('fme-note-widths',{});let key='n'+r;note.style.width=(widths[key]||72)+'px';let h=document.createElement('i');h.className='handle';let sx=0,sw=0;h.onpointerdown=e=>{sx=e.clientX;sw=note.offsetWidth;h.setPointerCapture(e.pointerId)};h.onpointermove=e=>{if(!h.hasPointerCapture(e.pointerId))return;note.style.width=Math.max(24,sw+e.clientX-sx)+'px'};h.onpointerup=e=>{let w=load('fme-note-widths',{});w[key]=note.offsetWidth;localStorage.setItem('fme-note-widths',JSON.stringify(w));try{h.releasePointerCapture(e.pointerId)}catch{}};note.append(h);lane.append(note);noteRoll.append(lane)})}
 function render(){drumGrid.innerHTML='';D.forEach((n,r)=>{let l=document.createElement('div');l.className='label';l.textContent=n;drumGrid.append(l);drums[r].forEach((v,s)=>{let b=document.createElement('button');b.className='step '+(v?'on ':'')+(s===step?'play':'');b.onclick=()=>{drums[r][s]=!drums[r][s];store();render()};drumGrid.append(b)})});bassGrid.innerHTML='';N.forEach((n,r)=>{let l=document.createElement('div');l.className='label';l.textContent=n;bassGrid.append(l);bass[r].forEach((v,s)=>{let b=document.createElement('button');b.className='step '+(v?'on ':'')+(s===step?'play':'');b.onclick=()=>{bass[r][s]=!bass[r][s];store();render()};bassGrid.append(b)})});soundName.textContent=sound.toUpperCase();kitName.textContent=kit.toUpperCase();renderNotes()}
 function applyLoop(loop){if(!loop)return;drums=loop.drums.map(r=>r.slice());bass=loop.bass.map(r=>r.slice());kit=loop.kit;sound=loop.sound;render()}
@@ -49,7 +49,7 @@ function loadCoreBrowser(){
     function draw(q=''){coreSamples.innerHTML='';files.filter(x=>x.toLowerCase().includes(q.toLowerCase())).slice(0,120).forEach(x=>{let b=document.createElement('button');b.className='preset';let name=x.split('/').pop();b.innerHTML='<strong>'+name+'</strong><span>FME CORE WAV</span>';b.onclick=()=>{let ok=DemonicNative.loadFmeCoreSample(x);if(ok){sound=name;nativePlay(60,110,450);engine.textContent='FME SAMPLE ACTIVE · '+name;render()}else engine.textContent='SAMPLE LOAD FAILED'};coreSamples.append(b)})} draw();sampleSearch.oninput=()=>draw(sampleSearch.value);
   }catch(e){coreState.textContent='FME CORE ERROR'}
 }
-setTimeout(loadCoreBrowser,350);
-window.addEventListener('demonic-native-ready',()=>{coreRetry=0;loadCoreBrowser()});
+setTimeout(()=>{try{DemonicNative.loadFmeDrumKit()}catch(e){}loadCoreBrowser()},350);
+window.addEventListener('demonic-native-ready',()=>{try{DemonicNative.loadFmeDrumKit();DemonicNative.setChannelMix(0,1,0,false,false);DemonicNative.setChannelMix(1,1,0,false,false)}catch(e){}coreRetry=0;loadCoreBrowser()});
 window.addEventListener('beforeunload',store);
 </script></body></html>
