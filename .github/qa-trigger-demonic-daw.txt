@@ -19,3 +19,5 @@ Revision: 13
 Reason: verify QA after replacing multiline UI hierarchy retry loops with runner-safe commands.
 Revision: 14
 Reason: verify emulator QA with multiline shell conditionals eliminated from runner script.
+Revision: 10
+Reason: move 19MB FME Core extraction off UI thread; retest visible local UI startup.
