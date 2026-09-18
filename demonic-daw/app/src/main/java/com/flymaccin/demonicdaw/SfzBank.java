@@ -12,8 +12,9 @@ public final class SfzBank {
     private static final Pattern TOKEN = Pattern.compile("([A-Za-z0-9_]+)=(\\\"[^\\\"]*\\\"|[^\\s]+)");
     private SfzBank() {}
 
-    public static int load(File sfzFile) throws IOException {
-        NativeAudioEngine.nativeClearSampleBank();
+    public static int load(File sfzFile) throws IOException { return load(sfzFile, 0, true); }
+    public static int load(File sfzFile, int channel, boolean clearAll) throws IOException {
+        if (clearAll) NativeAudioEngine.nativeClearSampleBank(); else NativeAudioEngine.nativeClearSampleChannel(channel);
         Map<String,String> global = new HashMap<>();
         Map<String,String> group = new HashMap<>();
         Map<String,String> region = null;
@@ -25,7 +26,7 @@ public final class SfzBank {
                 if (comment >= 0) line = line.substring(0, comment);
                 line = line.trim();
                 if (line.isEmpty()) continue;
-                if (line.contains("<global>")) { if (region != null) loaded += emit(sfzFile, global, group, region); region = null; global.clear(); group.clear(); line = line.substring(line.indexOf("<global>")+8); }
+                if (line.contains("<global>")) { if (region != null) loaded += emit(sfzFile, global, group, region, channel); region = null; global.clear(); group.clear(); line = line.substring(line.indexOf("<global>")+8); }
                 if (line.contains("<group>")) { if (region != null) loaded += emit(sfzFile, global, group, region); region = null; group.clear(); line = line.substring(line.indexOf("<group>")+7); }
                 if (line.contains("<region>")) { if (region != null) loaded += emit(sfzFile, global, group, region); region = new HashMap<>(); line = line.substring(line.indexOf("<region>")+8); }
                 Map<String,String> target = region != null ? region : (!group.isEmpty() ? group : global);
@@ -37,7 +38,7 @@ public final class SfzBank {
         return loaded;
     }
 
-    private static int emit(File sfzFile, Map<String,String> g, Map<String,String> grp, Map<String,String> r) {
+    private static int emit(File sfzFile, Map<String,String> g, Map<String,String> grp, Map<String,String> r, int channel) {
         Map<String,String> p = new HashMap<>(g); p.putAll(grp); p.putAll(r);
         String sample = p.get("sample"); if (sample == null) return 0;
         File wav = new File(sfzFile.getParentFile(), sample.replace('\\', File.separatorChar));
@@ -52,7 +53,7 @@ public final class SfzBank {
         String lm = p.getOrDefault("loop_mode","no_loop").toLowerCase(Locale.US);
         int loopMode = (lm.equals("loop_continuous") || lm.equals("loop_sustain")) ? 1 : 0;
         float release = Math.max(0.005f, number(p,"ampeg_release",0.15f));
-        return NativeAudioEngine.nativeAddWavRegion(wav.getAbsolutePath(), lo, hi, lovel, hivel, center,
+        return NativeAudioEngine.nativeAddWavRegion(wav.getAbsolutePath(), channel, lo, hi, lovel, hivel, center,
                 volume, pan, tune, transpose, loopMode, loopStart, loopEnd, offset, end, release) ? 1 : 0;
     }
 
