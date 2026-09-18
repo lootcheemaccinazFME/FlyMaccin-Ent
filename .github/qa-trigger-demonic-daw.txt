@@ -41,3 +41,5 @@ Revision: 19
 Reason: validate sampler voice pointer-safety fix before simultaneous SF2/SFZ routing work.
 Revision: 20
 Reason: validate simultaneous FluidSynth SF2 plus channel-scoped SFZ/WAV native mixing.
+Revision: 20
+Reason: integrated dependency batch: simultaneous SF2+sample mixing, FME drum mapping, channel mixer API, independent drum/bass routing; validate before track-arrangement expansion.
