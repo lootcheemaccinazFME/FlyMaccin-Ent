@@ -27,14 +27,14 @@ public final class SfzBank {
                 line = line.trim();
                 if (line.isEmpty()) continue;
                 if (line.contains("<global>")) { if (region != null) loaded += emit(sfzFile, global, group, region, channel); region = null; global.clear(); group.clear(); line = line.substring(line.indexOf("<global>")+8); }
-                if (line.contains("<group>")) { if (region != null) loaded += emit(sfzFile, global, group, region); region = null; group.clear(); line = line.substring(line.indexOf("<group>")+7); }
-                if (line.contains("<region>")) { if (region != null) loaded += emit(sfzFile, global, group, region); region = new HashMap<>(); line = line.substring(line.indexOf("<region>")+8); }
+                if (line.contains("<group>")) { if (region != null) loaded += emit(sfzFile, global, group, region, channel); region = null; group.clear(); line = line.substring(line.indexOf("<group>")+7); }
+                if (line.contains("<region>")) { if (region != null) loaded += emit(sfzFile, global, group, region, channel); region = new HashMap<>(); line = line.substring(line.indexOf("<region>")+8); }
                 Map<String,String> target = region != null ? region : (!group.isEmpty() ? group : global);
                 Matcher m = TOKEN.matcher(line);
                 while (m.find()) target.put(m.group(1).toLowerCase(Locale.US), strip(m.group(2)));
             }
         }
-        if (region != null) loaded += emit(sfzFile, global, group, region);
+        if (region != null) loaded += emit(sfzFile, global, group, region, channel);
         return loaded;
     }
 
