@@ -32,13 +32,19 @@ async function startRecording(){try{let stream=await navigator.mediaDevices.getU
 rec.onclick=startRecording;stopRec.onclick=()=>recorder&&recorder.state!=='inactive'&&recorder.stop();newTake.onclick=startRecording;
 importSf2.onclick=()=>window.DemonicNative?.importSoundFont();importSfz.onclick=()=>window.DemonicNative?.importSfzFolder();
 uploadAudio.onclick=()=>{let i=document.createElement('input');i.type='file';i.accept='audio/*,.wav,.mp3,.flac,.ogg,.m4a';i.onchange=()=>{if(!i.files[0])return;let a=document.createElement('audio');a.controls=true;a.src=URL.createObjectURL(i.files[0]);let d=document.createElement('div');d.innerHTML='<b>UPLOAD · '+i.files[0].name+'</b> ';d.append(a);takes.prepend(d);recStatus.textContent='AUDIO LOADED'};i.click()};
+let coreRetry=0;
 function loadCoreBrowser(){
   try{
-    if(!window.DemonicNative||!DemonicNative.hasFmeCore()){coreState.textContent='FME CORE NOT INSTALLED';return}
+    if(!window.DemonicNative||!DemonicNative.hasFmeCore()){
+      coreState.textContent='FME CORE INSTALLING...';
+      if(coreRetry++<60)setTimeout(loadCoreBrowser,500);
+      return
+    }
     let files=JSON.parse(DemonicNative.listFmeCoreSamples()||'[]'); coreState.textContent='FME CORE · '+files.length+' WAV SAMPLES INSTALLED · ACTIVE'; if(files.length){DemonicNative.loadFmeCoreSample(files[0]);sound=files[0].split('/').pop();render()}
     function draw(q=''){coreSamples.innerHTML='';files.filter(x=>x.toLowerCase().includes(q.toLowerCase())).slice(0,120).forEach(x=>{let b=document.createElement('button');b.className='preset';let name=x.split('/').pop();b.innerHTML='<strong>'+name+'</strong><span>FME CORE WAV</span>';b.onclick=()=>{let ok=DemonicNative.loadFmeCoreSample(x);if(ok){sound=name;nativePlay(60,110,450);engine.textContent='FME SAMPLE ACTIVE · '+name;render()}else engine.textContent='SAMPLE LOAD FAILED'};coreSamples.append(b)})} draw();sampleSearch.oninput=()=>draw(sampleSearch.value);
   }catch(e){coreState.textContent='FME CORE ERROR'}
 }
 setTimeout(loadCoreBrowser,350);
+window.addEventListener('demonic-native-ready',()=>{coreRetry=0;loadCoreBrowser()});
 window.addEventListener('beforeunload',store);
 </script></body></html>
