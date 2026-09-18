@@ -33,3 +33,5 @@ Revision: 15
 Reason: validate SONG arranger for chaining, duplicating, reordering, persisting, and playing connected loops.
 Revision: 16
 Reason: validate independent native sample channels and channel-scoped SFZ loading for simultaneous track playback.
+Revision: 17
+Reason: rebuild independent sample channels after fixing SFZ emit channel arguments.
