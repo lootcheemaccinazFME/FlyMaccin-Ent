@@ -172,7 +172,7 @@ public class MainActivity extends Activity {
     @JavascriptInterface public boolean saveNativeProject(String id,String json){ try{return projectStore.save(id,json);}catch(Exception e){return false;} }
     @JavascriptInterface public String loadNativeProject(String id){ try{return projectStore.load(id);}catch(Exception e){return "{}";} }
     @JavascriptInterface public String listNativeProjects(){ return projectStore.list(); }
-    @JavascriptInterface public String pairController(String client,String scopesJson){ try{return sessionManager.pair(client,new org.json.JSONArray(scopesJson));}catch(Exception e){return new JSONObject().put("error",e.getMessage()).toString();} }
+    @JavascriptInterface public String pairController(String client,String scopesJson){ try{return sessionManager.pair(client,new org.json.JSONArray(scopesJson));}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"pairing failed":e.getMessage())+"}";} }
     @JavascriptInterface public boolean revokeController(String sessionId){ try{return sessionManager.revoke(sessionId);}catch(Exception e){return false;} }
     @JavascriptInterface public boolean loadFmeDrumKit(){
       try{
