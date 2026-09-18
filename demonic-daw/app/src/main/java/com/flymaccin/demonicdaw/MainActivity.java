@@ -152,6 +152,8 @@ public class MainActivity extends Activity {
     @JavascriptInterface public int selectFactoryInstrument(String id){ return selectFactory(normalizeInstrument(id)); }
     @JavascriptInterface public void noteOn(int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(0,key,velocity); }
     @JavascriptInterface public void noteOff(int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(0,key); }
+    @JavascriptInterface public void noteOnChannel(int channel,int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(Math.max(0,Math.min(15,channel)),key,velocity); }
+    @JavascriptInterface public void noteOffChannel(int channel,int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(Math.max(0,Math.min(15,channel)),key); }
     @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
     @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"STARTING"; }
     @JavascriptInterface public String uiProbe(){ return "DEMONIC_DAW_LOCAL_FME_UI_V121"; }
@@ -167,7 +169,8 @@ public class MainActivity extends Activity {
         File wav=new File(root,relative); String rp=root.getCanonicalPath()+File.separator, wp=wav.getCanonicalPath();
         if(!wp.startsWith(rp)||!wav.isFile()||!wav.getName().toLowerCase(Locale.US).endsWith(".wav"))return false;
         File sfz=new File(getCacheDir(),"fme-core-preview.sfz");
-        String txt="<region> sample="+wav.getAbsolutePath().replace("\\","/")+" key=60\n";
+        // Selected FME samples are playable chromatically across the sequencer range.
+        String txt="<region> sample="+wav.getAbsolutePath().replace("\\","/")+" lokey=24 hikey=96 pitch_keycenter=60 ampeg_release=0.08\n";
         try(FileOutputStream o=new FileOutputStream(sfz)){o.write(txt.getBytes("UTF-8"));}
         return SfzBank.load(sfz)>0;
       }catch(Exception e){return false;}
