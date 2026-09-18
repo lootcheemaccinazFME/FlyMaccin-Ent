@@ -32,7 +32,7 @@ public class MainActivity extends Activity {
   private static final int SFZ_TREE_REQUEST = 903;
   private static final String ONLINE_URL = "https://demonicaistudiohut.floot.app";
   private static final String OFFLINE_URL = "file:///android_asset/offline.html";
-  private boolean nativeReady = false;
+  private volatile boolean nativeReady = false;
   private File factoryDir;
   private File importDir;
 
