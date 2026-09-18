@@ -150,8 +150,8 @@ public class MainActivity extends Activity {
   public final class NativeBridge {
     @JavascriptInterface public boolean ready(){ return nativeReady; }
     @JavascriptInterface public int selectFactoryInstrument(String id){ return selectFactory(normalizeInstrument(id)); }
-    @JavascriptInterface public void noteOn(int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(0,key,velocity); }
-    @JavascriptInterface public void noteOff(int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(0,key); }
+    @JavascriptInterface public void noteOn(int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(1,key,velocity); }
+    @JavascriptInterface public void noteOff(int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(1,key); }
     @JavascriptInterface public void noteOnChannel(int channel,int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(Math.max(0,Math.min(15,channel)),key,velocity); }
     @JavascriptInterface public void noteOffChannel(int channel,int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(Math.max(0,Math.min(15,channel)),key); }
     @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
