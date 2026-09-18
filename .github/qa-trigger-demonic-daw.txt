@@ -63,3 +63,5 @@ Revision: 29
 Reason: validate pairing bridge compile fix 937a0b35 and native ProjectStore SessionManager capability foundation.
 Revision: 30
 Reason: retrigger APK and Android QA after pairing bridge compile fix; verify current native control foundation.
+Revision: 31
+Reason: run Demonic DAW QA on API 34 after repeated API 35 emulator/ADB instability; validate current APK source.
