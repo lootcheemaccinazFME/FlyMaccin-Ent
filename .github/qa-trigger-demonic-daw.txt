@@ -59,3 +59,5 @@ Revision: 27
 Reason: activate provider-independent Local AI architecture, deterministic offline automation, optional on-device model adapter, DCP planner/executor, privacy boundaries, AI history and optional authenticated ChatGPT controller.
 Revision: 28
 Reason: native implementation begins: durable ProjectStore, scoped SessionManager, native capability registry, generic sample-to-channel routing, and legacy category-default sample loader disabled.
+Revision: 29
+Reason: validate pairing bridge compile fix 937a0b35 and native ProjectStore SessionManager capability foundation.
