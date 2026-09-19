@@ -2,6 +2,23 @@
 
 Status: ACTIVE IMPLEMENTATION REGISTRY
 
+## Unified application doctrine
+
+All historical Demonic/Pocket Potna/PocketBand-inspired development lines now converge into **one application**. This supersedes any prior two-app or separate-DD1/DD2 packaging plan.
+
+- Product lineage includes Pocket Potna, Pocket DAW, Demonic DAW, Demonic DAW 2/DD2, Demonic AI Studio Hut, FME Unified Studio, and PocketBand-inspired fast-loop workflows.
+- These are capability/workspace modes inside one app, not separate installable products.
+- The existing Android package lineage `com.flymaccin.pocketpotna` remains the continuity target unless the owner explicitly changes it.
+- Demonic DAW is the unified production/audio system inside the app.
+- DD1 means the fast, loop-first, lightweight PocketBand-style workflow.
+- DD2 means the deeper workstation workflow: routing, buses, automation, recording, editing, mixer, FX, rendering, controller and AI control.
+- DD1 and DD2 share one native Audio/Project/Command/Content core and one project format. A project may move between workflows without conversion or duplication.
+- Demonic AI Studio Hut/Pocket Potna capabilities such as FME Library, writing/creative rooms, voice/media tools, optional account/provider connections, remote pairing/control, and local-first storage remain integrated surfaces around the same core.
+- Local AI remains available without a paid cloud requirement; ChatGPT/cloud providers are optional adapters.
+- Historical versions are source/audit inputs. Merge the strongest compatible implementation of each capability; do not preserve obsolete code merely because a version number is newer.
+- Latest correction wins when historical versions conflict.
+- Capability Truth Law remains binding: merged does not mean runtime-verified.
+
 ## Governing laws
 1. Channels are generic routing resources. No channel number implies drums, melodic, sampler, vocal, or any other category.
 2. Native project state is the canonical project authority. WebView/localStorage is transitional UI state only.
@@ -29,12 +46,12 @@ SPECIFIED -> FOUNDATION -> IMPLEMENTED -> TESTED -> RUNTIME_VERIFIED -> PHYSICAL
 |---|---|---|---|---|---|---|---|
 | ROUTE-GENERIC-001 | Project/Audio | Track routing | IMPLEMENTED | Native/UI/DCP | yes | project | no category defaults anywhere; compile + runtime routing tests |
 | CAP-TRUTH-001 | Integrity | CapabilityRegistry | IMPLEMENTED | Native/DCP | no | no | renderer absent => no WAV capability advertised |
-| STATE-NATIVE-001 | Project | ProjectStore, schema, SQLite | FOUNDATION | Native/UI/DCP | no | yes | restart/reboot restores complete project without localStorage authority |
-| ASSET-001 | Project/Content/Integrity | SQLite, checksum store | SPECIFIED | Native/UI/DCP | no | yes | stable IDs/checksums/provenance/relink/manifest verified |
+| STATE-NATIVE-001 | Project | ProjectStore, schema, journal | IMPLEMENTED | Native/UI/DCP | no | yes | restart/reboot restores complete project without localStorage authority |
+| ASSET-001 | Project/Content/Integrity | ProjectStore, checksum store | FOUNDATION | Native/UI/DCP | no | yes | stable IDs/checksums/provenance/relink/manifest verified |
 | GRAPH-001 | Audio | routing, parameter registry | SPECIFIED | Native/DCP | yes | project | validated immutable graph drives realtime and offline render |
 | SNAPSHOT-001 | Audio | GRAPH-001 | SPECIFIED | Native | yes | no | lock-safe atomic graph swap under stress |
 | COMMAND-001 | Command | native state, revision model | FOUNDATION | Native/UI/DCP/AI | no | journal | one atomic transaction + rollback + one undo entry |
-| SECURITY-001 | Command/Integrity | Android Keystore | FOUNDATION | Native/DCP | no | yes | encrypted credentials, explicit approval, deny default, revoke-all, expiry/reconnect |
+| SECURITY-001 | Command/Integrity | Android Keystore | IMPLEMENTED | Native/DCP | no | yes | encrypted credentials, explicit approval, deny default, revoke-all, expiry/reconnect |
 | AUDIO-MIX-001 | Audio | graph, SF2/SFZ | FOUNDATION | Native | yes | project | SF2 + samples simultaneous; gain/pan/mute/solo both engines |
 | VOICE-001 | Audio | AUDIO-MIX-001 | SPECIFIED | Native | yes | preset/project | polyphony limits, stealing, choke groups, release tails stress-tested |
 | RT-SAFE-001 | Audio/Integrity | snapshot, buffer pools | SPECIFIED | Native | yes | diagnostics | callback safety + underrun regression tests |
