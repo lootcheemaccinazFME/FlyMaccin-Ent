@@ -44,7 +44,7 @@ public final class ProjectStore {
     writeAtomic(project,next.toString(2));wal.put("state","COMMITTED");writeAtomic(journal,wal.toString());if(!journal.delete())journal.deleteOnExit();
   }
   private boolean recover(File d)throws Exception{
-    File journal=new File(d,"autosave/project.wal.json");if(!journal.isFile())return false;JSONObject wal=readJson(journal),next=wal.optJSONObject("next"),project=new File(d,"project.json");
+    File journal=new File(d,"autosave/project.wal.json");if(!journal.isFile())return false;JSONObject wal=readJson(journal),next=wal.optJSONObject("next");File project=new File(d,"project.json");
     if(next==null){journal.delete();return false;}long target=wal.optLong("targetRevision",-1),current=-1;if(project.isFile())try{current=readJson(project).optLong("revision",-1);}catch(Exception ignored){}
     if(current<target)writeAtomic(project,canonical(next).toString(2));journal.delete();return true;
   }
