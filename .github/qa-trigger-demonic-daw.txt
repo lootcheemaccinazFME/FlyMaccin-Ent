@@ -1,3 +1,6 @@
 Demonic DAW QA trigger
 Revision: unified-build-routing-1789845032004
 Target: emulator compile/install/offline-online smoke after generic routing + unified harvest
+
+Revision: 33
+Reason: verify ProjectStore WAL compile-type fix and unified generic routing build.
