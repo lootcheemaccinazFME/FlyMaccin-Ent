@@ -204,6 +204,22 @@ public class MainActivity extends Activity {
         return result.toString();
       }catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"PACK_INSTALL_FAILED":e.getMessage())+"}";}
     }
+    @JavascriptInterface public String listFmeExpansionSamples(String packId){
+      try{
+        File root=new File(getFilesDir(),"fme-packs/expansions/"+safeName(packId));if(!root.isDirectory()||!new File(root,".installed").isFile())return "[]";
+        org.json.JSONArray out=new org.json.JSONArray();String base=root.getCanonicalPath()+File.separator;List<File> stack=new ArrayList<>();stack.add(root);
+        while(!stack.isEmpty()){File x=stack.remove(stack.size()-1);File[] kids=x.listFiles();if(kids==null)continue;for(File k:kids){if(k.isDirectory())stack.add(k);else if(k.getName().toLowerCase(Locale.US).endsWith(".wav")){String cp=k.getCanonicalPath();if(cp.startsWith(base))out.put(cp.substring(base.length()).replace(File.separatorChar,'/'));}}}
+        return out.toString();
+      }catch(Exception e){return "[]";}
+    }
+    @JavascriptInterface public boolean loadFmeExpansionSampleToChannel(String packId,String relativePath,int channel,boolean clearChannel){
+      if(!nativeReady||channel<0||channel>15)return false;
+      try{
+        File root=new File(getFilesDir(),"fme-packs/expansions/"+safeName(packId));File sample=new File(root,relativePath);String base=root.getCanonicalPath()+File.separator,cp=sample.getCanonicalPath();
+        if(!cp.startsWith(base)||!sample.isFile()||!sample.getName().toLowerCase(Locale.US).endsWith(".wav"))return false;
+        return SfzBank.loadSingleWav(sample,channel,clearChannel)>0;
+      }catch(Exception e){return false;}
+    }
     @JavascriptInterface public String listInstalledFmeExpansions(){
       org.json.JSONArray a=new org.json.JSONArray();File root=new File(getFilesDir(),"fme-packs/expansions");File[] packs=root.listFiles();
       if(packs!=null)for(File d:packs)if(d.isDirectory()&&new File(d,".installed").isFile()){int count=0;List<File> stack=new ArrayList<>();stack.add(d);while(!stack.isEmpty()){File x=stack.remove(stack.size()-1);File[] kids=x.listFiles();if(kids!=null)for(File k:kids)if(k.isDirectory())stack.add(k);else if(k.getName().toLowerCase(Locale.US).endsWith(".wav"))count++;}try{a.put(new JSONObject().put("id",d.getName()).put("path",d.getAbsolutePath()).put("wavCount",count));}catch(Exception ignored){}}
