@@ -330,10 +330,11 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void browserReload(){ runOnUiThread(()->webView.reload()); }
     @JavascriptInterface public void browserHome(){ runOnUiThread(()->webView.loadUrl(OFFLINE_URL)); }
     @JavascriptInterface public void enterPip(){ if(android.os.Build.VERSION.SDK_INT>=26)runOnUiThread(()->{try{enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new Rational(16,9)).build());}catch(Exception ignored){}}); }
-    @JavascriptInterface public boolean launchPsPlay(){
-      String[] packages={"psplay.grill.com","com.grill.psplay","com.stream.game"};
-      for(String pkg:packages){try{Intent launch=getPackageManager().getLaunchIntentForPackage(pkg);if(launch!=null){startActivity(launch);return true;}}catch(Exception ignored){}}
-      try{Intent market=new Intent(Intent.ACTION_VIEW,Uri.parse("market://search?q=PSPlay"));startActivity(market);return false;}catch(Exception ignored){}
+    @JavascriptInterface public boolean launchPsRemotePlay(){
+      String pkg="com.playstation.remoteplay";
+      try{Intent launch=getPackageManager().getLaunchIntentForPackage(pkg);if(launch!=null){startActivity(launch);return true;}}catch(Exception ignored){}
+      try{Intent market=new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+pkg));startActivity(market);return false;}catch(Exception ignored){}
+      try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id="+pkg)));}catch(Exception ignored){}
       return false;
     }
     @JavascriptInterface public void browserTvPip(){ if(android.os.Build.VERSION.SDK_INT>=26)runOnUiThread(()->{try{enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new Rational(16,9)).build());}catch(Exception ignored){}}); }
