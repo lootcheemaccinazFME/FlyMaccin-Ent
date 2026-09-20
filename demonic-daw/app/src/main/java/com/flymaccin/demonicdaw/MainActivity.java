@@ -19,6 +19,9 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.DownloadListener;
+import android.app.DownloadManager;
+import android.os.Environment;
 import android.graphics.Color;
 import androidx.documentfile.provider.DocumentFile;
 import org.json.JSONObject;
@@ -62,6 +65,16 @@ public class MainActivity extends Activity {
     WebSettings s = webView.getSettings();
     s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setMediaPlaybackRequiresUserGesture(false); s.setDatabaseEnabled(true); s.setAllowFileAccess(true); s.setCacheMode(WebSettings.LOAD_DEFAULT);
     webView.addJavascriptInterface(new NativeBridge(), "DemonicNative");
+    webView.setDownloadListener((url,userAgent,contentDisposition,mimetype,contentLength)->{
+      try{
+        if(url==null||!url.startsWith("https://"))return;
+        DownloadManager.Request r=new DownloadManager.Request(Uri.parse(url));
+        r.setMimeType(mimetype);r.addRequestHeader("User-Agent",userAgent==null?"":userAgent);
+        r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"DemonicTV_"+System.currentTimeMillis());
+        ((DownloadManager)getSystemService(DOWNLOAD_SERVICE)).enqueue(r);
+      }catch(Exception ignored){}
+    });
     webView.setWebChromeClient(new WebChromeClient() {
       @Override public void onPermissionRequest(final PermissionRequest request) {
         runOnUiThread(() -> { if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) request.grant(request.getResources()); else requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_REQUEST); });
@@ -309,6 +322,8 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void openBrowser(String url){ runOnUiThread(()->{String u=(url==null||url.trim().isEmpty())?SUNO_HOME:url.trim();if(u.startsWith("https://"))webView.loadUrl(u);}); }
     @JavascriptInterface public void openSunoCreate(){ runOnUiThread(()->webView.loadUrl(SUNO_CREATE)); }
     @JavascriptInterface public void openSunoStudio(){ runOnUiThread(()->webView.loadUrl(SUNO_HOME)); }
+    @JavascriptInterface public void openFreeTv(){ runOnUiThread(()->webView.loadUrl("https://pluto.tv/us/live-tv")); }
+    @JavascriptInterface public void downloadUrl(String url){ if(url==null||!url.startsWith("https://"))return;runOnUiThread(()->{try{DownloadManager.Request r=new DownloadManager.Request(Uri.parse(url));r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"DemonicTV_"+System.currentTimeMillis());((DownloadManager)getSystemService(DOWNLOAD_SERVICE)).enqueue(r);}catch(Exception ignored){}}); }
     @JavascriptInterface public String browserUrl(){ return webView==null?"":webView.getUrl(); }
     @JavascriptInterface public void browserBack(){ runOnUiThread(()->{if(webView.canGoBack())webView.goBack();}); }
     @JavascriptInterface public void browserForward(){ runOnUiThread(()->{if(webView.canGoForward())webView.goForward();}); }
