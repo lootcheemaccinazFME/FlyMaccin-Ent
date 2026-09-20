@@ -38,6 +38,7 @@ public class MainActivity extends Activity {
   private ProjectStore projectStore;
   private SessionManager sessionManager;
   private AssetStore assetStore;
+  private CommandTransactionEngine commandTransactions;
 
   @Override public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -47,6 +48,7 @@ public class MainActivity extends Activity {
     projectStore = new ProjectStore(this);
     sessionManager = new SessionManager(this);
     assetStore = new AssetStore(this,projectStore);
+    commandTransactions = new CommandTransactionEngine(projectStore);
 
     // Render the DAW first. Native audio and pack preparation must never block first paint.
     webView = new WebView(this);
@@ -175,6 +177,7 @@ public class MainActivity extends Activity {
     @JavascriptInterface public boolean saveNativeProject(String id,String json){ try{return projectStore.save(id,json);}catch(Exception e){return false;} }
     @JavascriptInterface public String saveNativeProjectRevision(String id,String json,long expectedRevision){ try{return projectStore.saveRevision(id,json,expectedRevision);}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"SAVE_FAILED":e.getMessage())+"}";} }
     @JavascriptInterface public String recoverNativeProject(String id){ try{return projectStore.recoverProject(id);}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"RECOVERY_FAILED":e.getMessage())+"}";} }
+    @JavascriptInterface public String executeNativeTransaction(String id,String commandsJson,long expectedRevision){ try{return commandTransactions.execute(id,commandsJson,expectedRevision);}catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"TRANSACTION_FAILED":e.getMessage())+"}";} }
     @JavascriptInterface public String loadNativeProject(String id){ try{return projectStore.load(id);}catch(Exception e){return "{}";} }
     @JavascriptInterface public String listNativeProjects(){ return projectStore.list(); }
     @JavascriptInterface public String pairController(String client,String scopesJson){ try{return sessionManager.requestPairing(client,new org.json.JSONArray(scopesJson));}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"pairing failed":e.getMessage())+"}";} }
