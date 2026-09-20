@@ -114,12 +114,12 @@ public class MainActivity extends Activity {
     try(FileOutputStream o=new FileOutputStream(done)){o.write("FME Core Pack v1".getBytes("UTF-8"));}
     getSharedPreferences("demonic_packs",MODE_PRIVATE).edit().putBoolean("fme_core_v1",true).putString("fme_core_path",root.getAbsolutePath()).apply();
   }
-  private int selectFactory(String id){ if(!nativeReady)return 0; try{return SfzBank.load(new File(factoryDir,id+".sfz"));}catch(Exception e){return 0;} }
+  private int selectFactoryToChannel(String id,int channel){ if(!nativeReady)return 0; try{return SfzBank.load(new File(factoryDir,id+".sfz"),Math.max(0,Math.min(15,channel)),true);}catch(Exception e){return 0;} }
 
   private boolean restoreLastBank(){
     String kind=getPreferences(MODE_PRIVATE).getString("bank_kind",""); String path=getPreferences(MODE_PRIVATE).getString("bank_path","");
     if(path.isEmpty())return false; File f=new File(path); if(!f.exists())return false;
-    try { if("sf2".equals(kind)) return NativeAudioEngine.nativeLoadSoundFont(path)>=0; if("sfz".equals(kind)) return SfzBank.load(f)>0; } catch(Exception ignored){} return false;
+    try { if("sf2".equals(kind)) return NativeAudioEngine.nativeLoadSoundFont(path)>=0; /* SFZ restore requires an explicit routed channel. */ } catch(Exception ignored){} return false;
   }
   private void rememberBank(String kind, File path){ getPreferences(MODE_PRIVATE).edit().putString("bank_kind",kind).putString("bank_path",path.getAbsolutePath()).apply(); }
 
@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
       getContentResolver().takePersistableUriPermission(uri,flags&(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION));
       DocumentFile root=DocumentFile.fromTreeUri(this,uri); if(root==null||!root.isDirectory())throw new IOException("Folder unavailable");
       File dstRoot=new File(importDir,"sfz-bank"); deleteTree(dstRoot); dstRoot.mkdirs(); List<File> sfzFiles=new ArrayList<>(); copyDocumentTree(root,dstRoot,sfzFiles);
-      if(sfzFiles.isEmpty())throw new IOException("No .sfz file found in selected folder"); File sfz=sfzFiles.get(0); int regions=SfzBank.load(sfz); boolean ok=regions>0; if(ok)rememberBank("sfz",sfz); notifyImport("sfz",ok,sfz.getName(),ok?(regions+" regions loaded"):"No playable regions found");
+      if(sfzFiles.isEmpty())throw new IOException("No .sfz file found in selected folder"); File sfz=sfzFiles.get(0); rememberBank("sfz",sfz); notifyImport("sfz",true,sfz.getName(),"SFZ imported; assign a track channel before loading");
     } catch(Exception e){notifyImport("sfz",false,"",e.getMessage());}
   }
   private void copyDocumentTree(DocumentFile src,File dst,List<File> sfzFiles)throws IOException{
@@ -162,7 +162,8 @@ public class MainActivity extends Activity {
 
   public final class NativeBridge {
     @JavascriptInterface public boolean ready(){ return nativeReady; }
-    @JavascriptInterface public int selectFactoryInstrument(String id){ return selectFactory(normalizeInstrument(id)); }
+    @JavascriptInterface public int selectFactoryInstrument(String id){ return 0; /* unrouted factory load disabled */ }
+    @JavascriptInterface public int selectFactoryInstrumentToChannel(String id,int channel){ return selectFactoryToChannel(normalizeInstrument(id),channel); }
     @JavascriptInterface public void noteOn(int key,int velocity){ /* Legacy unrouted entry point intentionally disabled. */ }
     @JavascriptInterface public void noteOff(int key){ /* Legacy unrouted entry point intentionally disabled. */ }
     @JavascriptInterface public void noteOnChannel(int channel,int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(Math.max(0,Math.min(15,channel)),key,velocity); }
@@ -205,6 +206,8 @@ public class MainActivity extends Activity {
         JSONObject r=new JSONObject(requestJson==null?"{}":requestJson);
         String command=r.optString("command",""),scope=scopeForCommand(command);
         sessionManager.authorize(r.optString("sessionId"),r.optString("token"),scope);
+        // Credentials terminate at the native authorization boundary and are never forwarded into WebView state.
+        r.remove("token");
         final String req=JSONObject.quote(r.toString());
         runOnUiThread(()->webView.evaluateJavascript(
           "(function(){try{return JSON.stringify(window.DemonicControl.execute(JSON.parse("+req+")));}catch(e){return JSON.stringify({ok:false,error:String(e)})}})()",null));
