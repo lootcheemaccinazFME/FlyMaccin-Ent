@@ -19,6 +19,26 @@ public final class AssetStore {
     File meta=new File(dir,id+".asset.json");try(FileOutputStream o=new FileOutputStream(meta)){o.write(x.toString(2).getBytes("UTF-8"));o.getFD().sync();}
     return x.toString();
   }
+  public synchronized String importAndRegister(String projectId,String kind,InputStream in,String originalName,String provenance,long expectedRevision)throws Exception{
+    JSONObject asset=new JSONObject(importFile(projectId,kind,in,originalName,provenance));
+    try{
+      JSONObject project=new JSONObject(projects.load(projectId));
+      long current=project.optLong("revision",0);
+      if(expectedRevision>=0&&expectedRevision!=current)throw new IllegalStateException("REVISION_STALE");
+      JSONArray assets=project.optJSONArray("assets");if(assets==null){assets=new JSONArray();project.put("assets",assets);}
+      assets.put(asset);
+      String saved=projects.saveRevision(projectId,project.toString(),current);
+      return new JSONObject().put("ok",true).put("asset",asset).put("state",new JSONObject(saved)).toString();
+    }catch(Exception e){
+      deleteAssetFiles(projectId,kind,asset.optString("id"));
+      throw e;
+    }
+  }
+  public synchronized boolean deleteAssetFiles(String projectId,String kind,String assetId)throws Exception{
+    File dir=projects.assetDir(projectId,kind),meta=new File(dir,safe(assetId)+".asset.json");boolean ok=true;
+    if(meta.isFile()){try{JSONObject x=new JSONObject(read(meta));File f=new File(dir,x.optString("file",""));if(f.isFile())ok=f.delete()&&ok;}catch(Exception ignored){}ok=meta.delete()&&ok;}
+    return ok;
+  }
   public synchronized String verify(String projectId,String kind,String assetId)throws Exception{
     File dir=projects.assetDir(projectId,kind),meta=new File(dir,safe(assetId)+".asset.json");if(!meta.isFile())return new JSONObject().put("ok",false).put("error","ASSET_NOT_FOUND").toString();
     JSONObject x=new JSONObject(read(meta));File f=new File(dir,x.getString("file"));if(!f.isFile())return new JSONObject().put("ok",false).put("error","ASSET_MISSING").put("asset",x).toString();
