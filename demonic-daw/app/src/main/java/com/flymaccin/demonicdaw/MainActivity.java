@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
   private static final int MIC_REQUEST = 901;
   private static final int SF2_REQUEST = 902;
   private static final int SFZ_TREE_REQUEST = 903;
+  private static final int FME_EXPANSION_REQUEST = 904;
   private static final String ONLINE_URL = "https://demonicaistudiohut.floot.app";
   private static final String OFFLINE_URL = "file:///android_asset/offline.html";
   private volatile boolean nativeReady = false;
@@ -130,11 +131,13 @@ public class MainActivity extends Activity {
     i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/octet-stream","audio/*","application/x-soundfont"}); startActivityForResult(i,SF2_REQUEST);
   }
   private void launchSfzFolderPicker(){ Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION); startActivityForResult(i,SFZ_TREE_REQUEST); }
+  private void launchFmeExpansionPicker(){ Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/zip");i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);startActivityForResult(i,FME_EXPANSION_REQUEST); }
 
   @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
     super.onActivityResult(requestCode,resultCode,data); if(resultCode!=RESULT_OK||data==null||data.getData()==null)return; Uri uri=data.getData();
     if(requestCode==SF2_REQUEST){ importSf2(uri); }
     else if(requestCode==SFZ_TREE_REQUEST){ importSfzTree(uri,data.getFlags()); }
+    else if(requestCode==FME_EXPANSION_REQUEST){ importFmeExpansion(uri,data.getFlags()); }
   }
   private void importSf2(Uri uri){
     try { File dst=new File(importDir,"custom.sf2"); try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(dst)){if(in==null)throw new IOException("No input stream");copy(in,out);} int id=NativeAudioEngine.nativeLoadSoundFont(dst.getAbsolutePath()); boolean ok=id>=0; if(ok)rememberBank("sf2",dst); notifyImport("sf2",ok,dst.getName(),ok?"SoundFont loaded":"FluidSynth rejected the SoundFont"); }
@@ -147,6 +150,15 @@ public class MainActivity extends Activity {
       File dstRoot=new File(importDir,"sfz-bank"); deleteTree(dstRoot); dstRoot.mkdirs(); List<File> sfzFiles=new ArrayList<>(); copyDocumentTree(root,dstRoot,sfzFiles);
       if(sfzFiles.isEmpty())throw new IOException("No .sfz file found in selected folder"); File sfz=sfzFiles.get(0); rememberBank("sfz",sfz); notifyImport("sfz",true,sfz.getName(),"SFZ imported; assign a track channel before loading");
     } catch(Exception e){notifyImport("sfz",false,"",e.getMessage());}
+  }
+  private void importFmeExpansion(Uri uri,int flags){
+    try{
+      try{getContentResolver().takePersistableUriPermission(uri,flags&Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+      String name="FME_Expansion";DocumentFile d=DocumentFile.fromSingleUri(this,uri);if(d!=null&&d.getName()!=null)name=d.getName().replaceFirst("(?i)\\.zip$","");
+      String result=new NativeBridge().installFmeExpansionPack("",uri.toString(),name,-1);JSONObject parsed=new JSONObject(result);boolean ok=parsed.optBoolean("ok");
+      notifyImport("pack",ok,name,ok?"Expansion installed":"Expansion install failed: "+parsed.optString("error"));
+      if(webView!=null)runOnUiThread(()->webView.evaluateJavascript("if(window.renderPacks)renderPacks();",null));
+    }catch(Exception e){notifyImport("pack",false,"",e.getMessage());}
   }
   private void copyDocumentTree(DocumentFile src,File dst,List<File> sfzFiles)throws IOException{
     if(src.isDirectory()){dst.mkdirs();for(DocumentFile child:src.listFiles()){String n=safeName(child.getName());copyDocumentTree(child,new File(dst,n),sfzFiles);}return;}
@@ -289,6 +301,7 @@ public class MainActivity extends Activity {
     }
     @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
     @JavascriptInterface public void importSfzFolder(){ runOnUiThread(()->launchSfzFolderPicker()); }
+    @JavascriptInterface public void importFmeExpansionPack(){ runOnUiThread(()->launchFmeExpansionPicker()); }
   }
   private static String scopeForCommand(String command){
     if(command==null)return "READ";
