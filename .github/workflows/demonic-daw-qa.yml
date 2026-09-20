@@ -50,18 +50,21 @@ jobs:
           script: |
             set -euxo pipefail
             mkdir -p qa-output
-            adb kill-server || true
+            # android-emulator-runner owns the ADB server lifecycle. Killing it here can
+            # orphan the already-booting emulator and leave its transport permanently offline.
             adb start-server
+            adb reconnect offline || true
             timeout 300 sh -c '
-              until [ "$(adb get-state 2>/dev/null || true)" = "device" ]; do
-                adb devices || true
-                sleep 2
+              until adb devices | awk "NR>1 && \\$2==\"device\" {ok=1} END{exit !ok}"; do
+                adb reconnect offline || true
+                sleep 3
               done
             '
-            timeout 300 sh -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\\r")" = "1" ]; do sleep 2; done'
-            timeout 180 sh -c 'until adb shell service check package 2>/dev/null | grep -q "found"; do sleep 2; done'
-            timeout 120 sh -c 'until adb shell service check activity 2>/dev/null | grep -q "found"; do sleep 2; done'
-            sleep 10
+            adb wait-for-device
+            timeout 300 sh -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\\r")" = "1" ]; do sleep 3; done'
+            timeout 180 sh -c 'until adb shell service check package 2>/dev/null | grep -q "found"; do sleep 3; done'
+            timeout 120 sh -c 'until adb shell service check activity 2>/dev/null | grep -q "found"; do sleep 3; done'
+            sleep 5
             adb install --no-streaming -r demonic-daw/app/build/outputs/apk/debug/app-debug.apk
             adb logcat -c
             # Pre-grant microphone so Android's runtime permission dialog cannot mask the WebView during UI QA.
