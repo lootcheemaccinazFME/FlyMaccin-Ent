@@ -184,6 +184,31 @@ public class MainActivity extends Activity {
         try(InputStream source=in){return assetStore.importAndRegister(projectId,kind,source,originalName,provenance,expectedRevision);}
       }catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"ASSET_IMPORT_FAILED":e.getMessage())+"}";}
     }
+    @JavascriptInterface public String installFmeExpansionPack(String projectId,String uriString,String packName,long expectedRevision){
+      try{
+        Uri uri=Uri.parse(uriString);InputStream raw=getContentResolver().openInputStream(uri);if(raw==null)throw new IOException("PACK_INPUT_UNAVAILABLE");
+        File root=new File(getFilesDir(),"fme-packs/expansions/"+safeName(packName));deleteTree(root);root.mkdirs();
+        String rootPath=root.getCanonicalPath()+File.separator;int wavCount=0;byte[]buf=new byte[32768];
+        try(ZipInputStream zin=new ZipInputStream(new BufferedInputStream(raw))){
+          ZipEntry e;while((e=zin.getNextEntry())!=null){
+            File dst=new File(root,e.getName());if(!dst.getCanonicalPath().startsWith(rootPath))throw new IOException("UNSAFE_PACK_PATH");
+            if(e.isDirectory()){dst.mkdirs();continue;}File parent=dst.getParentFile();if(parent!=null)parent.mkdirs();
+            try(FileOutputStream out=new FileOutputStream(dst)){int n;while((n=zin.read(buf))>0)out.write(buf,0,n);out.getFD().sync();}
+            if(dst.getName().toLowerCase(Locale.US).endsWith(".wav"))wavCount++;
+          }
+        }
+        if(wavCount<1){deleteTree(root);throw new IOException("PACK_HAS_NO_WAVS");}
+        File marker=new File(root,".installed");try(FileOutputStream o=new FileOutputStream(marker)){o.write((packName+"\n"+wavCount).getBytes("UTF-8"));o.getFD().sync();}
+        JSONObject result=new JSONObject().put("ok",true).put("pack",packName).put("wavCount",wavCount).put("path",root.getAbsolutePath());
+        getSharedPreferences("demonic_packs",MODE_PRIVATE).edit().putBoolean("expansion_"+safeName(packName),true).putString("expansion_path_"+safeName(packName),root.getAbsolutePath()).apply();
+        return result.toString();
+      }catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"PACK_INSTALL_FAILED":e.getMessage())+"}";}
+    }
+    @JavascriptInterface public String listInstalledFmeExpansions(){
+      org.json.JSONArray a=new org.json.JSONArray();File root=new File(getFilesDir(),"fme-packs/expansions");File[] packs=root.listFiles();
+      if(packs!=null)for(File d:packs)if(d.isDirectory()&&new File(d,".installed").isFile()){int count=0;List<File> stack=new ArrayList<>();stack.add(d);while(!stack.isEmpty()){File x=stack.remove(stack.size()-1);File[] kids=x.listFiles();if(kids!=null)for(File k:kids)if(k.isDirectory())stack.add(k);else if(k.getName().toLowerCase(Locale.US).endsWith(".wav"))count++;}try{a.put(new JSONObject().put("id",d.getName()).put("path",d.getAbsolutePath()).put("wavCount",count));}catch(Exception ignored){}}
+      return a.toString();
+    }
     @JavascriptInterface public String verifyProjectAsset(String projectId,String kind,String assetId){
       try{return assetStore.verify(projectId,kind,assetId);}catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"ASSET_VERIFY_FAILED":e.getMessage())+"}";}
     }
