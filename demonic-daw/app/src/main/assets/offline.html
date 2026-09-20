@@ -25,6 +25,7 @@ const uid=(p='id')=>p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36)
 let selectedTrackId=localStorage.getItem('fme-selected-track')||null,selectedClipId=localStorage.getItem('fme-selected-clip')||null,lastError=null,loadedFmeSound=null;
 let buses=load('fme-buses',[{id:'master',name:'Master',type:'master'}]),effects=load('fme-effects',[]),automation=load('fme-automation',[]);
 let clips=load('fme-clips',[]), projectName=localStorage.getItem('fme-project-name')||'Untitled Project', undoStack=[], redoStack=[];
+let nativeRevision=Number(localStorage.getItem('fme-native-revision')||0);
 function snapshot(){return JSON.stringify({protocolVersion:'1.1',project:{id:localStorage.getItem('fme-project-id')||'project_local',name:projectName},tracks,clips,buses,effects,automation,song,drums,bass,projectName,selectedTrackId,selectedClipId,bpm:+bpm.value,transport:{playing,step},recording:!!(recorder&&recorder.state==='recording'),loadedFmeSound,history:{undo:undoStack.length,redo:redoStack.length},lastError})}
 function emitDemonic(type,detail={}){window.dispatchEvent(new CustomEvent('demonic-control-event',{detail:{type,time:Date.now(),...detail}}))}
 function ensureIds(){if(!localStorage.getItem('fme-project-id'))localStorage.setItem('fme-project-id',uid('project'));tracks.forEach(t=>t.id=t.id||uid('track'));clips.forEach(c=>{c.id=c.id||uid('clip');(c.notes||[]).forEach(n=>n.id=n.id||uid('note'))})}
@@ -53,8 +54,8 @@ function renderArrangement(){if(!window.arrangement)return;arrangement.innerHTML
 function addClip(type){pushUndo();clips.push({id:Date.now()+'',name:(type==='audio'?'Audio Clip ':'MIDI Clip ')+(clips.length+1),type,trackId:tracks[0]?.id||'',start:clips.length+1,bars:1,notes:type==='midi'?[]:undefined});storeProject();renderArrangement()}
 function demonicControl(req){let r=typeof req==='string'?JSON.parse(req):req||{},a=r.args||{},out={ok:true,command:r.command};try{switch(r.command){
 case'capabilities.get':out.capabilities=window.DemonicControl.capabilities();out.protocolVersion='1.1';break;
-case'project.getState':out.state=JSON.parse(snapshot());break;
-case'project.save':storeProject();emitDemonic('project.saved',{name:projectName});break;
+case'project.getState':out.state=JSON.parse(snapshot());out.revision=nativeRevision;break;
+case'project.save':{storeProject();let pid=localStorage.getItem('fme-project-id')||'project_local';let expected=r.expectedRevision!=null?Number(r.expectedRevision):nativeRevision;if(window.DemonicNative?.saveNativeProjectRevision){let saved=JSON.parse(DemonicNative.saveNativeProjectRevision(pid,snapshot(),expected)||'{}');if(saved.error)throw Error(saved.error);nativeRevision=Number(saved.revision||nativeRevision);localStorage.setItem('fme-native-revision',String(nativeRevision));out.revision=nativeRevision;out.state=saved;}emitDemonic('project.saved',{name:projectName,revision:nativeRevision});break;}
 case'project.saveAs':pushUndo();projectName=String(a.name||projectName);localStorage.setItem('fme-project-id',uid('project'));storeProject();emitDemonic('project.saved',{name:projectName});break;
 case'project.rename':pushUndo();projectName=String(a.name||'Untitled Project');storeProject();renderTracks();emitDemonic('project.changed');break;
 case'track.create':addTrack(a.type||'instrument');out.track=tracks[tracks.length-1];emitDemonic('track.changed',{id:out.track.id});break;
