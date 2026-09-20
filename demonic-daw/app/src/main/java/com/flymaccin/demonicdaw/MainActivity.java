@@ -2,6 +2,8 @@ package com.flymaccin.demonicdaw;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.PictureInPictureParams;
+import android.util.Rational;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -33,6 +35,8 @@ public class MainActivity extends Activity {
   private static final int FME_EXPANSION_REQUEST = 904;
   private static final String ONLINE_URL = "https://demonicaistudiohut.floot.app";
   private static final String OFFLINE_URL = "file:///android_asset/offline.html";
+  private static final String SUNO_HOME = "https://suno.com/";
+  private static final String SUNO_CREATE = "https://suno.com/create";
   private volatile boolean nativeReady = false;
   private File factoryDir;
   private File importDir;
@@ -56,7 +60,7 @@ public class MainActivity extends Activity {
     webView.setBackgroundColor(Color.rgb(5,5,7));
     setContentView(webView);
     WebSettings s = webView.getSettings();
-    s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setMediaPlaybackRequiresUserGesture(false); s.setDatabaseEnabled(true); s.setAllowFileAccess(true);
+    s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setMediaPlaybackRequiresUserGesture(false); s.setDatabaseEnabled(true); s.setAllowFileAccess(true); s.setCacheMode(WebSettings.LOAD_DEFAULT);
     webView.addJavascriptInterface(new NativeBridge(), "DemonicNative");
     webView.setWebChromeClient(new WebChromeClient() {
       @Override public void onPermissionRequest(final PermissionRequest request) {
@@ -302,6 +306,15 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
     @JavascriptInterface public void importSfzFolder(){ runOnUiThread(()->launchSfzFolderPicker()); }
     @JavascriptInterface public void importFmeExpansionPack(){ runOnUiThread(()->launchFmeExpansionPicker()); }
+    @JavascriptInterface public void openBrowser(String url){ runOnUiThread(()->{String u=(url==null||url.trim().isEmpty())?SUNO_HOME:url.trim();if(u.startsWith("https://"))webView.loadUrl(u);}); }
+    @JavascriptInterface public void openSunoCreate(){ runOnUiThread(()->webView.loadUrl(SUNO_CREATE)); }
+    @JavascriptInterface public void openSunoStudio(){ runOnUiThread(()->webView.loadUrl(SUNO_HOME)); }
+    @JavascriptInterface public String browserUrl(){ return webView==null?"":webView.getUrl(); }
+    @JavascriptInterface public void browserBack(){ runOnUiThread(()->{if(webView.canGoBack())webView.goBack();}); }
+    @JavascriptInterface public void browserForward(){ runOnUiThread(()->{if(webView.canGoForward())webView.goForward();}); }
+    @JavascriptInterface public void browserReload(){ runOnUiThread(()->webView.reload()); }
+    @JavascriptInterface public void browserHome(){ runOnUiThread(()->webView.loadUrl(OFFLINE_URL)); }
+    @JavascriptInterface public void enterPip(){ if(android.os.Build.VERSION.SDK_INT>=26)runOnUiThread(()->{try{enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new Rational(16,9)).build());}catch(Exception ignored){}}); }
   }
   private static String scopeForCommand(String command){
     if(command==null)return "READ";
@@ -317,6 +330,7 @@ public class MainActivity extends Activity {
     Map<String,String> m=new HashMap<>(); m.put("grand-piano","grand");m.put("warm-organ","organ");m.put("rock--blues-lead","lead-guitar");m.put("rock-blues-lead","lead-guitar");m.put("g-funk-bass","gfunk-bass");m.put("808-sub","808-sub");m.put("brass-stack","brass-stack");m.put("demonic-synth","synth");m.put("percussion-fx","perc-fx"); return m.getOrDefault(x,x);
   }
 
+  @Override protected void onUserLeaveHint(){ super.onUserLeaveHint(); if(android.os.Build.VERSION.SDK_INT>=26&&webView!=null&&webView.getUrl()!=null&&!webView.getUrl().startsWith("file:///android_asset/")){try{enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new Rational(16,9)).build());}catch(Exception ignored){}} }
   @Override public void onBackPressed(){ if(webView!=null&&webView.canGoBack())webView.goBack();else super.onBackPressed(); }
   @Override protected void onDestroy(){ try{if(nativeReady)NativeAudioEngine.nativeStop();}catch(Throwable ignored){} super.onDestroy(); }
 }
