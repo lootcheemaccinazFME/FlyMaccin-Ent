@@ -178,6 +178,15 @@ public class MainActivity extends Activity {
     @JavascriptInterface public String saveNativeProjectRevision(String id,String json,long expectedRevision){ try{return projectStore.saveRevision(id,json,expectedRevision);}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"SAVE_FAILED":e.getMessage())+"}";} }
     @JavascriptInterface public String recoverNativeProject(String id){ try{return projectStore.recoverProject(id);}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"RECOVERY_FAILED":e.getMessage())+"}";} }
     @JavascriptInterface public String executeNativeTransaction(String id,String commandsJson,long expectedRevision){ try{return commandTransactions.execute(id,commandsJson,expectedRevision);}catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"TRANSACTION_FAILED":e.getMessage())+"}";} }
+    @JavascriptInterface public String importProjectAsset(String projectId,String kind,String uriString,String originalName,String provenance,long expectedRevision){
+      try{
+        Uri uri=Uri.parse(uriString);InputStream in=getContentResolver().openInputStream(uri);if(in==null)throw new IOException("ASSET_INPUT_UNAVAILABLE");
+        try(InputStream source=in){return assetStore.importAndRegister(projectId,kind,source,originalName,provenance,expectedRevision);}
+      }catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"ASSET_IMPORT_FAILED":e.getMessage())+"}";}
+    }
+    @JavascriptInterface public String verifyProjectAsset(String projectId,String kind,String assetId){
+      try{return assetStore.verify(projectId,kind,assetId);}catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"ASSET_VERIFY_FAILED":e.getMessage())+"}";}
+    }
     @JavascriptInterface public String loadNativeProject(String id){ try{return projectStore.load(id);}catch(Exception e){return "{}";} }
     @JavascriptInterface public String listNativeProjects(){ return projectStore.list(); }
     @JavascriptInterface public String pairController(String client,String scopesJson){ try{return sessionManager.requestPairing(client,new org.json.JSONArray(scopesJson));}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"pairing failed":e.getMessage())+"}";} }
