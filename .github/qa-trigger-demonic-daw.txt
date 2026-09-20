@@ -7,3 +7,5 @@ Reason: verify ProjectStore WAL compile-type fix and unified generic routing bui
 
 Revision: 34
 Reason: preserve emulator-runner ADB lifecycle; reconnect offline transport without killing server.
+
+Release-readiness QA trigger: 2026-09-20 pack installer + native transaction baseline
