@@ -4,3 +4,6 @@ Target: emulator compile/install/offline-online smoke after generic routing + un
 
 Revision: 33
 Reason: verify ProjectStore WAL compile-type fix and unified generic routing build.
+
+Revision: 34
+Reason: preserve emulator-runner ADB lifecycle; reconnect offline transport without killing server.
