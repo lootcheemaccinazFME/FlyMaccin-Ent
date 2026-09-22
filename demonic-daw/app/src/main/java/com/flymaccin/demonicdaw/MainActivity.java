@@ -199,7 +199,7 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void noteOff(int key){ /* Legacy unrouted entry point intentionally disabled. */ }
     @JavascriptInterface public void noteOnChannel(int channel,int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(Math.max(0,Math.min(15,channel)),key,velocity); }
     @JavascriptInterface public void noteOffChannel(int channel,int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(Math.max(0,Math.min(15,channel)),key); }
-    @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
+    @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }\n    @JavascriptInterface public void allNotesOff(){ if(nativeReady)for(int ch=0;ch<16;ch++)NativeAudioEngine.nativeCc(ch,123,0); }
     @JavascriptInterface public void setChannelMix(int channel,float gain,float pan,boolean mute,boolean solo){ if(nativeReady)NativeAudioEngine.nativeSetChannelMix(Math.max(0,Math.min(15,channel)),gain,pan,mute,solo); }
     @JavascriptInterface public String nativeCapabilities(){ try{return CapabilityRegistry.snapshot(nativeReady,hasFmeCore());}catch(Exception e){return "{}";} }
     @JavascriptInterface public String createNativeProject(String name){ try{return projectStore.create(name);}catch(Exception e){return "";} }
