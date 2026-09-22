@@ -9,3 +9,6 @@ Revision: 34
 Reason: preserve emulator-runner ADB lifecycle; reconnect offline transport without killing server.
 
 Release-readiness QA trigger: 2026-09-20 pack installer + native transaction baseline
+
+Revision: 35
+Reason: canonical native state validator + compiled audio graph + immutable realtime snapshot foundation.
