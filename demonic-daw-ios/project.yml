@@ -1,0 +1,28 @@
+name: DemonicDAW
+options:
+  bundleIdPrefix: com.flymaccin
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  DemonicDAW:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    resources:
+      - Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.flymaccin.demonicdaw
+        SWIFT_VERSION: 5.9
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Demonic DAW uses microphone input for audio recording.
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Demonic DAW
+        UILaunchScreen: {}
+        UIBackgroundModes:
+          - audio
+        NSMicrophoneUsageDescription: Demonic DAW uses microphone input for audio recording.
