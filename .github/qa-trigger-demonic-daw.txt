@@ -18,3 +18,6 @@ Reason: compile/smoke non-AI parallel P0-P5 P8 P9 foundations; AI remains deferr
 
 Revision: 37
 Reason: fix first real QA failure: missing SfzBank.loadSingleWav(File,int,boolean); rerun build before feature work.
+
+Revision: 38
+Reason: verify instrument track auto-routing/selection, FME sample audition, studio panic control, and recording UI compile/smoke.
