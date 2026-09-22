@@ -38,6 +38,15 @@ public final class SfzBank {
         return loaded;
     }
 
+    /** Load one WAV as a full-keyboard region on an explicitly selected generic channel. */
+    public static int loadSingleWav(File wavFile, int channel, boolean clearChannel) throws IOException {
+        if (wavFile == null || !wavFile.isFile()) throw new FileNotFoundException("WAV_NOT_FOUND");
+        if (channel < 0 || channel > 15) throw new IllegalArgumentException("INVALID_CHANNEL");
+        if (clearChannel) NativeAudioEngine.nativeClearSampleChannel(channel);
+        return NativeAudioEngine.nativeAddWavRegion(wavFile.getAbsolutePath(), channel, 0, 127, 0, 127, 60,
+                0f, 0f, 0f, 0, 0, -1, -1, 0, -1, 0.15f) ? 1 : 0;
+    }
+
     private static int emit(File sfzFile, Map<String,String> g, Map<String,String> grp, Map<String,String> r, int channel) {
         Map<String,String> p = new HashMap<>(g); p.putAll(grp); p.putAll(r);
         String sample = p.get("sample"); if (sample == null) return 0;
