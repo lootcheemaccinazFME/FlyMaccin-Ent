@@ -12,3 +12,6 @@ Release-readiness QA trigger: 2026-09-20 pack installer + native transaction bas
 
 Revision: 35
 Reason: canonical native state validator + compiled audio graph + immutable realtime snapshot foundation.
+
+Revision: 36
+Reason: compile/smoke non-AI parallel P0-P5 P8 P9 foundations; AI remains deferred.
