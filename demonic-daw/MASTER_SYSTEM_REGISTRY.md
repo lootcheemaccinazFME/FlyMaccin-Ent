@@ -86,3 +86,16 @@ AI is last. Finish every non-AI DAW subsystem and its verification gates before 
 P0 integrity/state/storage/transactions -> P1 realtime graph/snapshots/audio -> P2 arrangement/piano roll/audio editing/recording -> P3 mixer/DSP/automation -> P4 rendering/project packaging -> P5 MIDI/hardware/sampler/time-pitch/vocal -> P6 FME content/workflows -> P7 non-AI external control -> P8 advanced UX/live/collaboration/diagnostics -> P9 certification/release -> P10 AI last.
 
 This ordering is mandatory unless the owner explicitly changes it. AI scaffolding already present may remain, but it receives no priority over unfinished non-AI systems.
+
+
+## Parallel non-AI implementation start — P0-P5, P8, P9
+Started in source on 2026-09-21. AI remains deferred.
+
+- P0: canonical native state, WAL ProjectStore, AssetStore, revisioned CommandTransactionEngine and security foundations are active.
+- P1: AudioGraph and RealtimeSnapshotManager foundations are active; native callback integration remains the critical realtime gate.
+- P2: TimelineEngine foundation added for clip validation, PPQ timing and MIDI-note quantization; recording/arrangement integration remains.
+- P3: MixerAutomationEngine foundation added for deterministic automation interpolation/validation; DSP/bus runtime integration remains.
+- P4: RenderJob lifecycle foundation added. Native renderer remains unavailable until audio output is actually rendered and verified.
+- P5: MidiDevicePolicy foundation added with explicit generic-channel law and timestamp/data normalization; Android MIDI device integration remains.
+- P8: DiagnosticsRegistry and CompatibilityManifest foundations added for runtime evidence, recovery/underrun counters and schema/protocol compatibility. Advanced UX/live/collaboration remain future non-AI work.
+- P9: certification track is active through QA workflow and capability-truth gates. Physical-device verification is not claimed until hardware evidence exists.
