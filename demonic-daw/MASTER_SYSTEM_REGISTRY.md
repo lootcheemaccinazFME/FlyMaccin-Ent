@@ -14,7 +14,7 @@ All historical Demonic/Pocket Potna/PocketBand-inspired development lines now co
 - DD2 means the deeper workstation workflow: routing, buses, automation, recording, editing, mixer, FX, rendering, controller and AI control.
 - DD1 and DD2 share one native Audio/Project/Command/Content core and one project format. A project may move between workflows without conversion or duplication.
 - Demonic AI Studio Hut/Pocket Potna capabilities such as FME Library, writing/creative rooms, voice/media tools, optional account/provider connections, remote pairing/control, and local-first storage remain integrated surfaces around the same core.
-- Local AI remains available without a paid cloud requirement; ChatGPT/cloud providers are optional adapters.
+- AI is deliberately LAST in the implementation order. Local AI and ChatGPT/cloud adapters remain planned, but no AI work may preempt unfinished DAW/audio/editing/render/MIDI/content/release work.
 - Historical versions are source/audit inputs. Merge the strongest compatible implementation of each capability; do not preserve obsolete code merely because a version number is newer.
 - Latest correction wins when historical versions conflict.
 - Capability Truth Law remains binding: merged does not mean runtime-verified.
@@ -61,9 +61,9 @@ SPECIFIED -> FOUNDATION -> IMPLEMENTED -> TESTED -> RUNTIME_VERIFIED -> PHYSICAL
 | MIXER-001 | Audio | graph/parameters | FOUNDATION | UI/Native/DCP | yes | yes | buses/sends/FX/automation validated |
 | RENDER-001 | Audio/Integrity | offline graph, jobs, assets | SPECIFIED | Native/UI/DCP | no | yes | WAV mix/stems/range/bounce with validation/progress/cancel |
 | JOB-001 | Integrity | service lifecycle | SPECIFIED | Native/UI/DCP | no | yes | resumable/cancellable job states verified |
-| AI-LOCAL-001 | Command | DCP, analysis, project memory | SPECIFIED | Native/UI | no | yes | airplane-mode macros/analysis with undo/history |
 | DCP-EXT-001 | Command/Integrity | SECURITY-001, event bus | SPECIFIED | DCP/connector | no | yes | authenticated reconnecting command + subscription roundtrip |
-| CHATGPT-001 | Command | DCP-EXT-001 | SPECIFIED | connector | no | no | installed tablet state inspect + command + event roundtrip verified |
+| AI-LOCAL-001 | Command | ALL NON-AI RELEASE GATES, DCP, analysis, project memory | DEFERRED-LAST | Native/UI | no | yes | airplane-mode macros/analysis with undo/history |
+| CHATGPT-001 | Command | ALL NON-AI RELEASE GATES, DCP-EXT-001 | DEFERRED-LAST | connector | no | no | installed tablet state inspect + command + event roundtrip verified |
 | RELEASE-001 | Integrity | tests, migration, render | FOUNDATION | CI/device | no | build | signed APK/AAB + clean install/upgrade + physical certification |
 
 ## Immediate dependency order
@@ -73,7 +73,16 @@ P2: durable recording, clips, piano roll, arrangement, tracks.
 P3: mixer/DSP/buses/sends/automation/latency.
 P4: native render/job system and validation.
 P5: MIDI/hardware/device calibration and sync.
-P6: local AI/analysis/macros/version graph.
-P7: authenticated external DCP transport and ChatGPT connector.
-P8: advanced/live/collaboration/content SDK.
-P9: certification and release.
+P6: FME content manager, pack lifecycle, sampler/time-pitch/vocal production, templates and advanced production workflow.
+P7: authenticated external DCP transport as a non-AI controller protocol; hardware/controller sync and conflict handling.
+P8: advanced/live/collaboration/content SDK, diagnostics, accessibility, tablet UX, compatibility and migration.
+P9: certification and release: stress/recovery, emulator/device matrix, signing, APK/AAB, clean install/upgrade.
+P10 LAST ONLY AFTER P9: local AI, AI analysis/macros/mix/sampler helpers, project AI memory, then ChatGPT/cloud adapters. AI must not block or preempt the DAW release core.
+
+
+## Owner priority override — 2026-09-21
+AI is last. Finish every non-AI DAW subsystem and its verification gates before implementing AI features. The non-AI execution train is:
+
+P0 integrity/state/storage/transactions -> P1 realtime graph/snapshots/audio -> P2 arrangement/piano roll/audio editing/recording -> P3 mixer/DSP/automation -> P4 rendering/project packaging -> P5 MIDI/hardware/sampler/time-pitch/vocal -> P6 FME content/workflows -> P7 non-AI external control -> P8 advanced UX/live/collaboration/diagnostics -> P9 certification/release -> P10 AI last.
+
+This ordering is mandatory unless the owner explicitly changes it. AI scaffolding already present may remain, but it receives no priority over unfinished non-AI systems.
