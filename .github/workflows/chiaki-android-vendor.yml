@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [fme-agent]
+  pull_request:
     paths:
       - 'app/src/main/cpp/**'
       - 'third_party/chiaki/**'
