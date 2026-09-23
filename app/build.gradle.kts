@@ -3,6 +3,7 @@ plugins { id("com.android.application") }
 android {
     namespace = "com.flymaccin.bookwriter"
     compileSdk = 35
+    ndkVersion = "30.0.16248370"
 
     defaultConfig {
         applicationId = "com.flymaccin.bookwriter.openai"
@@ -10,6 +11,7 @@ android {
         targetSdk = 35
         versionCode = 122
         versionName = "1.2.2-house-core-loop"
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     signingConfigs {
@@ -33,6 +35,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" } }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

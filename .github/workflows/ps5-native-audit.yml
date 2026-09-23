@@ -1,0 +1,26 @@
+name: FME PS5 Native Audit
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/src/main/cpp/**"
+      - "app/src/main/java/com/flymaccin/bookwriter/ps5/**"
+      - "third_party/chiaki/**"
+      - "scripts/vendor-chiaki.sh"
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Phase 1 source checks
+        run: |
+          test -f app/src/main/cpp/CMakeLists.txt
+          test -f app/src/main/java/com/flymaccin/bookwriter/ps5/Ps5Discovery.java
+          test -f app/src/main/java/com/flymaccin/bookwriter/ps5/SecureConsoleStore.java
+          test -f app/src/main/java/com/flymaccin/bookwriter/ps5/Ps5ProtocolBridge.java
+          test -f third_party/chiaki/INTEGRATION.md
+          grep -q "CHIAKI_ENABLE_ANDROID" third_party/chiaki/INTEGRATION.md
+          grep -q "AndroidKeyStore" app/src/main/java/com/flymaccin/bookwriter/ps5/SecureConsoleStore.java
+      - name: Secret guard
+        run: |
+          ! grep -R -nE 'ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}' app third_party scripts
