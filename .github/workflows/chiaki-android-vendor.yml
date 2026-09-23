@@ -27,6 +27,17 @@ jobs:
           grep -q 'CHIAKI_ENABLE_ANDROID' third_party/chiaki/upstream/CMakeLists.txt
           grep -q 'add_subdirectory(lib)' third_party/chiaki/upstream/CMakeLists.txt
           test -f third_party/chiaki/upstream/lib/CMakeLists.txt
+      - name: Install Android SDK native components
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'ndk;30.0.16248370' 'cmake;3.22.1'
+      - name: Configure FME native core for arm64-v8a
+        run: |
+          cmake -S app/src/main/cpp -B build/fme-ps5-arm64 -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_HOME/ndk/30.0.16248370/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26
+      - name: Build FME native core
+        run: cmake --build build/fme-ps5-arm64 --target fme_ps5 -- -v
       - name: Verify FME integration boundary
         run: |
           grep -q 'FME_HAS_CHIAKI' app/src/main/cpp/CMakeLists.txt
