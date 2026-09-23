@@ -2,19 +2,18 @@
 set -euo pipefail
 UPSTREAM="https://github.com/streetpea/chiaki-ng.git"
 DEST="third_party/chiaki/upstream"
-REF="${CHIAKI_REF:-v1.10.0}"
+REF="${CHIAKI_REF:-a9a2805884cfa83865fdfcc09ca3ddfcd628aa42}"
 
 rm -rf "$DEST"
 git clone --filter=blob:none --recurse-submodules --shallow-submodules "$UPSTREAM" "$DEST"
-
-# The initial clone may not contain older tag refs. Fetch the requested ref
-# explicitly before checkout so pinned releases work reliably in CI.
-if ! git -C "$DEST" checkout --detach "$REF" 2>/dev/null; then
-  git -C "$DEST" fetch --depth 1 origin "refs/tags/$REF:refs/tags/$REF" || \
-  git -C "$DEST" fetch --depth 1 origin "$REF"
-  git -C "$DEST" checkout --detach FETCH_HEAD
-fi
-
+git -C "$DEST" fetch --depth 1 origin "$REF"
+git -C "$DEST" checkout --detach FETCH_HEAD
 git -C "$DEST" submodule update --init --recursive --depth 1
-git -C "$DEST" rev-parse HEAD | tee third_party/chiaki/UPSTREAM_COMMIT
-echo "Vendored chiaki-ng ref $REF at $(cat third_party/chiaki/UPSTREAM_COMMIT)"
+
+ACTUAL="$(git -C "$DEST" rev-parse HEAD)"
+if [[ "$ACTUAL" != "$REF" ]]; then
+  echo "FME ERROR: chiaki-ng pin mismatch: expected $REF, got $ACTUAL" >&2
+  exit 1
+fi
+printf '%s\n' "$ACTUAL" | tee third_party/chiaki/UPSTREAM_COMMIT
+echo "Vendored chiaki-ng exact commit $ACTUAL"
