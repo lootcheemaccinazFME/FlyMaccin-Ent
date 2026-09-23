@@ -2,7 +2,7 @@
 set -euo pipefail
 UPSTREAM="https://github.com/streetpea/chiaki-ng.git"
 DEST="third_party/chiaki/upstream"
-REF="${CHIAKI_REF:-main}"
+REF="${CHIAKI_REF:-v1.10.2}"
 rm -rf "$DEST"
 git clone --filter=blob:none --recurse-submodules --shallow-submodules "$UPSTREAM" "$DEST"
 git -C "$DEST" checkout "$REF"
