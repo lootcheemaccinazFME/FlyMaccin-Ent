@@ -29,3 +29,22 @@ The upstream root CMake currently exposes `CHIAKI_ENABLE_ANDROID` specifically f
 - Establish session request.
 
 All remain PENDING until observed.
+
+
+## Android dependency policy
+
+FME configures chiaki-ng from its v1.10.0 top-level CMake project so upstream owns the target-ABI dependency graph. Android builds must not satisfy protocol dependencies from Ubuntu host libraries.
+
+Required external/target builds during bring-up:
+- OpenSSL crypto used by chiaki-lib
+- json-c
+- miniupnpc
+- nanopb
+- Jerasure/GF-Complete
+- Opus for the eventual audio path
+
+Curl is not an FME application dependency. If upstream requires it internally, it must be built for the Android target ABI and must never resolve to a host library.
+
+mediaPipelineReady() must remain false until a real ChiakiSession, encoded video sink, audio sink, MediaCodec path and AudioTrack path are wired.
+
+CI preflight is responsible for catching missing v1.10.0 options and host dependency leakage before native compilation.
