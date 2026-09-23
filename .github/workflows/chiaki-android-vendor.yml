@@ -1,0 +1,33 @@
+name: FME Chiaki Android Vendor Check
+on:
+  workflow_dispatch:
+jobs:
+  vendor-and-configure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install Android build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build protobuf-compiler libprotobuf-dev python3-protobuf
+      - name: Vendor exact chiaki-ng source
+        run: |
+          chmod +x scripts/vendor-chiaki.sh
+          scripts/vendor-chiaki.sh
+          test -s third_party/chiaki/UPSTREAM_COMMIT
+          echo "CHIAKI_SHA=$(cat third_party/chiaki/UPSTREAM_COMMIT)" >> "$GITHUB_ENV"
+      - name: Record source provenance
+        run: |
+          echo "chiaki-ng commit: $CHIAKI_SHA"
+          git -C third_party/chiaki/upstream status --short
+          test -f third_party/chiaki/upstream/COPYING
+      - name: Verify Android-capable upstream configuration
+        run: |
+          grep -q 'CHIAKI_ENABLE_ANDROID' third_party/chiaki/upstream/CMakeLists.txt
+          grep -q 'add_subdirectory(lib)' third_party/chiaki/upstream/CMakeLists.txt
+          test -f third_party/chiaki/upstream/lib/CMakeLists.txt
+      - name: Verify FME integration boundary
+        run: |
+          grep -q 'FME_HAS_CHIAKI' app/src/main/cpp/CMakeLists.txt
+          grep -q 'hasChiaki' app/src/main/cpp/fme_ps5.cpp
