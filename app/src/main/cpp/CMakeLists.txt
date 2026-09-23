@@ -5,40 +5,39 @@ add_library(fme_ps5 SHARED fme_ps5.cpp chiaki_adapter.cpp)
 find_library(log-lib log)
 target_link_libraries(fme_ps5 ${log-lib})
 
-# Optional vendored chiaki-ng protocol core.
-# Run scripts/vendor-chiaki.sh before enabling this path.
+# FME consumes only chiaki-lib. Keep desktop/UI/update dependencies out of the
+# Android protocol core while the session bridge is being brought up.
 set(FME_CHIAKI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/chiaki/upstream")
 if(EXISTS "${FME_CHIAKI_DIR}/CMakeLists.txt")
+  # These names/types match chiaki-ng v1.10.0's top-level CMake options.
   set(CHIAKI_ENABLE_ANDROID ON CACHE BOOL "" FORCE)
-  set(CHIAKI_ENABLE_GUI OFF CACHE BOOL "" FORCE)
-  set(CHIAKI_ENABLE_CLI OFF CACHE BOOL "" FORCE)
   set(CHIAKI_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+  set(CHIAKI_ENABLE_CLI OFF CACHE BOOL "" FORCE)
+  set(CHIAKI_ENABLE_GUI OFF CACHE BOOL "" FORCE)
   set(CHIAKI_ENABLE_BOREALIS OFF CACHE BOOL "" FORCE)
-  set(CHIAKI_ENABLE_STEAMDECK_NATIVE OFF CACHE STRING "" FORCE)
   set(CHIAKI_ENABLE_SETSU OFF CACHE STRING "" FORCE)
-  set(CHIAKI_ENABLE_FFMPEG_DECODER OFF CACHE STRING "" FORCE)
-  set(CHIAKI_ENABLE_PI_DECODER OFF CACHE STRING "" FORCE)
-  set(CHIAKI_ENABLE_SPEEX OFF CACHE STRING "" FORCE)
-  set(CHIAKI_ENABLE_RUDP OFF CACHE STRING "" FORCE)
-  set(CHIAKI_ENABLE_STEAM_SHORTCUT OFF CACHE BOOL "" FORCE)
+  set(CHIAKI_ENABLE_STEAMDECK_NATIVE OFF CACHE STRING "" FORCE)
+  set(CHIAKI_LIB_ENABLE_OPUS OFF CACHE BOOL "" FORCE)
   set(CHIAKI_USE_SYSTEM_JERASURE OFF CACHE STRING "" FORCE)
   set(CHIAKI_USE_SYSTEM_NANOPB OFF CACHE STRING "" FORCE)
-  # Android upstream owns its curl/crypto dependency graph. Keep curl disabled\n  # for the FME core-only build so desktop curl does not force host OpenSSL.\n  set(CHIAKI_USE_SYSTEM_CURL OFF CACHE STRING "" FORCE)\n  set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)\n  set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)\n  set(CURL_USE_OPENSSL OFF CACHE BOOL "" FORCE)\n  set(CURL_USE_MBEDTLS ON CACHE BOOL "" FORCE)
-  set(CHIAKI_LIB_JSONC_EXTERNAL_PROJECT ON CACHE BOOL "" FORCE)
-  set(CHIAKI_LIB_MINIUPNPC_EXTERNAL_PROJECT ON CACHE BOOL "" FORCE)
-  set(CHIAKI_LIB_ENABLE_OPUS OFF CACHE BOOL "" FORCE)
-  # chiaki-ng core still requires crypto. For Android, build mbedTLS from source
-  # rather than depending on a host OpenSSL installation.
-  set(CHIAKI_LIB_ENABLE_MBEDTLS ON CACHE BOOL "" FORCE)
-  set(CHIAKI_LIB_MBEDTLS_EXTERNAL_PROJECT ON CACHE BOOL "" FORCE)
-  set(CHIAKI_LIB_OPENSSL_EXTERNAL_PROJECT OFF CACHE BOOL "" FORCE)
+  set(CHIAKI_USE_SYSTEM_CURL OFF CACHE STRING "" FORCE)
+  set(CHIAKI_LIB_JSONC_EXTERNAL_PROJECT OFF CACHE BOOL "" FORCE)
+  set(CHIAKI_LIB_MINIUPNPC_EXTERNAL_PROJECT OFF CACHE BOOL "" FORCE)
+
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384")
-  add_subdirectory("${FME_CHIAKI_DIR}" "${CMAKE_BINARY_DIR}/chiaki-ng" EXCLUDE_FROM_ALL)
-  # Current upstream core target is chiaki-lib. Fail the configure step if the
-  # vendored tree is present but that protocol library is not actually exposed.
+
+  # Do not add the upstream top-level project here: v1.10.0's top-level graph
+  # brings bundled curl/desktop dependencies that are not required for the
+  # local-console chiaki-lib session core. Build the protocol library directly.
+  add_subdirectory("${FME_CHIAKI_DIR}/lib" "${CMAKE_BINARY_DIR}/chiaki-lib" EXCLUDE_FROM_ALL)
+
   if(NOT TARGET chiaki-lib)
-    message(FATAL_ERROR "Vendored chiaki-ng did not expose required target chiaki-lib")
+    message(FATAL_ERROR "FME ERROR: chiaki-ng v1.10.0 lib did not expose chiaki-lib")
   endif()
+  if(TARGET libcurl OR TARGET curl OR TARGET CURL::libcurl)
+    message(FATAL_ERROR "FME ERROR: curl entered the Android chiaki-lib core build")
+  endif()
+
   target_link_libraries(fme_ps5 PRIVATE chiaki-lib)
   target_include_directories(fme_ps5 PRIVATE "${FME_CHIAKI_DIR}/lib/include")
   target_compile_definitions(fme_ps5 PRIVATE FME_HAS_CHIAKI=1)
