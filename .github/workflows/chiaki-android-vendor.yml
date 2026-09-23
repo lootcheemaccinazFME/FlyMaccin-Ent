@@ -39,11 +39,32 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager 'ndk;30.0.16248370' 'cmake;3.22.1'
+      - name: Preflight Chiaki dependency graph
+        run: |
+          set -euo pipefail
+          C=third_party/chiaki/upstream/CMakeLists.txt
+          L=third_party/chiaki/upstream/lib/CMakeLists.txt
+          for token in CHIAKI_ENABLE_ANDROID CHIAKI_LIB_JSONC_EXTERNAL_PROJECT CHIAKI_LIB_MINIUPNPC_EXTERNAL_PROJECT CHIAKI_LIB_OPENSSL_EXTERNAL_PROJECT CHIAKI_LIB_ENABLE_OPUS CHIAKI_USE_SYSTEM_JERASURE CHIAKI_USE_SYSTEM_NANOPB CHIAKI_USE_SYSTEM_CURL; do
+            grep -R -q "$token" "$C" "$L" || { echo "FME ERROR: expected chiaki-ng v1.10.0 option missing: $token"; exit 1; }
+          done
+          grep -q 'chiaki-lib' "$L" || { echo "FME ERROR: chiaki-lib target definition missing"; exit 1; }
+          grep -q 'CHIAKI_LIB_JSONC_EXTERNAL_PROJECT ON' app/src/main/cpp/CMakeLists.txt || { echo "FME ERROR: Android json-c external build not enabled"; exit 1; }
+          grep -q 'CHIAKI_LIB_MINIUPNPC_EXTERNAL_PROJECT ON' app/src/main/cpp/CMakeLists.txt || { echo "FME ERROR: Android miniupnpc external build not enabled"; exit 1; }
+          grep -q 'CHIAKI_LIB_OPENSSL_EXTERNAL_PROJECT ON' app/src/main/cpp/CMakeLists.txt || { echo "FME ERROR: Android crypto external build not enabled"; exit 1; }
       - name: Configure FME native core for arm64-v8a
         run: |
           cmake -S app/src/main/cpp -B build/fme-ps5-arm64 -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=$ANDROID_HOME/ndk/30.0.16248370/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26
+      - name: Validate configured Android graph
+        run: |
+          set -euo pipefail
+          test -f build/fme-ps5-arm64/CMakeCache.txt
+          if grep -E 'OPENSSL_(CRYPTO_LIBRARY|INCLUDE_DIR):.*(/usr/|/lib/)' build/fme-ps5-arm64/CMakeCache.txt; then
+            echo "FME ERROR: host OpenSSL leaked into Android cross-build"
+            exit 1
+          fi
+          grep -q 'ANDROID_ABI:.*arm64-v8a' build/fme-ps5-arm64/CMakeCache.txt || true
       - name: Build FME native core
         run: cmake --build build/fme-ps5-arm64 --target fme_ps5 -- -v
       - name: Verify FME integration boundary
