@@ -8,7 +8,6 @@ permissions:
   contents: read
 jobs:
   android:
-    if: ${{ hashFiles('gradlew') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -31,10 +30,3 @@ jobs:
           path: '**/build/outputs/apk/debug/*.apk'
           if-no-files-found: error
           retention-days: 14
-  no-android-project:
-    if: ${{ hashFiles('gradlew') == '' }}
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          echo "FME Agent is installed, but no Gradle wrapper exists yet."
-          echo "Create/import the native Android project before APK compilation can run."
