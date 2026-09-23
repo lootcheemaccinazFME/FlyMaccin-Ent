@@ -63,10 +63,14 @@ public class AgentActivity extends Activity {
     EditText pin=new EditText(this);pin.setHint("8-digit Link Device PIN");pin.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);pin.setTextColor(fg);body.addView(pin);
     body.addView(button("AUTHORIZE CONSOLE",v->{
       Ps5RegistrationRequest req=new Ps5RegistrationRequest(host.getText().toString(),account.getText().toString(),pin.getText().toString());
-      Ps5ProtocolBridge.RegistrationResult r=new Ps5ProtocolBridge().register(req);
-      body.addView(text(r.ok?"Registration complete":r.message,13,r.ok?accent:muted));
+      v.setEnabled(false);
+      boolean started=new Ps5ProtocolBridge().registerAsync(req,r->runOnUiThread(()->{
+        body.addView(text(r.ok?"Registration complete":r.message,13,r.ok?accent:muted));
+        v.setEnabled(true);
+      }));
+      if(started) body.addView(text("Registration started…",13,muted));
     }));
-    body.addView(text("FME does not ask for or store your PSN password. Registration remains PENDING until the native Chiaki protocol core is linked.",12,muted));
+    body.addView(text("FME does not ask for or store your PSN password. Registration runs asynchronously through the pinned native Chiaki core. Hardware success remains PENDING until verified on the physical PS5.",12,muted));
   }
   private void browser(){head("Browser","Open a URL in the device browser. Embedded tab/browser engine is the next native module.");
     EditText e=new EditText(this);e.setText("https://");e.setTextColor(fg);body.addView(e);body.addView(button("OPEN",v->{String u=e.getText().toString().trim();if(!u.startsWith("http"))u="https://"+u;startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));}));}
