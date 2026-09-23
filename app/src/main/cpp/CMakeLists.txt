@@ -1,5 +1,28 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(fme_ps5)
+
 add_library(fme_ps5 SHARED fme_ps5.cpp)
 find_library(log-lib log)
 target_link_libraries(fme_ps5 ${log-lib})
+
+# Optional vendored chiaki-ng protocol core.
+# Run scripts/vendor-chiaki.sh before enabling this path.
+set(FME_CHIAKI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/chiaki/upstream")
+if(EXISTS "${FME_CHIAKI_DIR}/CMakeLists.txt")
+  set(CHIAKI_ENABLE_ANDROID ON CACHE BOOL "" FORCE)
+  set(CHIAKI_ENABLE_GUI OFF CACHE BOOL "" FORCE)
+  set(CHIAKI_ENABLE_CLI OFF CACHE BOOL "" FORCE)
+  set(CHIAKI_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+  set(CHIAKI_ENABLE_BOREALIS OFF CACHE BOOL "" FORCE)
+  set(CHIAKI_ENABLE_STEAMDECK_NATIVE OFF CACHE STRING "" FORCE)
+  set(CHIAKI_ENABLE_SETSU OFF CACHE STRING "" FORCE)
+  set(CHIAKI_ENABLE_FFMPEG_DECODER OFF CACHE STRING "" FORCE)
+  add_subdirectory("${FME_CHIAKI_DIR}" "${CMAKE_BINARY_DIR}/chiaki-ng" EXCLUDE_FROM_ALL)
+  if(TARGET chiaki-lib)
+    target_link_libraries(fme_ps5 chiaki-lib)
+    target_compile_definitions(fme_ps5 PRIVATE FME_HAS_CHIAKI=1)
+  elseif(TARGET chiaki)
+    target_link_libraries(fme_ps5 chiaki)
+    target_compile_definitions(fme_ps5 PRIVATE FME_HAS_CHIAKI=1)
+  endif()
+endif()
