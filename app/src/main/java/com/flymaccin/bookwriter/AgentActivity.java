@@ -32,28 +32,14 @@ public class AgentActivity extends Activity {
     for(String x:a)body.addView(text("✓  "+x,16,fg));
     body.addView(text("Network agent actions use an authenticated service/connector. Secrets are never embedded in the APK.",13,muted));
   }
-  private static final String PS_REMOTE_PLAY_PACKAGE="com.playstation.remoteplay";
   private void ps5(){
-    head("PS5 Remote","Official PS Remote Play handoff · no Sony authentication or protection bypass");
-    boolean installed;
-    try { getPackageManager().getPackageInfo(PS_REMOTE_PLAY_PACKAGE,0); installed=true; } catch(Exception e){ installed=false; }
-    body.addView(text(installed ? "STATUS · PS Remote Play detected" : "STATUS · PS Remote Play not detected",16,installed ? accent : muted));
-    if(installed){
-      body.addView(button("LAUNCH PS REMOTE PLAY",v->launchRemotePlay()));
-    } else {
-      body.addView(button("GET PS REMOTE PLAY",v->openRemotePlayStore()));
-    }
-    body.addView(button("PS5 REMOTE PLAY SETUP",v->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://www.playstation.com/remote-play/")))));
-    body.addView(text("Pair/sign in inside Sony's official app. FME Agent acts as the controller-friendly launch hub and does not capture PSN credentials.",13,muted));
-  }
-  private void launchRemotePlay(){
-    Intent i=getPackageManager().getLaunchIntentForPackage(PS_REMOTE_PLAY_PACKAGE);
-    if(i!=null){ i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(i); }
-    else openRemotePlayStore();
-  }
-  private void openRemotePlayStore(){
-    try { startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+PS_REMOTE_PLAY_PACKAGE))); }
-    catch(Exception e){ startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id="+PS_REMOTE_PLAY_PACKAGE))); }
+    head("FME Native PS5","Independent Remote Play client foundation · no Sony Remote Play app required");
+    body.addView(text("PHASE 1 · Native PS5 protocol integration",16,accent));
+    body.addView(text("Foundation selected: Chiaki-family open-source Remote Play core. FME will integrate compatible native protocol components rather than launching Sony's Android app.",14,fg));
+    body.addView(text("NEXT BUILD GATES",13,muted));
+    String[] gates={"Native PS5 discovery","User-authorized console registration","Wake + session connection","H.264/H.265 video decode","Opus/audio playback","DualSense + touchscreen input","Reconnect/bitrate/latency controls","Android Keystore credential protection"};
+    for(String x:gates) body.addView(text("○  "+x,15,fg));
+    body.addView(text("No PSN credential capture, DRM bypass, authentication bypass, or fabricated connection status.",13,muted));
   }
   private void browser(){head("Browser","Open a URL in the device browser. Embedded tab/browser engine is the next native module.");
     EditText e=new EditText(this);e.setText("https://");e.setTextColor(fg);body.addView(e);body.addView(button("OPEN",v->{String u=e.getText().toString().trim();if(!u.startsWith("http"))u="https://"+u;startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));}));}
