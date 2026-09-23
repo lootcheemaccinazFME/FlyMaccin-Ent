@@ -1,12 +1,13 @@
 #include <jni.h>
 #include <string>
+#include "chiaki_adapter.h"
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_flymaccin_bookwriter_ps5_Ps5Native_nativeStatus(JNIEnv* env, jobject) {
 #ifdef FME_HAS_CHIAKI
-    std::string status = "FME PS5 native core loaded · Chiaki linked";
+    std::string status = std::string("FME PS5 native core loaded · ") + fme_chiaki_stage();
 #else
-    std::string status = "FME PS5 native core loaded · Chiaki source not vendored";
+    std::string status = std::string("FME PS5 native core loaded · ") + fme_chiaki_stage();
 #endif
     return env->NewStringUTF(status.c_str());
 }
