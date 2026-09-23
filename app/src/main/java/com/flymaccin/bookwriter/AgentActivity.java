@@ -32,7 +32,29 @@ public class AgentActivity extends Activity {
     for(String x:a)body.addView(text("✓  "+x,16,fg));
     body.addView(text("Network agent actions use an authenticated service/connector. Secrets are never embedded in the APK.",13,muted));
   }
-  private void ps5(){Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse("https://remoteplay.dl.playstation.net/remoteplay/"));startActivity(i);}
+  private static final String PS_REMOTE_PLAY_PACKAGE="com.playstation.remoteplay";
+  private void ps5(){
+    head("PS5 Remote","Official PS Remote Play handoff · no Sony authentication or protection bypass");
+    boolean installed;
+    try { getPackageManager().getPackageInfo(PS_REMOTE_PLAY_PACKAGE,0); installed=true; } catch(Exception e){ installed=false; }
+    body.addView(text(installed ? "STATUS · PS Remote Play detected" : "STATUS · PS Remote Play not detected",16,installed ? accent : muted));
+    if(installed){
+      body.addView(button("LAUNCH PS REMOTE PLAY",v->launchRemotePlay()));
+    } else {
+      body.addView(button("GET PS REMOTE PLAY",v->openRemotePlayStore()));
+    }
+    body.addView(button("PS5 REMOTE PLAY SETUP",v->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://www.playstation.com/remote-play/")))));
+    body.addView(text("Pair/sign in inside Sony's official app. FME Agent acts as the controller-friendly launch hub and does not capture PSN credentials.",13,muted));
+  }
+  private void launchRemotePlay(){
+    Intent i=getPackageManager().getLaunchIntentForPackage(PS_REMOTE_PLAY_PACKAGE);
+    if(i!=null){ i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(i); }
+    else openRemotePlayStore();
+  }
+  private void openRemotePlayStore(){
+    try { startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+PS_REMOTE_PLAY_PACKAGE))); }
+    catch(Exception e){ startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id="+PS_REMOTE_PLAY_PACKAGE))); }
+  }
   private void browser(){head("Browser","Open a URL in the device browser. Embedded tab/browser engine is the next native module.");
     EditText e=new EditText(this);e.setText("https://");e.setTextColor(fg);body.addView(e);body.addView(button("OPEN",v->{String u=e.getText().toString().trim();if(!u.startsWith("http"))u="https://"+u;startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));}));}
   private void downloads(){head("Downloads","Android Download Manager. Direct downloadable files only. No DRM/access-control bypass.");body.addView(button("OPEN DOWNLOADS",v->startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS))));}
