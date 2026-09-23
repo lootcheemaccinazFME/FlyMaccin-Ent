@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(fme_ps5)
 
-add_library(fme_ps5 SHARED fme_ps5.cpp)
+add_library(fme_ps5 SHARED fme_ps5.cpp chiaki_adapter.cpp)
 find_library(log-lib log)
 target_link_libraries(fme_ps5 ${log-lib})
 
