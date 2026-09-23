@@ -12,6 +12,8 @@ import android.widget.*;
 import java.util.*;
 import com.flymaccin.bookwriter.ps5.Ps5Native;
 import com.flymaccin.bookwriter.ps5.Ps5Discovery;
+import com.flymaccin.bookwriter.ps5.Ps5RegistrationRequest;
+import com.flymaccin.bookwriter.ps5.Ps5ProtocolBridge;
 
 public class AgentActivity extends Activity {
   private LinearLayout body;
@@ -48,10 +50,23 @@ public class AgentActivity extends Activity {
       }).start();
     }));
     body.addView(text("Foundation selected: Chiaki-family open-source Remote Play core. FME will integrate compatible native protocol components rather than launching Sony's Android app.",14,fg));
-    body.addView(text("NEXT BUILD GATES",13,muted));
+    body.addView(button("REGISTER PS5",v->showRegistrationForm()));
+        body.addView(text("NEXT BUILD GATES",13,muted));
     String[] gates={"Native PS5 discovery","User-authorized console registration","Wake + session connection","H.264/H.265 video decode","Opus/audio playback","DualSense + touchscreen input","Reconnect/bitrate/latency controls","Android Keystore credential protection"};
     for(String x:gates) body.addView(text("○  "+x,15,fg));
     body.addView(text("No PSN credential capture, DRM bypass, authentication bypass, or fabricated connection status.",13,muted));
+  }
+  private void showRegistrationForm(){
+    head("Register PS5","On PS5: Settings → System → Remote Play → Link Device. Enter the console address, your PSN AccountID, and the 8-digit Link Device PIN.");
+    EditText host=new EditText(this);host.setHint("PS5 IP / host");host.setTextColor(fg);body.addView(host);
+    EditText account=new EditText(this);account.setHint("PSN AccountID");account.setTextColor(fg);body.addView(account);
+    EditText pin=new EditText(this);pin.setHint("8-digit Link Device PIN");pin.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);pin.setTextColor(fg);body.addView(pin);
+    body.addView(button("AUTHORIZE CONSOLE",v->{
+      Ps5RegistrationRequest req=new Ps5RegistrationRequest(host.getText().toString(),account.getText().toString(),pin.getText().toString());
+      Ps5ProtocolBridge.RegistrationResult r=new Ps5ProtocolBridge().register(req);
+      body.addView(text(r.ok?"Registration complete":r.message,13,r.ok?accent:muted));
+    }));
+    body.addView(text("FME does not ask for or store your PSN password. Registration remains PENDING until the native Chiaki protocol core is linked.",12,muted));
   }
   private void browser(){head("Browser","Open a URL in the device browser. Embedded tab/browser engine is the next native module.");
     EditText e=new EditText(this);e.setText("https://");e.setTextColor(fg);body.addView(e);body.addView(button("OPEN",v->{String u=e.getText().toString().trim();if(!u.startsWith("http"))u="https://"+u;startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));}));}
