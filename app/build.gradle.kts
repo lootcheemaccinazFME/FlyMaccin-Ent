@@ -11,6 +11,7 @@ android {
         targetSdk = 35
         versionCode = 122
         versionName = "1.2.2-house-core-loop"
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     signingConfigs {
