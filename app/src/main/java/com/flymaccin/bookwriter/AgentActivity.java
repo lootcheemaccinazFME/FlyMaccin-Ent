@@ -10,6 +10,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.*;
 import java.util.*;
+import com.flymaccin.bookwriter.ps5.Ps5Native;
+import com.flymaccin.bookwriter.ps5.Ps5Discovery;
 
 public class AgentActivity extends Activity {
   private LinearLayout body;
@@ -35,6 +37,16 @@ public class AgentActivity extends Activity {
   private void ps5(){
     head("FME Native PS5","Independent Remote Play client foundation · no Sony Remote Play app required");
     body.addView(text("PHASE 1 · Native PS5 protocol integration",16,accent));
+    try { body.addView(text(new Ps5Native().nativeStatus(),13,accent)); } catch(Throwable t) { body.addView(text("Native core unavailable: "+t.getClass().getSimpleName(),13,muted)); }
+    body.addView(button("SCAN LAN FOR PS5",v->{
+      v.setEnabled(false); body.addView(text("Scanning local network…",13,muted));
+      new Thread(()->{
+        try {
+          java.util.List<String> found=Ps5Discovery.scan(2500);
+          runOnUiThread(()->{ body.addView(text(found.isEmpty()?"No PS5 response detected.":"PS5-compatible response(s): "+found.size(),14,found.isEmpty()?muted:accent)); for(String x:found) body.addView(text(x,11,fg)); v.setEnabled(true); });
+        } catch(Exception e){ runOnUiThread(()->{body.addView(text("Discovery failed: "+e.getMessage(),12,muted));v.setEnabled(true);}); }
+      }).start();
+    }));
     body.addView(text("Foundation selected: Chiaki-family open-source Remote Play core. FME will integrate compatible native protocol components rather than launching Sony's Android app.",14,fg));
     body.addView(text("NEXT BUILD GATES",13,muted));
     String[] gates={"Native PS5 discovery","User-authorized console registration","Wake + session connection","H.264/H.265 video decode","Opus/audio playback","DualSense + touchscreen input","Reconnect/bitrate/latency controls","Android Keystore credential protection"};
