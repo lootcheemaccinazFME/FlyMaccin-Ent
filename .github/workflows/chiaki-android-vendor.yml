@@ -1,6 +1,13 @@
 name: FME Chiaki Android Vendor Check
 on:
   workflow_dispatch:
+  push:
+    branches: [fme-agent]
+    paths:
+      - 'app/src/main/cpp/**'
+      - 'third_party/chiaki/**'
+      - 'scripts/vendor-chiaki.sh'
+      - '.github/workflows/chiaki-android-vendor.yml'
 jobs:
   vendor-and-configure:
     runs-on: ubuntu-latest
