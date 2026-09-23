@@ -34,12 +34,8 @@ int fme_chiaki_set_media_callbacks(const FmeMediaCallbacks *callbacks) {
 }
 
 int fme_chiaki_media_pipeline_ready(void) {
-#ifdef FME_HAS_CHIAKI
-  // session.h exposes the raw encoded video callback and the session/event
-  // lifecycle used by the FME Android decoder bridge. Audio is intentionally
-  // kept as a separate sink so Android AudioTrack can own playback.
-  return 1;
-#else
+// Linking chiaki-lib is not the same as having a working media pipeline.
+  // Return ready only after a real ChiakiSession plus video/audio sinks are
+  // constructed and wired to Android MediaCodec/AudioTrack.
   return 0;
-#endif
 }
