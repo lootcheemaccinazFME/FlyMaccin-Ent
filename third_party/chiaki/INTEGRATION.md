@@ -33,7 +33,7 @@ All remain PENDING until observed.
 
 ## Android dependency policy
 
-FME configures chiaki-ng from its v1.10.0 top-level CMake project so upstream owns the target-ABI dependency graph. Android builds must not satisfy protocol dependencies from Ubuntu host libraries.
+FME pins chiaki-ng commit `a9a2805884cfa83865fdfcc09ca3ddfcd628aa42` (v1.10.0-compatible) and imports only upstream `third-party` plus `lib` CMake graphs. The upstream Android app/JNI, GUI, CLI, tests, desktop, Oboe, FFmpeg, and Steam targets are intentionally excluded. Android builds must not satisfy protocol dependencies from Ubuntu host libraries.
 
 Required external/target builds during bring-up:
 - OpenSSL crypto used by chiaki-lib
@@ -48,3 +48,13 @@ Curl is not an FME application dependency. If upstream requires it internally, i
 mediaPipelineReady() must remain false until a real ChiakiSession, encoded video sink, audio sink, MediaCodec path and AudioTrack path are wired.
 
 CI preflight is responsible for catching missing v1.10.0 options and host dependency leakage before native compilation.
+
+## Active native milestone
+
+- Pin: `a9a2805884cfa83865fdfcc09ca3ddfcd628aa42`
+- ABI: `arm64-v8a` only during bring-up.
+- `fme_ps5` links `chiaki-lib` directly.
+- JNI registration uses `chiaki_regist_start` and returns completion through an asynchronous Java callback.
+- PSN AccountID input is decoded as Chiaki's 8-byte base64 AccountID. The normal PSN password is never requested.
+- 16 KB ELF page alignment is requested at link time for `libfme_ps5.so`.
+- Physical PS5 registration, wake, and session connection remain PENDING until hardware verification.
