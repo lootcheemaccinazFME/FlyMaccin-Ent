@@ -1,7 +1,7 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "com.flymaccin.lootcheerom"
-    compileSdk = 36
+    compileSdk = 36\n    ndkVersion = "27.0.12077973"
     defaultConfig {
         applicationId = "com.flymaccin.lootcheerom"; minSdk = 26; targetSdk = 36; versionCode = 1; versionName = "0.2.0"
         externalNativeBuild { cmake { cppFlags += "-std=c++17" } }
