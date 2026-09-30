@@ -2,7 +2,7 @@ package com.flymaccin.lootcheerom
 object NativeBridge {
     init { System.loadLibrary("lootchee_frontend") }
     external fun open(path:String):Boolean
-    external fun loadRom(bytes:ByteArray):Boolean
+    external fun loadGame(path:String?, bytes:ByteArray):Boolean
     external fun runFrame()
     external fun reset()
     external fun setButton(id:Int, down:Boolean)
