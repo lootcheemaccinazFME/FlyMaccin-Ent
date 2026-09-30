@@ -5,7 +5,9 @@
 #include <vector>
 #include <string>
 #include <mutex>
-#include <cstring>\n#include <GLES3/gl3.h>\n#include <EGL/egl.h>
+#include <cstring>
+#include <GLES3/gl3.h>
+#include <EGL/egl.h>
 
 struct retro_game_info { const char *path; const void *data; size_t size; const char *meta; };
 struct retro_system_info { const char *library_name,*library_version,*valid_extensions; bool need_fullpath,block_extract; };
@@ -33,7 +35,10 @@ static std::vector<uint8_t> rom;
 static std::vector<uint32_t> frame;
 static std::vector<int16_t> audio;
 static unsigned fw=0,fh=0,pixel_fmt=1;
-static double sample_rate=48000.0;\nstatic std::string system_dir,save_dir,content_dir;\nstatic int16_t pointer_x=0,pointer_y=0,pointer_pressed=0;\nstatic bool hw_requested=false; static unsigned hw_context_type=0; static retro_hw_render_callback* active_hw=nullptr; static unsigned hw_w=0,hw_h=0;
+static double sample_rate=48000.0;
+static std::string system_dir,save_dir,content_dir;
+static int16_t pointer_x=0,pointer_y=0,pointer_pressed=0;
+static bool hw_requested=false; static unsigned hw_context_type=0; static retro_hw_render_callback* active_hw=nullptr; static unsigned hw_w=0,hw_h=0;
 static int16_t buttons[16]={0};
 static std::mutex lock;
 
@@ -92,7 +97,8 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridg
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_runFrame(JNIEnv*,jobject){ if(p_run) p_run(); }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_reset(JNIEnv*,jobject){ if(p_reset) p_reset(); }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setButton(JNIEnv*,jobject,jint id,jboolean down){ if(id>=0&&id<16) buttons[id]=down?1:0; }
-extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setPointer(JNIEnv*,jobject,jfloat x,jfloat y,jboolean down){ pointer_x=(int16_t)(x*32767.0f);pointer_y=(int16_t)(y*32767.0f);pointer_pressed=down?1:0; }\nextern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_hardwareSurfaceCreated(JNIEnv*,jobject){ if(active_hw&&active_hw->context_reset) active_hw->context_reset(); }
+extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setPointer(JNIEnv*,jobject,jfloat x,jfloat y,jboolean down){ pointer_x=(int16_t)(x*32767.0f);pointer_y=(int16_t)(y*32767.0f);pointer_pressed=down?1:0; }
+extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_hardwareSurfaceCreated(JNIEnv*,jobject){ if(active_hw&&active_hw->context_reset) active_hw->context_reset(); }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_hardwareSurfaceChanged(JNIEnv*,jobject,jint w,jint h){hw_w=w;hw_h=h;glViewport(0,0,w,h);}
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_presentHardwareFrame(JNIEnv*,jobject){glFlush();}
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_hardwareSurfaceDestroyed(JNIEnv*,jobject){if(active_hw&&active_hw->context_destroy)active_hw->context_destroy();}
