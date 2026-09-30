@@ -27,7 +27,7 @@ static void* (*p_mem_data)(unsigned); static size_t (*p_mem_size)(unsigned);
 static void (*p_set_env)(retro_environment_t); static void (*p_set_video)(retro_video_refresh_t);
 static void (*p_set_audio)(retro_audio_sample_t); static void (*p_set_audio_batch)(retro_audio_sample_batch_t);
 static void (*p_set_poll)(retro_input_poll_t); static void (*p_set_state)(retro_input_state_t);
-static void (*p_get_av)(retro_system_av_info*);
+static void (*p_get_av)(retro_system_av_info*); static void (*p_get_info)(retro_system_info*);
 
 static std::vector<uint8_t> rom;
 static std::vector<uint32_t> frame;
@@ -65,14 +65,18 @@ static void close_core(){ if(p_unload) p_unload(); if(p_deinit) p_deinit(); if(c
 
 extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_open(JNIEnv* e,jobject,jstring path){
     const char* p=e->GetStringUTFChars(path,nullptr); core=dlopen(p,RTLD_NOW|RTLD_LOCAL); e->ReleaseStringUTFChars(path,p); if(!core) return false;
-    bool ok=sym(p_init,"retro_init")&&sym(p_deinit,"retro_deinit")&&sym(p_load,"retro_load_game")&&sym(p_unload,"retro_unload_game")&&sym(p_run,"retro_run")&&sym(p_reset,"retro_reset")&&sym(p_serialize_size,"retro_serialize_size")&&sym(p_serialize,"retro_serialize")&&sym(p_unserialize,"retro_unserialize")&&sym(p_mem_data,"retro_get_memory_data")&&sym(p_mem_size,"retro_get_memory_size")&&sym(p_set_env,"retro_set_environment")&&sym(p_set_video,"retro_set_video_refresh")&&sym(p_set_audio,"retro_set_audio_sample")&&sym(p_set_audio_batch,"retro_set_audio_sample_batch")&&sym(p_set_poll,"retro_set_input_poll")&&sym(p_set_state,"retro_set_input_state")&&sym(p_get_av,"retro_get_system_av_info");
+    bool ok=sym(p_init,"retro_init")&&sym(p_deinit,"retro_deinit")&&sym(p_load,"retro_load_game")&&sym(p_unload,"retro_unload_game")&&sym(p_run,"retro_run")&&sym(p_reset,"retro_reset")&&sym(p_serialize_size,"retro_serialize_size")&&sym(p_serialize,"retro_serialize")&&sym(p_unserialize,"retro_unserialize")&&sym(p_mem_data,"retro_get_memory_data")&&sym(p_mem_size,"retro_get_memory_size")&&sym(p_set_env,"retro_set_environment")&&sym(p_set_video,"retro_set_video_refresh")&&sym(p_set_audio,"retro_set_audio_sample")&&sym(p_set_audio_batch,"retro_set_audio_sample_batch")&&sym(p_set_poll,"retro_set_input_poll")&&sym(p_set_state,"retro_set_input_state")&&sym(p_get_av,"retro_get_system_av_info")&&sym(p_get_info,"retro_get_system_info");
     if(!ok){ close_core(); return false; }
     p_set_env(env_cb); p_set_video(video_cb); p_set_audio(audio_one); p_set_audio_batch(audio_batch); p_set_poll(input_poll); p_set_state(input_state); p_init(); return true;
 }
-extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_loadRom(JNIEnv* e,jobject,jbyteArray a){
-    jsize n=e->GetArrayLength(a); rom.resize(n); e->GetByteArrayRegion(a,0,n,(jbyte*)rom.data());
-    retro_game_info info{nullptr,rom.data(),rom.size(),nullptr}; if(!p_load||!p_load(&info)) return false;
-    retro_system_av_info av{}; p_get_av(&av); sample_rate=av.timing.sample_rate; return true;
+extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_loadGame(JNIEnv* e,jobject,jstring jpath,jbyteArray a){
+    retro_system_info si{}; p_get_info(&si);
+    std::string path;
+    if(jpath){ const char* p=e->GetStringUTFChars(jpath,nullptr); path=p?p:""; e->ReleaseStringUTFChars(jpath,p); }
+    retro_game_info info{};
+    if(si.need_fullpath){ if(path.empty()) return false; info.path=path.c_str(); }
+    else { jsize n=e->GetArrayLength(a); rom.resize(n); e->GetByteArrayRegion(a,0,n,(jbyte*)rom.data()); info.data=rom.data(); info.size=rom.size(); info.path=path.empty()?nullptr:path.c_str(); }
+    if(!p_load||!p_load(&info)) return false; retro_system_av_info av{};p_get_av(&av);sample_rate=av.timing.sample_rate;return true;
 }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_runFrame(JNIEnv*,jobject){ if(p_run) p_run(); }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_reset(JNIEnv*,jobject){ if(p_reset) p_reset(); }
