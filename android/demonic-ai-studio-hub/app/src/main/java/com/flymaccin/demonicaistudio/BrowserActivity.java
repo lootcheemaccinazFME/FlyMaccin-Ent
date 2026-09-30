@@ -17,7 +17,7 @@ public final class BrowserActivity extends Activity {
     private static final int BG=Color.rgb(8,9,14), PANEL=Color.rgb(25,27,37), PURPLE=Color.rgb(164,92,255), CYAN=Color.rgb(55,226,255), WHITE=Color.rgb(239,241,248);
     private final ArrayList<Tab> tabs=new ArrayList<>();
     private FrameLayout stage; private EditText address; private TextView tabLabel,status; private BrowserDb db; private int active=-1;
-    private boolean privateMode=false, blockThirdParty=true, allowJs=true;
+    private boolean privateMode=false, blockThirdParty=true, allowJs=true;\n    private DemonicToolRegistry toolRegistry;
     private ValueCallback<Uri[]> fileCallback;
     private static final int FILE_PICKER=8801;
 
@@ -25,7 +25,7 @@ public final class BrowserActivity extends Activity {
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state); requestWindowFeature(Window.FEATURE_NO_TITLE); db=new BrowserDb(this);
-        setContentView(shell()); newTab("https://www.google.com");
+        toolRegistry=new DemonicToolRegistry(this); setContentView(shell()); newTab("https://www.google.com");
     }
 
     private View shell(){
@@ -44,7 +44,7 @@ public final class BrowserActivity extends Activity {
         tools.addView(btn("TABS",v->showTabs())); tools.addView(btn("★ BOOKMARK",v->bookmark()));
         tools.addView(btn("HISTORY",v->showHistory())); tools.addView(btn("BOOKMARKS",v->showBookmarks()));
         tools.addView(btn("DOWNLOADS",v->openDownloads())); tools.addView(btn("MINI TV",v->enterPip()));
-        tools.addView(btn("PRIVACY",v->privacyDialog())); tools.addView(btn("TOOLS",v->toolsDialog()));
+        tools.addView(btn("PRIVACY",v->privacyDialog())); tools.addView(btn("TOOLS",v->toolsDialog())); tools.addView(btn("PLUGINS",v->pluginsDialog()));
         tools.addView(btn("CLOSE TAB",v->closeTab()));
         status=label("BROWSER READY",PURPLE); tools.addView(status);
         scroll.addView(tools); root.addView(scroll,new LinearLayout.LayoutParams(-1,dp(58)));
@@ -110,7 +110,7 @@ public final class BrowserActivity extends Activity {
             for(Tab t:tabs){t.view.getSettings().setJavaScriptEnabled(allowJs);t.view.getSettings().setDomStorageEnabled(!privateMode);CookieManager.getInstance().setAcceptThirdPartyCookies(t.view,!blockThirdParty);}
         }).show();
     }
-    private void toolsDialog(){
+    private void pluginsDialog(){\n        List<DemonicTool> all=toolRegistry.all(); String[] names=new String[all.size()];\n        for(int i=0;i<all.size();i++){DemonicTool t=all.get(i);names[i]=t.name()+"  v"+t.version()+"  "+t.capabilities();}\n        new AlertDialog.Builder(this).setTitle("Demonic Plugins / Tools").setItems(names,(d,w)->status.setText(all.get(w).name()+" READY")).setNegativeButton("CLOSE",null).show();\n    }\n    private void toolsDialog(){
         String[] items={"Page info","Open external app","Desktop mode","Find in page"};
         new AlertDialog.Builder(this).setTitle("Demonic Browser Tools").setItems(items,(d,w)->{
             if(w==0)new AlertDialog.Builder(this).setTitle("Page info").setMessage(current().getUrl()).setPositiveButton("OK",null).show();
