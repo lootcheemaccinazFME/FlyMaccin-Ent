@@ -32,7 +32,7 @@ class MainActivity:Activity(){
         val c=core?:return;c.stop();c.load(uri).onSuccess{c.start();status.text="PLAYING USER ROM"}.onFailure{status.text="ROM ERROR: "+it.message}
     }}
     override fun onPause(){super.onPause();core?.pause()}
-    override fun onResume(){super.onResume()}
+    override fun onResume(){super.onResume();core?.resume()}
     override fun onDestroy(){core?.stop();super.onDestroy()}
     override fun dispatchKeyEvent(e:KeyEvent):Boolean{
         if((e.source and InputDevice.SOURCE_GAMEPAD)!=0||(e.source and InputDevice.SOURCE_JOYSTICK)!=0){
