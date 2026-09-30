@@ -39,6 +39,7 @@ static double sample_rate=48000.0, fps=60.0;
 static bool core_initialized=false, game_loaded=false;
 static std::string system_dir,save_dir,content_dir;
 static int16_t pointer_x=0,pointer_y=0,pointer_pressed=0;
+struct retro_hw_render_callback;
 static bool hw_requested=false; static unsigned hw_context_type=0; static retro_hw_render_callback* active_hw=nullptr; static unsigned hw_w=0,hw_h=0;
 static int16_t buttons[16]={0};
 static std::mutex lock;
