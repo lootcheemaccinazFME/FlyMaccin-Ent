@@ -30,7 +30,7 @@ class MainActivity:Activity(){
     @Deprecated("compat")
     override fun onActivityResult(req:Int,result:Int,data:Intent?){super.onActivityResult(req,result,data);if(req==100&&result==RESULT_OK&&data?.data!=null){
         val uri=data.data!!;runCatching{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}
-        val spec=CoreRegistry.forUri(uri);if(spec==null){status.text="UNSUPPORTED ROM TYPE";return};switchCore(spec);val c=core?:return;c.load(uri).onSuccess{c.start();status.text="PLAYING "+spec.systems.joinToString("/")+" • "+spec.id}.onFailure{status.text="ROM ERROR: "+it.message}
+        val spec=CoreRegistry.forUri(this,uri);if(spec==null){status.text="UNSUPPORTED ROM TYPE";return};switchCore(spec);val c=core?:return;c.load(uri).onSuccess{c.start();status.text="PLAYING "+spec.systems.joinToString("/")+" • "+spec.id}.onFailure{status.text="ROM ERROR: "+it.message}
     }}
     override fun onPause(){super.onPause();core?.pause()}
     override fun onResume(){super.onResume();core?.resume()}
