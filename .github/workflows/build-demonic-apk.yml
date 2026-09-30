@@ -50,6 +50,16 @@ jobs:
             adb shell am start -W -n com.flymaccin.demonicaistudio/.StudioActivity
             sleep 5
             adb shell pidof com.flymaccin.demonicaistudio
+            adb shell input tap 300 330
+            sleep 1
+            adb shell input tap 220 420
+            sleep 1
+            adb shell input tap 620 720
+            sleep 1
+            adb shell input tap 700 720
+            sleep 1
+            adb shell input tap 1060 720
+            sleep 1
             if adb logcat -d '*:E' | grep -q 'FATAL EXCEPTION.*com.flymaccin.demonicaistudio'; then exit 1; fi
 
       - name: Upload APK
