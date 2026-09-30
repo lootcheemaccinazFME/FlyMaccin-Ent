@@ -94,8 +94,7 @@ public final class BrowserActivity extends Activity {
     private void showHistory(){ showRows("History",db.rows("SELECT title,url FROM history ORDER BY visited_at DESC LIMIT 100")); }
     private void showBookmarks(){ showRows("Bookmarks",db.rows("SELECT title,url FROM bookmarks ORDER BY created_at DESC")); }
     private void showRows(String title,List<String[]> rows){
-        String[] names=new String[rows.size()]; for(int i=0;i<rows.size();i++)names[i]=rows.get(i)[0]+"
-"+rows.get(i)[1];
+        String[] names=new String[rows.size()]; for(int i=0;i<rows.size();i++)names[i]=rows.get(i)[0]+"\\n"+rows.get(i)[1];
         new AlertDialog.Builder(this).setTitle(title).setItems(names,(d,w)->navigate(rows.get(w)[1])).setNegativeButton("CLOSE",null).show();
     }
     private void showTabs(){
