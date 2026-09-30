@@ -24,7 +24,7 @@ object CoreRegistry {
         CoreSpec("fbneo","fbneo_libretro_android",setOf("Arcade","Neo Geo"),setOf("zip","7z"),"Non-commercial",true),
         CoreSpec("play","play_libretro_android",setOf("PlayStation 2"),setOf("isz"),"MIT")
     )
-    fun extension(uri:Uri)=uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase().orEmpty()
-    fun forUri(uri:Uri)=specs.firstOrNull{extension(uri) in it.extensions}
+    fun extension(context:Context,uri:Uri)=RomVault.extension(context,uri)
+    fun forUri(context:Context,uri:Uri)=specs.firstOrNull{extension(context,uri) in it.extensions}
     fun libraryPath(context:Context,spec:CoreSpec)=File(context.applicationInfo.nativeLibraryDir,"lib"+spec.library+".so").absolutePath
 }
