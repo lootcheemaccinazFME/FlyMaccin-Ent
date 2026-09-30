@@ -17,7 +17,8 @@ public final class BrowserActivity extends Activity {
     private static final int BG=Color.rgb(8,9,14), PANEL=Color.rgb(25,27,37), PURPLE=Color.rgb(164,92,255), CYAN=Color.rgb(55,226,255), WHITE=Color.rgb(239,241,248);
     private final ArrayList<Tab> tabs=new ArrayList<>();
     private FrameLayout stage; private EditText address; private TextView tabLabel,status; private BrowserDb db; private int active=-1;
-    private boolean privateMode=false, blockThirdParty=true, allowJs=true;\n    private DemonicToolRegistry toolRegistry;
+    private boolean privateMode=false, blockThirdParty=true, allowJs=true;
+    private DemonicToolRegistry toolRegistry;
     private ValueCallback<Uri[]> fileCallback;
     private static final int FILE_PICKER=8801;
 
@@ -93,7 +94,8 @@ public final class BrowserActivity extends Activity {
     private void showHistory(){ showRows("History",db.rows("SELECT title,url FROM history ORDER BY visited_at DESC LIMIT 100")); }
     private void showBookmarks(){ showRows("Bookmarks",db.rows("SELECT title,url FROM bookmarks ORDER BY created_at DESC")); }
     private void showRows(String title,List<String[]> rows){
-        String[] names=new String[rows.size()]; for(int i=0;i<rows.size();i++)names[i]=rows.get(i)[0]+"\n"+rows.get(i)[1];
+        String[] names=new String[rows.size()]; for(int i=0;i<rows.size();i++)names[i]=rows.get(i)[0]+"
+"+rows.get(i)[1];
         new AlertDialog.Builder(this).setTitle(title).setItems(names,(d,w)->navigate(rows.get(w)[1])).setNegativeButton("CLOSE",null).show();
     }
     private void showTabs(){
@@ -110,7 +112,12 @@ public final class BrowserActivity extends Activity {
             for(Tab t:tabs){t.view.getSettings().setJavaScriptEnabled(allowJs);t.view.getSettings().setDomStorageEnabled(!privateMode);CookieManager.getInstance().setAcceptThirdPartyCookies(t.view,!blockThirdParty);}
         }).show();
     }
-    private void pluginsDialog(){\n        List<DemonicTool> all=toolRegistry.all(); String[] names=new String[all.size()];\n        for(int i=0;i<all.size();i++){DemonicTool t=all.get(i);names[i]=t.name()+"  v"+t.version()+"  "+t.capabilities();}\n        new AlertDialog.Builder(this).setTitle("Demonic Plugins / Tools").setItems(names,(d,w)->status.setText(all.get(w).name()+" READY")).setNegativeButton("CLOSE",null).show();\n    }\n    private void toolsDialog(){
+    private void pluginsDialog(){
+        List<DemonicTool> all=toolRegistry.all(); String[] names=new String[all.size()];
+        for(int i=0;i<all.size();i++){DemonicTool t=all.get(i);names[i]=t.name()+"  v"+t.version()+"  "+t.capabilities();}
+        new AlertDialog.Builder(this).setTitle("Demonic Plugins / Tools").setItems(names,(d,w)->status.setText(all.get(w).name()+" READY")).setNegativeButton("CLOSE",null).show();
+    }
+    private void toolsDialog(){
         String[] items={"Page info","Open external app","Desktop mode","Find in page"};
         new AlertDialog.Builder(this).setTitle("Demonic Browser Tools").setItems(items,(d,w)->{
             if(w==0)new AlertDialog.Builder(this).setTitle("Page info").setMessage(current().getUrl()).setPositiveButton("OK",null).show();
