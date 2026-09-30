@@ -47,7 +47,7 @@ jobs:
           script: |
             adb install -r android/demonic-ai-studio-hub/app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.flymaccin.demonicaistudio android.permission.RECORD_AUDIO
-                        adb logcat -c
+            adb logcat -c
             adb shell am start -W -n com.flymaccin.demonicaistudio/.StudioActivity
             sleep 5
             echo "=== DEMONIC PROCESS ==="
@@ -56,11 +56,7 @@ jobs:
             adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|com.flymaccin.demonicaistudio" | tail -40 || true
             echo "=== CRASH BUFFER ==="
             adb logcat -b crash -d || true
-            if ! adb shell pidof com.flymaccin.demonicaistudio; then
-              echo "DEMONIC_PROCESS_DIED"
-              adb logcat -d | grep -E -A 80 -B 20 "FATAL EXCEPTION|AndroidRuntime|com.flymaccin.demonicaistudio" || true
-              exit 1
-            fi
+            adb shell pidof com.flymaccin.demonicaistudio || (echo "DEMONIC_PROCESS_DIED"; adb logcat -d | grep -E -A 80 -B 20 "FATAL EXCEPTION|AndroidRuntime|com.flymaccin.demonicaistudio" || true; exit 1)
             adb shell input tap 300 330
             sleep 1
             adb shell input tap 220 420
@@ -71,10 +67,7 @@ jobs:
             sleep 1
             adb shell input tap 1060 720
             sleep 1
-            if adb logcat -b crash -d | grep -q 'com.flymaccin.demonicaistudio'; then
-              adb logcat -b crash -d
-              exit 1
-            fi
+            ! adb logcat -b crash -d | grep -q 'com.flymaccin.demonicaistudio' || (adb logcat -b crash -d; exit 1)
 
       - name: Upload APK
         if: always()
