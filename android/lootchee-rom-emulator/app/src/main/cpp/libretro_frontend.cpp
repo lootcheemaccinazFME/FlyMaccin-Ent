@@ -33,11 +33,13 @@ static std::vector<uint8_t> rom;
 static std::vector<uint32_t> frame;
 static std::vector<int16_t> audio;
 static unsigned fw=0,fh=0,pixel_fmt=1;
-static double sample_rate=48000.0;\nstatic std::string system_dir,save_dir,content_dir;\nstatic int16_t pointer_x=0,pointer_y=0,pointer_pressed=0;
+static double sample_rate=48000.0;\nstatic std::string system_dir,save_dir,content_dir;\nstatic int16_t pointer_x=0,pointer_y=0,pointer_pressed=0;\nstatic bool hw_requested=false; static unsigned hw_context_type=0;
 static int16_t buttons[16]={0};
 static std::mutex lock;
 
+struct retro_hw_render_callback { unsigned context_type; void (*context_reset)(); uintptr_t (*get_current_framebuffer)(); void* (*get_proc_address)(const char*); bool depth; bool stencil; bool bottom_left_origin; unsigned version_major; unsigned version_minor; bool cache_context; void (*context_destroy)(); bool debug_context; };
 static bool env_cb(unsigned cmd, void* data) {
+    if (cmd==14 && data) { auto *cb=(retro_hw_render_callback*)data; hw_requested=true; hw_context_type=cb->context_type; return false; } // SET_HW_RENDER: Java host must provision EGL/GL before retry
     if (cmd==10 && data) { pixel_fmt=*(unsigned*)data; return true; } // SET_PIXEL_FORMAT
     if (cmd==3) { if(data) *(bool*)data=true; return true; }          // GET_CAN_DUPE
     if (cmd==9) { if(data) *(const char**)data=system_dir.c_str(); return true; } // GET_SYSTEM_DIRECTORY
@@ -90,7 +92,9 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridg
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_runFrame(JNIEnv*,jobject){ if(p_run) p_run(); }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_reset(JNIEnv*,jobject){ if(p_reset) p_reset(); }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setButton(JNIEnv*,jobject,jint id,jboolean down){ if(id>=0&&id<16) buttons[id]=down?1:0; }
-extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setPointer(JNIEnv*,jobject,jfloat x,jfloat y,jboolean down){ pointer_x=(int16_t)(x*32767.0f);pointer_y=(int16_t)(y*32767.0f);pointer_pressed=down?1:0; }\nextern "C" JNIEXPORT jintArray JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_frame(JNIEnv* e,jobject){
+extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setPointer(JNIEnv*,jobject,jfloat x,jfloat y,jboolean down){ pointer_x=(int16_t)(x*32767.0f);pointer_y=(int16_t)(y*32767.0f);pointer_pressed=down?1:0; }\nextern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_hardwareRequested(JNIEnv*,jobject){return hw_requested;}
+extern "C" JNIEXPORT jint JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_hardwareContextType(JNIEnv*,jobject){return hw_context_type;}
+extern "C" JNIEXPORT jintArray JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_frame(JNIEnv* e,jobject){
     std::lock_guard<std::mutex> g(lock); jintArray a=e->NewIntArray((jsize)frame.size()); if(a&&!frame.empty()) e->SetIntArrayRegion(a,0,(jsize)frame.size(),(jint*)frame.data()); return a;
 }
 extern "C" JNIEXPORT jint JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_frameWidth(JNIEnv*,jobject){return fw;}
