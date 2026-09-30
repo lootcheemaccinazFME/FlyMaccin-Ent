@@ -16,12 +16,15 @@ jobs:
         with: { distribution: temurin, java-version: "17" }
       - uses: android-actions/setup-android@v3
       - run: sdkmanager "ndk;27.0.12077973" "platforms;android-36"
-      - name: Fetch SameBoy arm64 libretro core
+      - name: Fetch SameBoy cores
         run: |
-          mkdir -p app/src/main/jniLibs/arm64-v8a
-          curl -fL https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/sameboy_libretro_android.so.zip -o /tmp/sameboy.zip
-          unzip -p /tmp/sameboy.zip sameboy_libretro_android.so > app/src/main/jniLibs/arm64-v8a/libsameboy_libretro_android.so
-          test -s app/src/main/jniLibs/arm64-v8a/libsameboy_libretro_android.so\n          mkdir -p app/src/main/jniLibs/x86_64\n          curl -fL https://buildbot.libretro.com/nightly/android/latest/x86_64/sameboy_libretro_android.so.zip -o /tmp/sameboy-x86.zip\n          unzip -p /tmp/sameboy-x86.zip sameboy_libretro_android.so > app/src/main/jniLibs/x86_64/libsameboy_libretro_android.so
+          mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/jniLibs/x86_64
+          curl -fL https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/sameboy_libretro_android.so.zip -o /tmp/sameboy-arm64.zip
+          unzip -p /tmp/sameboy-arm64.zip sameboy_libretro_android.so > app/src/main/jniLibs/arm64-v8a/libsameboy_libretro_android.so
+          curl -fL https://buildbot.libretro.com/nightly/android/latest/x86_64/sameboy_libretro_android.so.zip -o /tmp/sameboy-x86.zip
+          unzip -p /tmp/sameboy-x86.zip sameboy_libretro_android.so > app/src/main/jniLibs/x86_64/libsameboy_libretro_android.so
+          test -s app/src/main/jniLibs/arm64-v8a/libsameboy_libretro_android.so
+          test -s app/src/main/jniLibs/x86_64/libsameboy_libretro_android.so
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.13" }
       - run: gradle :app:assembleDebug --stacktrace
@@ -30,7 +33,9 @@ jobs:
           APK=app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
           unzip -l "$APK" | grep 'lib/arm64-v8a/liblootchee_frontend.so'
-          unzip -l "$APK" | grep 'lib/arm64-v8a/libsameboy_libretro_android.so'\n          unzip -l "$APK" | grep 'lib/x86_64/libsameboy_libretro_android.so'
+          unzip -l "$APK" | grep 'lib/arm64-v8a/libsameboy_libretro_android.so'
+          unzip -l "$APK" | grep 'lib/x86_64/liblootchee_frontend.so'
+          unzip -l "$APK" | grep 'lib/x86_64/libsameboy_libretro_android.so'
           $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)/aapt dump badging "$APK" | grep "package: name='com.flymaccin.lootcheerom'"
       - uses: actions/upload-artifact@v4
         with:
@@ -46,12 +51,14 @@ jobs:
         with: { distribution: temurin, java-version: "17" }
       - uses: android-actions/setup-android@v3
       - run: sdkmanager "ndk;27.0.12077973" "platforms;android-36"
-      - name: Fetch SameBoy arm64 libretro core
+      - name: Fetch SameBoy cores
         working-directory: android/lootchee-rom-emulator
         run: |
-          mkdir -p app/src/main/jniLibs/arm64-v8a
-          curl -fL https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/sameboy_libretro_android.so.zip -o /tmp/sameboy.zip
-          unzip -p /tmp/sameboy.zip sameboy_libretro_android.so > app/src/main/jniLibs/arm64-v8a/libsameboy_libretro_android.so
+          mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/jniLibs/x86_64
+          curl -fL https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/sameboy_libretro_android.so.zip -o /tmp/sameboy-arm64.zip
+          unzip -p /tmp/sameboy-arm64.zip sameboy_libretro_android.so > app/src/main/jniLibs/arm64-v8a/libsameboy_libretro_android.so
+          curl -fL https://buildbot.libretro.com/nightly/android/latest/x86_64/sameboy_libretro_android.so.zip -o /tmp/sameboy-x86.zip
+          unzip -p /tmp/sameboy-x86.zip sameboy_libretro_android.so > app/src/main/jniLibs/x86_64/libsameboy_libretro_android.so
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.13" }
       - name: Build
