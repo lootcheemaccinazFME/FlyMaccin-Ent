@@ -38,7 +38,10 @@ jobs:
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           for attempt in 1 2 3; do
             rm -rf "$ANDROID_HOME/ndk/27.0.12077973" "$ANDROID_HOME/.temp" || true
-            if yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 && "$SDKMANAGER" "ndk;27.0.12077973" "platforms;android-36"; then
+            set +o pipefail
+            yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+            set -o pipefail
+            if "$SDKMANAGER" "ndk;27.0.12077973" "platforms;android-36"; then
               exit 0
             fi
             echo "Android SDK install attempt $attempt failed; retrying after cleanup"
