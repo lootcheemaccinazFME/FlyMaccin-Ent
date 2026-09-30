@@ -1,0 +1,27 @@
+name: LOOTCHEE ROM Emulator CI
+on:
+  push:
+    branches: [ "build/lootchee-rom-emulator-v1" ]
+  pull_request:
+    paths: [ "android/lootchee-rom-emulator/**" ]
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android/lootchee-rom-emulator
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+      - run: gradle :app:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lootchee-rom-emulator-debug
+          path: android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk
