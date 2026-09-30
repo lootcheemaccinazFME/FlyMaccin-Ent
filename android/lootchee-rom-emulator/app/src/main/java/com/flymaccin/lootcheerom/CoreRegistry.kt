@@ -24,6 +24,18 @@ object CoreRegistry {
         CoreSpec("play","play_libretro_android",setOf("PlayStation 2"),setOf("iso","isz","cso","chd","elf"),"MIT")
     )
     fun extension(context:Context,uri:Uri)=RomVault.extension(context,uri)
-    fun forUri(context:Context,uri:Uri)=specs.firstOrNull{extension(context,uri) in it.extensions}
+    fun candidates(context:Context,uri:Uri)=specs.filter{extension(context,uri) in it.extensions}
+    fun forUri(context:Context,uri:Uri):CoreSpec? {
+        val matches=candidates(context,uri)
+        if(matches.size<=1)return matches.firstOrNull()
+        val ext=extension(context,uri)
+        if(ext=="iso"||ext=="cso"){
+            val name=RomVault.displayName(context,uri).lowercase()
+            if("ps2" in name||"playstation 2" in name)return matches.firstOrNull{it.id=="play"}
+            if("psp" in name)return matches.firstOrNull{it.id=="ppsspp"}
+            return null
+        }
+        return matches.firstOrNull()
+    }
     fun libraryPath(context:Context,spec:CoreSpec)=File(context.applicationInfo.nativeLibraryDir,"lib"+spec.library+".so").absolutePath
 }
