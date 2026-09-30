@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
-      - run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973" "platforms;android-36"\n      - name: Fetch SameBoy cores
+      - run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973" "platforms;android-36"
+      - name: Fetch SameBoy cores
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/jniLibs/x86_64
           for core in sameboy fceumm mgba bsnes gearsystem clownmdemu pcsx_rearmed mupen64plus_next_gles3 melondsds ppsspp flycast mednafen_pce_fast stella handy geolith play; do
@@ -51,7 +52,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
-      - run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973" "platforms;android-36"\n      - name: Fetch SameBoy cores
+      - run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973" "platforms;android-36"
+      - name: Fetch SameBoy cores
         working-directory: android/lootchee-rom-emulator
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/jniLibs/x86_64
