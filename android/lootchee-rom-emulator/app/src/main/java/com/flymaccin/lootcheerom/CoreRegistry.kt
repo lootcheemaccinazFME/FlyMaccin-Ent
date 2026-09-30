@@ -15,14 +15,13 @@ object CoreRegistry {
         CoreSpec("pcsx_rearmed","pcsx_rearmed_libretro_android",setOf("PlayStation"),setOf("cue","chd","pbp"),"GPL-2.0",true),
         CoreSpec("mupen64plus_next","mupen64plus_next_gles3_libretro_android",setOf("Nintendo 64","Nintendo 64DD"),setOf("n64","v64","z64","ndd"),"GPL-3.0"),
         CoreSpec("melondsds","melondsds_libretro_android",setOf("Nintendo DS","Nintendo DSi"),setOf("nds","dsi","ids"),"GPL-3.0",true),
-        CoreSpec("ppsspp","ppsspp_libretro_android",setOf("PSP"),setOf("cso","prx"),"GPL-2.0"),
+        CoreSpec("ppsspp","ppsspp_libretro_android",setOf("PSP"),setOf("iso","cso","pbp","elf","prx"),"GPL-2.0"),
         CoreSpec("flycast","flycast_libretro_android",setOf("Dreamcast","NAOMI","Atomiswave"),setOf("cdi","gdi","elf","lst","dat","m3u"),"GPL-2.0",true),
         CoreSpec("beetle_pce_fast","mednafen_pce_fast_libretro_android",setOf("PC Engine","TurboGrafx-16","PC Engine CD","TurboGrafx-CD"),setOf("pce","ccd","img"),"GPL-2.0",true),
         CoreSpec("stella","stella_libretro_android",setOf("Atari 2600"),setOf("a26"),"GPL-2.0"),
         CoreSpec("handy","handy_libretro_android",setOf("Atari Lynx"),setOf("lnx"),"zlib"),
         CoreSpec("geolith","geolith_libretro_android",setOf("Neo Geo AES","Neo Geo MVS"),setOf("neo"),"BSD-3-Clause/MIT",true),
-        CoreSpec("fbneo","fbneo_libretro_android",setOf("Arcade","Neo Geo"),setOf("zip","7z"),"Non-commercial",true),
-        CoreSpec("play","play_libretro_android",setOf("PlayStation 2"),setOf("isz"),"MIT")
+        CoreSpec("play","play_libretro_android",setOf("PlayStation 2"),setOf("iso","isz","cso","chd","elf"),"MIT")
     )
     fun extension(context:Context,uri:Uri)=RomVault.extension(context,uri)
     fun forUri(context:Context,uri:Uri)=specs.firstOrNull{extension(context,uri) in it.extensions}
