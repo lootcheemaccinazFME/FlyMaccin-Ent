@@ -11,7 +11,7 @@ class SameBoyCore(private val context:Context, private val onFrame:(IntArray,Int
     private val running=AtomicBoolean(false)
     private var thread:Thread?=null
     private var audio:AudioTrack?=null
-    private var gameKey="game"
+    private var gameKey="game"\n    @Volatile private var loaded=false
     private val map=mapOf(
         GameAction.B to 0, GameAction.Y to 1, GameAction.SELECT to 2, GameAction.START to 3,
         GameAction.UP to 4, GameAction.DOWN to 5, GameAction.LEFT to 6, GameAction.RIGHT to 7,
@@ -27,7 +27,7 @@ class SameBoyCore(private val context:Context, private val onFrame:(IntArray,Int
         check(NativeBridge.loadRom(bytes)) { "SameBoy rejected ROM" }
         restoreSram()
     }
-    fun loadBuiltIn(bytes:ByteArray):Result<Unit> = runCatching { gameKey="lootchee-test-rom"; check(NativeBridge.loadRom(bytes)) { "SameBoy rejected built-in test ROM" }; restoreSram() }\n    override fun start():Result<Unit> = runCatching {
+    fun loadBuiltIn(bytes:ByteArray):Result<Unit> = runCatching { gameKey="lootchee-test-rom"; check(NativeBridge.loadRom(bytes)) { "SameBoy rejected built-in test ROM" }; loaded=true; restoreSram() }\n    override fun start():Result<Unit> = runCatching {
         if(running.getAndSet(true)) return@runCatching
         val rate=NativeBridge.sampleRate().coerceAtLeast(8000)
         val min=AudioTrack.getMinBufferSize(rate,AudioFormat.CHANNEL_OUT_STEREO,AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(rate/5)
@@ -46,7 +46,7 @@ class SameBoyCore(private val context:Context, private val onFrame:(IntArray,Int
         }.apply{name="LootcheeEmulation";start()}
     }
     override fun pause(){ running.set(false); thread?.join(250); audio?.pause(); persistSram() }
-    override fun resume(){ start() }
+    override fun resume(){ if(loaded) start() }
     override fun reset(){ NativeBridge.reset() }
     override fun stop(){ pause(); audio?.release(); audio=null }
     override fun button(action:GameAction,pressed:Boolean){ map[action]?.let{NativeBridge.setButton(it,pressed)} }
