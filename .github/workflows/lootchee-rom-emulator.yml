@@ -14,7 +14,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
-      - uses: android-actions/setup-android@v3
       - run: sdkmanager "ndk;27.0.12077973" "platforms;android-36"
       - name: Fetch SameBoy cores
         run: |
@@ -53,7 +52,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
-      - uses: android-actions/setup-android@v3
       - run: sdkmanager "ndk;27.0.12077973" "platforms;android-36"
       - name: Fetch SameBoy cores
         working-directory: android/lootchee-rom-emulator
