@@ -24,7 +24,8 @@ class MainActivity:Activity(){
         screen=EmulatorView(this);screen.touchSink={x,y,down->NativeBridge.setPointer(x,y,down)};root.addView(screen,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
         if(intent.getBooleanExtra("autoTest",false)) loadTest()
     }
-    private fun loadTest(){ switchCore(CoreRegistry.specs.first{it.id=="sameboy"}); val c=core?:return;c.loadBuiltIn(TestRom.build(),"lootchee-test-rom").onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • SAMEBOY"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }\n    private fun switchCore(spec:CoreSpec){core?.stop();core=runCatching{LibretroCore(this,spec){p,w,h->runOnUiThread{screen.submit(p,w,h)}}}.getOrElse{status.text="CORE ERROR "+spec.id+": "+it.message;null}}
+    private fun loadTest(){ switchCore(CoreRegistry.specs.first{it.id=="sameboy"}); val c=core?:return;c.loadBuiltIn(TestRom.build(),"lootchee-test-rom").onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • SAMEBOY"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }
+    private fun switchCore(spec:CoreSpec){core?.stop();core=runCatching{LibretroCore(this,spec){p,w,h->runOnUiThread{screen.submit(p,w,h)}}}.getOrElse{status.text="CORE ERROR "+spec.id+": "+it.message;null}}
     private fun pickRom(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/octet-stream";addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)},100)}
     @Deprecated("compat")
     override fun onActivityResult(req:Int,result:Int,data:Intent?){super.onActivityResult(req,result,data);if(req==100&&result==RESULT_OK&&data?.data!=null){
