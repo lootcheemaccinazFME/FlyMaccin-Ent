@@ -27,7 +27,7 @@ class SameBoyCore(private val context:Context, private val onFrame:(IntArray,Int
         check(NativeBridge.loadRom(bytes)) { "SameBoy rejected ROM" }
         restoreSram()
     }
-    override fun start():Result<Unit> = runCatching {
+    fun loadBuiltIn(bytes:ByteArray):Result<Unit> = runCatching { gameKey="lootchee-test-rom"; check(NativeBridge.loadRom(bytes)) { "SameBoy rejected built-in test ROM" }; restoreSram() }\n    override fun start():Result<Unit> = runCatching {
         if(running.getAndSet(true)) return@runCatching
         val rate=NativeBridge.sampleRate().coerceAtLeast(8000)
         val min=AudioTrack.getMinBufferSize(rate,AudioFormat.CHANNEL_OUT_STEREO,AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(rate/5)
