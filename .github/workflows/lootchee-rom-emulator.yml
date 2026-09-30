@@ -19,12 +19,13 @@ jobs:
       - name: Fetch SameBoy cores
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/jniLibs/x86_64
-          curl -fL https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/sameboy_libretro_android.so.zip -o /tmp/sameboy-arm64.zip
-          unzip -p /tmp/sameboy-arm64.zip sameboy_libretro_android.so > app/src/main/jniLibs/arm64-v8a/libsameboy_libretro_android.so
-          curl -fL https://buildbot.libretro.com/nightly/android/latest/x86_64/sameboy_libretro_android.so.zip -o /tmp/sameboy-x86.zip
-          unzip -p /tmp/sameboy-x86.zip sameboy_libretro_android.so > app/src/main/jniLibs/x86_64/libsameboy_libretro_android.so
-          test -s app/src/main/jniLibs/arm64-v8a/libsameboy_libretro_android.so
-          test -s app/src/main/jniLibs/x86_64/libsameboy_libretro_android.so
+          for core in sameboy fceumm mgba bsnes gearsystem clownmdemu pcsx_rearmed; do
+            for abi in arm64-v8a x86_64; do
+              curl -fL "https://buildbot.libretro.com/nightly/android/latest/$abi/${core}_libretro_android.so.zip" -o "/tmp/${core}-${abi}.zip"
+              unzip -p "/tmp/${core}-${abi}.zip" "${core}_libretro_android.so" > "app/src/main/jniLibs/$abi/lib${core}_libretro_android.so"
+              test -s "app/src/main/jniLibs/$abi/lib${core}_libretro_android.so"
+            done
+          done
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.13" }
       - run: gradle :app:assembleDebug --stacktrace
@@ -36,6 +37,9 @@ jobs:
           unzip -l "$APK" | grep 'lib/arm64-v8a/libsameboy_libretro_android.so'
           unzip -l "$APK" | grep 'lib/x86_64/liblootchee_frontend.so'
           unzip -l "$APK" | grep 'lib/x86_64/libsameboy_libretro_android.so'
+          for core in fceumm mgba bsnes gearsystem clownmdemu pcsx_rearmed; do
+            unzip -l "$APK" | grep "lib/arm64-v8a/lib${core}_libretro_android.so"
+          done
           $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)/aapt dump badging "$APK" | grep "package: name='com.flymaccin.lootcheerom'"
       - uses: actions/upload-artifact@v4
         with:
