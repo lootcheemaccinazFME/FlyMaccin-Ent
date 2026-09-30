@@ -19,6 +19,8 @@ object NativeBridge {
     external fun frameHeight():Int
     external fun drainAudio():ShortArray
     external fun sampleRate():Int
+    external fun fps():Double
+    external fun close()
     external fun saveState():ByteArray?
     external fun loadState(data:ByteArray):Boolean
     external fun sram():ByteArray?
