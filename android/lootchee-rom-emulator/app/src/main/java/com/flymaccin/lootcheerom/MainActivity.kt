@@ -21,7 +21,7 @@ class MainActivity:Activity(){
         bar.addView(button("LOAD STATE"){if(core?.loadState(0)==true) status.text="STATE LOADED"})
         bar.addView(button("RESET"){core?.reset()})
         root.addView(status); root.addView(bar)
-        screen=EmulatorView(this); root.addView(screen,LinearLayout.LayoutParams(-1,0,1f)); setContentView(root)
+        screen=EmulatorView(this);screen.touchSink={x,y,down->NativeBridge.setPointer(x,y,down)};root.addView(screen,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
         if(intent.getBooleanExtra("autoTest",false)) loadTest()
     }
     private fun loadTest(){ switchCore(CoreRegistry.specs.first{it.id=="sameboy"}); val c=core?:return;c.loadBuiltIn(TestRom.build(),"lootchee-test-rom").onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • SAMEBOY"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }\n    private fun switchCore(spec:CoreSpec){core?.stop();core=runCatching{LibretroCore(this,spec){p,w,h->runOnUiThread{screen.submit(p,w,h)}}}.getOrElse{status.text="CORE ERROR "+spec.id+": "+it.message;null}}
