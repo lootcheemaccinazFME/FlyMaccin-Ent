@@ -22,7 +22,7 @@ class MainActivity:Activity(){
         bar.addView(button("RESET"){core?.reset()})
         root.addView(status); root.addView(bar)
         screen=EmulatorView(this); root.addView(screen,LinearLayout.LayoutParams(-1,0,1f)); setContentView(root)
-        runCatching { SameBoyCore(this){p,w,h->runOnUiThread{screen.submit(p,w,h)}} }.onSuccess{core=it}.onFailure{status.text="CORE ERROR: "+it.message}
+        runCatching { SameBoyCore(this){p,w,h->runOnUiThread{screen.submit(p,w,h)}} }.onSuccess{core=it;if(intent.getBooleanExtra("autoTest",false)) loadTest()}.onFailure{status.text="CORE ERROR: "+it.message}
     }
     private fun loadTest(){ val c=core?:return; c.stop(); c.loadBuiltIn(TestRom.build()).onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • HOLD D-PAD TO CHANGE PALETTE"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }
     private fun pickRom(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/octet-stream";addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)},100)}
