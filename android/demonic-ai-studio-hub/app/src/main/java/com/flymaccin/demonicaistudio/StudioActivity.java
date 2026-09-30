@@ -167,7 +167,8 @@ public final class StudioActivity extends Activity {
         nav.addView(navButton("MIXER + FX", v -> showMixer()));
         nav.addView(navButton("RECORD", v -> showRecorder()));
         nav.addView(navButton("EXPORT", v -> showExport()));
-        nav.addView(navButton("PROJECT", v -> showProject()));\n        nav.addView(navButton("BROWSER", v -> startActivity(new Intent(this, BrowserActivity.class))));
+        nav.addView(navButton("PROJECT", v -> showProject()));
+        nav.addView(navButton("BROWSER", v -> startActivity(new Intent(this, BrowserActivity.class))));
         navScroll.addView(nav);
         root.addView(navScroll, new LinearLayout.LayoutParams(-1, dp(64)));
         return root;
