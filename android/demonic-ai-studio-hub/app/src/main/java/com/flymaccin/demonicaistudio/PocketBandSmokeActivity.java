@@ -22,7 +22,7 @@ public final class PocketBandSmokeActivity extends Activity {
         try {
             File sample = new File(getCacheDir(), "pocketband_smoke_C4.wav");
             writeTone(sample, 261.626, 350);
-            PocketBandInstrument instrument = new PocketBandInstrument(sample);
+            PocketBandInstrument instrument = new PocketBandInstrument(sample, PocketBandInstrument.detect(sample), sample.getName());
             if (!instrument.exists() || instrument.format != PocketBandInstrument.Format.WAV)
                 throw new IllegalStateException("Instrument load failed");
 
