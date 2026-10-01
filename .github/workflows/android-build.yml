@@ -4,7 +4,7 @@ name: Pocket Potna FME Android Build
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ aippy-game-apks-batch-01 ]
     paths:
       - '.github/workflows/android-build.yml'
 
@@ -25,11 +25,8 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Android SDK 35
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Restore Pocket Potna FME v2.0.1 source
         shell: bash
