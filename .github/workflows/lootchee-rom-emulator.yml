@@ -1,13 +1,13 @@
-name: LOOTCHEE ROM Emulator CI
+name: FME Universal Emulator APK CI
 
 "on":
   push:
     branches:
-      - build/lootchee-rom-emulator-v1
+      - build/fme-universal-emulator-apk-v1
   workflow_dispatch:
 
 concurrency:
-  group: lootchee-rom-emulator-${{ github.ref }}
+  group: fme-universal-emulator-${{ github.ref }}
   cancel-in-progress: true
 
 # PR #8 uses the branch push run as its single CI source to avoid duplicate builds.
@@ -89,7 +89,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: lootchee-rom-emulator-debug
+          name: fme-universal-emulator-debug
           path: android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk
 
   device-smoke:
@@ -108,7 +108,7 @@ jobs:
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
-          name: lootchee-rom-emulator-debug
+          name: fme-universal-emulator-debug
           path: /tmp/apk
       - name: Boot and prove first emulated frame
         uses: reactivecircus/android-emulator-runner@v2
