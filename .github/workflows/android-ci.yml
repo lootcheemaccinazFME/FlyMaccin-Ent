@@ -1,0 +1,36 @@
+name: FME Android CI
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, fme-agent ]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Install native generator prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler python3-protobuf
+      - run: chmod +x ./gradlew scripts/vendor-chiaki.sh
+      - name: Vendor pinned chiaki-ng
+        run: scripts/vendor-chiaki.sh
+      - name: Unit tests
+        run: ./gradlew test --stacktrace
+      - name: Android lint
+        run: ./gradlew lint --stacktrace
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fme-debug-apk-${{ github.sha }}
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
+          retention-days: 14
