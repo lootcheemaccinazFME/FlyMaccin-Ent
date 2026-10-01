@@ -18,7 +18,9 @@ jobs:
         with:
           python-version: "3.x"
       - name: Install Android build prerequisites
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build protobuf-compiler libprotobuf-dev python3-protobuf
+        run: |
+          sudo apt-get update && sudo apt-get install -y cmake ninja-build protobuf-compiler libprotobuf-dev
+          python -m pip install --upgrade protobuf
       - name: Vendor exact chiaki-ng source
         run: |
           chmod +x scripts/vendor-chiaki.sh
