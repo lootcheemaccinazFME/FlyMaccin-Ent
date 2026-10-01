@@ -1,0 +1,47 @@
+name: Demonic TV Android CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/demonic-tv-ps5-20260920
+    paths:
+      - 'android/demonic-tv/**'
+      - '.github/workflows/demonic-tv-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: android/demonic-tv
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build Demonic TV debug APK
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Verify package artifact
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/demonic-tv-badging.txt
+          grep -q "package: name='com.flymaccin.demonictv'" /tmp/demonic-tv-badging.txt
+          grep -q "versionName='1.0.0-alpha1'" /tmp/demonic-tv-badging.txt
+          sha256sum "$APK" | tee /tmp/demonic-tv-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Demonic-TV-v1.0.0-alpha1-debug
+          path: android/demonic-tv/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
