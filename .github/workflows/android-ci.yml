@@ -17,6 +17,8 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+      - name: Install native generator prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler python3-protobuf
       - run: chmod +x ./gradlew scripts/vendor-chiaki.sh
       - name: Vendor pinned chiaki-ng
         run: scripts/vendor-chiaki.sh
