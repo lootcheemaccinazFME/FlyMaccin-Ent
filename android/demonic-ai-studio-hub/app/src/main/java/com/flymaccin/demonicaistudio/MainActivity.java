@@ -185,6 +185,9 @@ public final class MainActivity extends Activity {
 
     private void openRoom(FunRoom room) {
         if ("studio".equals(room.id)) { showHome(); return; }
+        if ("daw".equals(room.id)) { setPage(new DawRoom(this).build("1")); status.setText("ROOM • DEMONIC DAW"); return; }
+        if ("daw2".equals(room.id)) { setPage(new DawRoom(this).build("2")); status.setText("ROOM • DEMONIC DAW 2"); return; }
+        if ("8bit".equals(room.id) || "hyphyxels".equals(room.id) || "carnival".equals(room.id)) { setPage(GameRooms.build(this, room.id)); status.setText("GAME ROOM • " + room.title.toUpperCase(Locale.US)); return; }
         if ("remote".equals(room.id)) { setPage(NativeRooms.remote(this)); status.setText("ROOM • POCKET POTNA REMOTE"); return; }
         if ("video".equals(room.id)) { setPage(NativeRooms.video(this)); status.setText("ROOM • AI VIDEO GENERATOR"); return; }
         if ("octop".equals(room.id)) { setPage(NativeRooms.octop(this)); status.setText("ROOM • OCTOP FME"); return; }
