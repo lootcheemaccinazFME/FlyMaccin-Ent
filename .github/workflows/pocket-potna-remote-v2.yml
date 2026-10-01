@@ -1,0 +1,36 @@
+name: Pocket Potna Remote v2 APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [ rebuild/pocket-potna-remote-v2 ]
+    paths: [ 'android/pocket-potna-remote/**', '.github/workflows/pocket-potna-remote-v2.yml' ]
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.9' }
+      - name: Build
+        working-directory: android/pocket-potna-remote
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Verify identity
+        run: |
+          set -euo pipefail
+          APK=android/pocket-potna-remote/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "package: name='com.flymaccin.pocketpotnaremote'" /tmp/badging.txt
+          grep -q "application-label:'Pocket Potna Remote'" /tmp/badging.txt
+          sha256sum "$APK" | tee /tmp/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pocket-Potna-Remote-v2-debug
+          path: |
+            android/pocket-potna-remote/app/build/outputs/apk/debug/app-debug.apk
+            /tmp/SHA256SUMS.txt
+          if-no-files-found: error
