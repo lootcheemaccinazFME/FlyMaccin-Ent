@@ -13,3 +13,7 @@ The first reusable House is **Music & Media House**. It owns audio creation and 
 House state persists locally, required stages unlock in sequence, and the TV Lounge remains optional after the production loop. The same House pattern is intended for future specialized Houses such as Comic Studio, Bookwriter, Video Studio, and Visual Studio without flattening their individual workflows.
 
 No OpenAI API keys or signing secrets are stored in this repository.
+
+## Demonic AI Studio
+
+The unified Android app is built from `demonic-daw/` as one APK. It opens the local-first DAW and includes the native piano, guitar, drum, timeline, recording, and export screens under **STUDIO HUB**. The APK keeps the application ID `com.flymaccin.demonicdaw`.

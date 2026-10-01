@@ -320,6 +320,7 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void importSfzFolder(){ runOnUiThread(()->launchSfzFolderPicker()); }
     @JavascriptInterface public void importFmeExpansionPack(){ runOnUiThread(()->launchFmeExpansionPicker()); }
     @JavascriptInterface public void openBrowser(String url){ runOnUiThread(()->{String u=(url==null||url.trim().isEmpty())?SUNO_HOME:url.trim();if(u.startsWith("https://"))webView.loadUrl(u);}); }
+    @JavascriptInterface public void openStudioHub(){ runOnUiThread(()->startActivity(new Intent(MainActivity.this,com.flymaccin.demonicaistudio.StudioActivity.class))); }
     @JavascriptInterface public void openSunoCreate(){ runOnUiThread(()->webView.loadUrl(SUNO_CREATE)); }
     @JavascriptInterface public void openSunoStudio(){ runOnUiThread(()->webView.loadUrl(SUNO_HOME)); }
     @JavascriptInterface public void openFreeTv(){ runOnUiThread(()->webView.loadUrl("https://pluto.tv/us/live-tv")); }

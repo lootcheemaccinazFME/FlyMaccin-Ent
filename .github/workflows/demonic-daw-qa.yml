@@ -10,6 +10,13 @@ on:
         options:
           - '35'
           - '34'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'demonic-daw/app/src/main/java/com/flymaccin/demonicaistudio/**'
+      - 'demonic-daw/**'
+      - '.github/scripts/generate_demonic_factory.py'
+      - '.github/workflows/demonic-daw-qa.yml'
   push:
     branches: [ 'build/demonic-daw-apk-20260917' ]
     paths:
@@ -125,6 +132,20 @@ jobs:
             grep -q 'STUDIO' qa-output/packaged-offline.html
             ! grep -q 'Grand Piano' qa-output/packaged-offline.html
             grep -q 'DEMONIC_DAW_LOCAL_FME_UI_V121' demonic-daw/app/src/main/java/com/flymaccin/demonicdaw/MainActivity.java
+            grep -q 'STUDIO HUB' qa-output/packaged-offline.html
+            grep -q 'openStudioHub' demonic-daw/app/src/main/java/com/flymaccin/demonicdaw/MainActivity.java
+            grep -q 'com.flymaccin.demonicaistudio.StudioActivity' demonic-daw/app/src/main/AndroidManifest.xml
+            adb shell am start -W -n com.flymaccin.demonicdaw/com.flymaccin.demonicaistudio.StudioActivity
+            sleep 3
+            adb exec-out screencap -p > qa-output/studio-hub.png
+            adb shell dumpsys activity activities > qa-output/studio-activities.txt
+            grep -q 'com.flymaccin.demonicaistudio.StudioActivity' qa-output/studio-activities.txt
+            adb logcat -d > qa-output/studio-logcat.txt
+            ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' qa-output/studio-logcat.txt
+            adb shell input keyevent 4
+            sleep 2
+            adb shell dumpsys activity activities > qa-output/daw-after-studio-activities.txt
+            grep -q 'com.flymaccin.demonicdaw/.MainActivity' qa-output/daw-after-studio-activities.txt
             adb shell settings put global airplane_mode_on 0
             adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false || true
             sleep 4
