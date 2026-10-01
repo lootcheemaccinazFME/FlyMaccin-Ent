@@ -20,7 +20,7 @@ jobs:
         with:
           gradle-version: '8.13'
       - name: Install Android SDK 36
-        run: yes | sdkmanager --licenses >/dev/null || true; sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true; "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
       - name: Generate isolated Android project
         shell: bash
         run: |
