@@ -78,6 +78,10 @@ public final class StudioActivity extends Activity {
     private String clipboard = "";
     private int clipboardTrack = -1;
     private MediaPlayer voicePlayer;
+    private MediaPlayer importedPlayer;
+    private final ArrayList<String> productionUndo = new ArrayList<>();
+    private final ArrayList<String> productionRedo = new ArrayList<>();
+    private boolean restoringProductionHistory=false;
     private Uri lastExportUri;
     private String lastExportName = "No export yet";
     private boolean pendingRecord;
@@ -158,6 +162,8 @@ public final class StudioActivity extends Activity {
         header.addView(smallButton("▶ PLAY", v -> startTransport()));
         header.addView(smallButton("Ⅱ PAUSE", v -> pauseTransport()));
         header.addView(smallButton("■ STOP", v -> stopTransport()));
+        header.addView(smallButton("↶ UNDO", v -> undoProduction()));
+        header.addView(smallButton("↷ REDO", v -> redoProduction()));
         status = text("AUTOSAVE RESTORED", 11, GREEN, true);
         header.addView(status);
         root.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
@@ -239,7 +245,11 @@ public final class StudioActivity extends Activity {
         LinearLayout page=column();page.setPadding(dp(14),dp(10),dp(14),dp(10));ProductionProject.Channel ch=prodChannel();page.addView(text("INSTRUMENT RACK · WAV / SFZ / SF2",20,GOLD,true));page.addView(text("Current: "+ch.instrument.type+(ch.instrument.path.isEmpty()?" · built-in synth":" · "+new File(ch.instrument.path).getName()),13,WHITE,true));page.addView(actionButton("LOAD WAV / SFZ / SF2",GOLD,v->pickProduction("instrument","application/octet-stream")));page.addView(text("WAV: PCM16 sample instrument with root-key mapping. SFZ: region/sample/key mapping parser. SF2: SoundFont container validation and bank/preset state. Full SF2 voice rendering is the next engine layer.",12,MUTED,false));setPage(page);
     }
 
-    private void autosaveProduction(){getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("production_project_v2",production.toJson()).apply();}
+    private void autosaveProduction(){SharedPreferences p=getSharedPreferences(PREFS,MODE_PRIVATE);String next=production.toJson(),prev=p.getString("production_project_v2","");if(!restoringProductionHistory&&!prev.isEmpty()&&!prev.equals(next)){productionUndo.add(prev);if(productionUndo.size()>80)productionUndo.remove(0);productionRedo.clear();}p.edit().putString("production_project_v2",next).apply();}
+
+    private void undoProduction(){if(productionUndo.isEmpty()){status.setText("NOTHING TO UNDO");return;}String current=production.toJson();String prior=productionUndo.remove(productionUndo.size()-1);productionRedo.add(current);restoreProduction(prior,"UNDO");}
+    private void redoProduction(){if(productionRedo.isEmpty()){status.setText("NOTHING TO REDO");return;}String current=production.toJson();String next=productionRedo.remove(productionRedo.size()-1);productionUndo.add(current);restoreProduction(next,"REDO");}
+    private void restoreProduction(String json,String label){restoringProductionHistory=true;production=ProductionProject.fromJson(json);productionChannel=Math.max(0,Math.min(productionChannel,production.channels.size()-1));getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("production_project_v2",production.toJson()).apply();restoringProductionHistory=false;stopImportedClip();status.setText(label+" · PRODUCTION STATE RESTORED");showProductionTracks();}
 
     private void showPiano() {
         LinearLayout page = column();
