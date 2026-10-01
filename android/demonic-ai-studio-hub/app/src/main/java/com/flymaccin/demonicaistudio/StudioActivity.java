@@ -85,6 +85,9 @@ public final class StudioActivity extends Activity {
     private Uri lastExportUri;
     private String lastExportName = "No export yet";
     private boolean pendingRecord;
+    private MaestroBridge maestro;
+    private EditText maestroHost, maestroPrompt, maestroDuration, maestroModel;
+    private String maestroJobId="";
     private Uri incomingAssetUri;
     private ProductionProject production = new ProductionProject();
     private int productionChannel = 0;
@@ -131,6 +134,7 @@ public final class StudioActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         project = StudioProject.fromJson(prefs.getString(PROJECT_KEY, ""));
         production = ProductionProject.fromJson(prefs.getString("production_project_v2", ""));
+        maestro = new MaestroBridge(prefs.getString("maestro_host", "http://100.64.0.1:7860"));
         setContentView(buildShell());
         getWindow().getDecorView().post(this::hideSystemBars);
         showHome();
@@ -176,6 +180,7 @@ public final class StudioActivity extends Activity {
         LinearLayout nav = row();
         nav.setPadding(dp(5), dp(5), dp(5), dp(7));
         nav.addView(navButton("HOME", v -> showHome()));
+        nav.addView(navButton("AI MAESTRO", v -> showMaestro()));
         nav.addView(navButton("+ TRACK", v -> showAddTrack()));
         nav.addView(navButton("TRACKS", v -> showProductionTracks()));
         nav.addView(navButton("PIANO", v -> showPiano()));
@@ -192,6 +197,37 @@ public final class StudioActivity extends Activity {
         navScroll.addView(nav);
         root.addView(navScroll, new LinearLayout.LayoutParams(-1, dp(64)));
         return root;
+    }
+
+
+    private void showMaestro(){
+        ScrollView sc=new ScrollView(this); LinearLayout page=column(); page.setPadding(dp(16),dp(10),dp(16),dp(14));
+        page.addView(text("MAC-MAESTRO · AI MEDIA ENGINE",22,GOLD,true));
+        page.addView(text("Director-grade local video, image and music generation inside the Demonic production session.",13,MUTED,false));
+        maestroHost=new EditText(this); maestroHost.setText(maestro.getBaseUrl()); maestroHost.setHint("Maestro host, e.g. http://100.x.x.x:7860"); maestroHost.setTextColor(WHITE); maestroHost.setHintTextColor(MUTED); page.addView(maestroHost);
+        LinearLayout connect=row();
+        connect.addView(actionButton("CONNECT",CYAN,v->{String host=maestroHost.getText().toString().trim();maestro.setBaseUrl(host);getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("maestro_host",host).apply();status.setText("CONNECTING TO MAESTRO…");maestro.models((json,error)->runOnUiThread(()->status.setText(error==null?"MAESTRO CONNECTED · MODELS READY":"MAESTRO OFFLINE · "+error.getMessage())));}));
+        connect.addView(smallButton("REFRESH JOB",v->refreshMaestroJob())); page.addView(connect);
+        maestroPrompt=new EditText(this); maestroPrompt.setHint("Describe the full video, scene, image or music concept…"); maestroPrompt.setTextColor(WHITE); maestroPrompt.setHintTextColor(MUTED); maestroPrompt.setMinLines(5); page.addView(maestroPrompt);
+        LinearLayout settings=row();
+        maestroModel=new EditText(this); maestroModel.setHint("Model type (blank = Maestro default)"); maestroModel.setTextColor(WHITE); maestroModel.setHintTextColor(MUTED); settings.addView(maestroModel,new LinearLayout.LayoutParams(0,-2,1));
+        maestroDuration=new EditText(this); maestroDuration.setHint("Seconds"); maestroDuration.setText("60"); maestroDuration.setTextColor(WHITE); maestroDuration.setHintTextColor(MUTED); maestroDuration.setInputType(2); settings.addView(maestroDuration,new LinearLayout.LayoutParams(dp(140),-2)); page.addView(settings);
+        page.addView(text("Longform duration is a project target. Maestro may use native long windows, sliding-window continuation, or multiple clips depending on the selected model.",12,MUTED,false));
+        page.addView(actionButton("GENERATE WITH MAESTRO",GOLD,v->submitMaestro()));
+        page.addView(text("Generated media remains a Maestro job until completion. Refresh Job reads live progress and output files; completed assets can then enter the Demonic production workflow.",12,MUTED,false));
+        sc.addView(page); setPage(sc);
+    }
+
+    private void submitMaestro(){
+        String p=maestroPrompt==null?"":maestroPrompt.getText().toString().trim(); if(p.isEmpty()){status.setText("MAESTRO · ADD A PROMPT");return;}
+        int seconds=60; try{seconds=Math.max(1,Integer.parseInt(maestroDuration.getText().toString().trim()));}catch(Exception ignored){}
+        String model=maestroModel.getText().toString().trim(); status.setText("MAESTRO · SUBMITTING "+seconds+"s PROJECT…");
+        maestro.generate(p,model,"1280x720",seconds,(json,error)->runOnUiThread(()->{if(error!=null){status.setText("MAESTRO ERROR · "+error.getMessage());return;}maestroJobId=json.optString("job_id","");status.setText(maestroJobId.isEmpty()?"MAESTRO ACCEPTED":"MAESTRO JOB · "+maestroJobId);}));
+    }
+
+    private void refreshMaestroJob(){
+        if(maestroJobId.isEmpty()){status.setText("MAESTRO · NO ACTIVE JOB");return;} status.setText("MAESTRO · CHECKING "+maestroJobId+"…");
+        maestro.status(maestroJobId,(json,error)->runOnUiThread(()->{if(error!=null){status.setText("MAESTRO STATUS ERROR · "+error.getMessage());return;}String state=json.optString("status","unknown");int pct=json.optInt("progress",0);String msg=json.optString("message","");status.setText("MAESTRO · "+state.toUpperCase(Locale.US)+" · "+pct+"%"+(msg.isEmpty()?"":" · "+msg));}));
     }
 
     private void showHome() {
