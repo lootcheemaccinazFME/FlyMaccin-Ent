@@ -109,7 +109,7 @@ final class StudioRenderer {
         List<File> stems=new ArrayList<>();if(exportStems)for(int i=0;i<tracks.size();i++){float[] t=tracks.get(i);normalize(t);File sf=new File(root,safe(name)+"_STEM_"+safe(project.channels.get(i).name)+"_"+stamp+".wav");writeWav(sf,t);stems.add(sf);}return new Result(mf,stems);
     }
     private static void addProductionClip(float[] target,ProductionProject.AudioClip clip,int offset,float volume,float pan){
-        try{WavFile.Data d=WavFile.read(new File(clip.path));float[] src=d.mono();int a=(int)Math.max(0,clip.trimStartMs*d.rate/1000L),b=clip.trimEndMs<0?src.length:(int)Math.min(src.length,clip.trimEndMs*d.rate/1000L);if(b<=a)return;float[] cut=new float[b-a];for(int i=0;i<cut.length;i++)cut[i]=src[clip.reverse?b-1-i:a+i]*clip.gain;addMono(target,cut,offset,volume,pan);}catch(Exception ignored){}
+        try{WavFile.Data d=WavFile.read(new File(clip.path));float[] src=WavFile.mono(d);int a=(int)Math.max(0,clip.trimStartMs*d.rate/1000L),b=clip.trimEndMs<0?src.length:(int)Math.min(src.length,clip.trimEndMs*d.rate/1000L);if(b<=a)return;float[] cut=new float[b-a];for(int i=0;i<cut.length;i++)cut[i]=src[clip.reverse?b-1-i:a+i]*clip.gain;addMono(target,cut,offset,volume,pan);}catch(Exception ignored){}
     }
     private static void applyProductionFx(float[] s,ProductionProject.Channel ch){
         float drive=Math.max(0,ch.drive);if(drive>0)for(int i=0;i<s.length;i++)s[i]=(float)Math.tanh(s[i]*(1+drive*5));
