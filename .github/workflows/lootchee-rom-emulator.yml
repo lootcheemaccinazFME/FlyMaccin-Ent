@@ -117,8 +117,34 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -cores 2 -memory 4096
           script: |
-            adb install -r /tmp/apk/app-debug.apk
+            set -euxo pipefail
+            adb install --no-streaming -r /tmp/apk/app-debug.apk
+            adb logcat -c
             adb shell am force-stop com.flymaccin.lootcheerom
-            adb shell am start -n com.flymaccin.lootcheerom/.MainActivity --ez autoTest true
-            bash -lc 'for i in $(seq 1 30); do marker="$(adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok 2>/dev/null || true)"; if echo "$marker" | grep -q "sameboy 160x144"; then echo "$marker"; exit 0; fi; sleep 1; done; adb logcat -d | tail -300; exit 1'
+            adb shell am start -W -n com.flymaccin.lootcheerom/.MainActivity --ez autoTest true
+
+            for i in $(seq 1 45); do
+              marker="$(adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok 2>/dev/null || true)"
+              if echo "$marker" | grep -q "sameboy 160x144"; then
+                echo "LOOTCHEE emulator smoke passed: $marker"
+                exit 0
+              fi
+              if ! adb shell pidof com.flymaccin.lootcheerom >/dev/null 2>&1; then
+                echo "LOOTCHEE emulator process exited before first frame"
+                break
+              fi
+              sleep 1
+            done
+
+            echo "=== LOOTCHEE app files ==="
+            adb shell run-as com.flymaccin.lootcheerom ls -la files 2>&1 || true
+            echo "=== LOOTCHEE process ==="
+            adb shell ps -A | grep com.flymaccin.lootcheerom || true
+            echo "=== LOOTCHEE activity ==="
+            adb shell dumpsys activity activities | grep -A 20 -B 5 com.flymaccin.lootcheerom || true
+            echo "=== LOOTCHEE logcat ==="
+            adb logcat -d | grep -E -i "lootcheerom|sameboy|libretro|AndroidRuntime|FATAL EXCEPTION|UnsatisfiedLinkError|Fatal signal" || true
+            exit 1
