@@ -14,6 +14,10 @@ final class MaestroBridge {
 
     void models(Callback cb){ request("GET","/api/v1/models",null,cb); }
     void status(String jobId, Callback cb){ request("GET","/api/v1/status/"+UriEncoder.encode(jobId),null,cb); }
+    void directorPlan(String concept,int seconds,String style,Callback cb){try{JSONObject b=new JSONObject();b.put("skill_type","story");b.put("story_description",concept);b.put("concept",concept);b.put("target_duration",seconds);b.put("narrative_mode",true);b.put("visual_style",style);request("POST","/api/v1/director/v2/plan",b,cb);}catch(Exception e){cb.done(null,e);}}
+    void startDirector(JSONObject params,Callback cb){ request("POST","/api/v1/director/pipeline/start",params,cb); }
+    void directorStatus(String id,Callback cb){ request("GET","/api/v1/director/pipeline/"+UriEncoder.encode(id),null,cb); }
+    String mediaUrl(String path){ if(path==null||path.isEmpty())return ""; if(path.startsWith("http://")||path.startsWith("https://"))return path; return baseUrl+(path.startsWith("/")?path:"/"+path); }
     void generate(String prompt,String model,String resolution,int seconds,Callback cb){
         try{
             JSONObject body=new JSONObject();
