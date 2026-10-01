@@ -129,18 +129,8 @@ jobs:
             adb shell am force-stop com.flymaccin.lootcheerom
             adb shell am start -W -n com.flymaccin.lootcheerom/.MainActivity --ez autoTest true
 
-            for i in $(seq 1 45); do
-              marker="$(adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok 2>/dev/null || true)"
-              if echo "$marker" | grep -q "sameboy 160x144"; then
-                echo "LOOTCHEE emulator smoke passed: $marker"
-                exit 0
-              fi
-              if ! adb shell pidof com.flymaccin.lootcheerom >/dev/null 2>&1; then
-                echo "LOOTCHEE emulator process exited before first frame"
-                break
-              fi
-              sleep 1
-            done
+            i=0
+            while [ "$i" -lt 45 ]; do marker="$(adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok 2>/dev/null || true)"; if echo "$marker" | grep -q "sameboy 160x144"; then echo "LOOTCHEE emulator smoke passed: $marker"; exit 0; fi; if ! adb shell pidof com.flymaccin.lootcheerom >/dev/null 2>&1; then echo "LOOTCHEE emulator process exited before first frame"; break; fi; i=$((i + 1)); sleep 1; done
 
             echo "=== LOOTCHEE staged smoke markers ==="
             adb shell run-as com.flymaccin.lootcheerom sh -c 'for f in files/smoke.core files/smoke.stage files/boot.ok; do echo "--- $f"; cat "$f" 2>/dev/null || echo MISSING; done' || true
