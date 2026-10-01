@@ -9,7 +9,7 @@
     <application
         android:allowBackup="true"
         android:usesCleartextTraffic="false"
-        android:label="Demonic AI Studio"
+        android:label="Demonic Fun Hub"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
