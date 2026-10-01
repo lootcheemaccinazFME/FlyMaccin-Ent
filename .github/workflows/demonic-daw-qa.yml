@@ -1,6 +1,15 @@
 name: Demonic DAW Android QA
 on:
   workflow_dispatch:
+    inputs:
+      api_level:
+        description: 'Android API level (35 recommended, use 34 if emulator offline)'
+        required: false
+        default: '35'
+        type: choice
+        options:
+          - '35'
+          - '34'
   push:
     branches: [ 'build/demonic-daw-apk-20260917' ]
     paths:
@@ -36,7 +45,7 @@ jobs:
         run: gradle assembleDebug --stacktrace
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: ${{ github.event.inputs.api_level || '35' }}
           arch: x86_64
           profile: pixel_6
           disable-animations: true
@@ -44,7 +53,22 @@ jobs:
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -cores 2 -memory 4096
           script: |
             set -euxo pipefail
-            mkdir -p qa-output
+            mkdir -p qa-output/failure-diagnostics
+            
+            # Capture diagnostics on any error
+            on_error() {
+              local exit_code=$?
+              if [ $exit_code -ne 0 ]; then
+                echo "ERROR: Job failed with exit code $exit_code. Capturing diagnostics..."
+                adb devices -l > qa-output/failure-diagnostics/devices.txt 2>&1 || true
+                adb logcat -d > qa-output/failure-diagnostics/logcat.txt 2>&1 || true
+                adb shell dumpsys activity activities > qa-output/failure-diagnostics/activities.txt 2>&1 || true
+                adb shell dumpsys package com.flymaccin.demonicdaw > qa-output/failure-diagnostics/package.txt 2>&1 || true
+              fi
+              return $exit_code
+            }
+            trap on_error ERR
+            
             adb kill-server || true
             adb start-server
             timeout 300 sh -c '
@@ -57,7 +81,30 @@ jobs:
             timeout 180 sh -c 'until adb shell service check package 2>/dev/null | grep -q "found"; do sleep 2; done'
             timeout 120 sh -c 'until adb shell service check activity 2>/dev/null | grep -q "found"; do sleep 2; done'
             sleep 10
-            adb install --no-streaming -r demonic-daw/app/build/outputs/apk/debug/app-debug.apk
+            
+            # Install APK with retry logic (up to 3 attempts)
+            echo "Installing APK (up to 3 attempts)..."
+            install_success=0
+            for attempt in 1 2 3; do
+              echo "Install attempt $attempt/3..."
+              if adb install --no-streaming -r demonic-daw/app/build/outputs/apk/debug/app-debug.apk; then
+                echo "APK install succeeded on attempt $attempt"
+                install_success=1
+                break
+              else
+                echo "APK install failed on attempt $attempt"
+                if [ $attempt -lt 3 ]; then
+                  echo "Retrying in 5 seconds..."
+                  sleep 5
+                fi
+              fi
+            done
+            
+            if [ $install_success -eq 0 ]; then
+              echo "ERROR: APK install failed after 3 attempts"
+              exit 1
+            fi
+            
             adb logcat -c
             # Pre-grant microphone so Android's runtime permission dialog cannot mask the WebView during UI QA.
             adb shell pm grant com.flymaccin.demonicdaw android.permission.RECORD_AUDIO || true
