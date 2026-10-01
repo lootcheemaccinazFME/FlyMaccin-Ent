@@ -123,6 +123,9 @@ jobs:
             set -euxo pipefail
             adb install --no-streaming -r /tmp/apk/app-debug.apk
             adb logcat -c
+            echo "=== Installed x86_64 native libraries ==="
+            adb shell pm path com.flymaccin.lootcheerom
+            adb shell dumpsys package com.flymaccin.lootcheerom | grep -E "primaryCpuAbi|nativeLibraryDir" || true
             adb shell am force-stop com.flymaccin.lootcheerom
             adb shell am start -W -n com.flymaccin.lootcheerom/.MainActivity --ez autoTest true
 
@@ -139,12 +142,17 @@ jobs:
               sleep 1
             done
 
+            echo "=== LOOTCHEE staged smoke markers ==="
+            adb shell run-as com.flymaccin.lootcheerom sh -c 'for f in files/smoke.core files/smoke.stage files/boot.ok; do echo "--- $f"; cat "$f" 2>/dev/null || echo MISSING; done' || true
             echo "=== LOOTCHEE app files ==="
             adb shell run-as com.flymaccin.lootcheerom ls -la files 2>&1 || true
+            echo "=== Loaded SameBoy mapping ==="
+            pid="$(adb shell pidof com.flymaccin.lootcheerom | tr -d '\r' || true)"
+            if [ -n "$pid" ]; then adb shell run-as com.flymaccin.lootcheerom cat "/proc/$pid/maps" | grep -i sameboy || true; fi
             echo "=== LOOTCHEE process ==="
             adb shell ps -A | grep com.flymaccin.lootcheerom || true
             echo "=== LOOTCHEE activity ==="
             adb shell dumpsys activity activities | grep -A 20 -B 5 com.flymaccin.lootcheerom || true
             echo "=== LOOTCHEE logcat ==="
-            adb logcat -d | grep -E -i "lootcheerom|sameboy|libretro|AndroidRuntime|FATAL EXCEPTION|UnsatisfiedLinkError|Fatal signal" || true
+            adb logcat -d | grep -E -i "LOOTCHEE-NATIVE|lootcheerom|sameboy|libretro|AndroidRuntime|FATAL EXCEPTION|UnsatisfiedLinkError|Fatal signal" || true
             exit 1
