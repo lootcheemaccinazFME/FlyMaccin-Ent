@@ -176,6 +176,7 @@ public final class StudioActivity extends Activity {
         LinearLayout nav = row();
         nav.setPadding(dp(5), dp(5), dp(5), dp(7));
         nav.addView(navButton("HOME", v -> showHome()));
+        nav.addView(navButton("MAESTRO", v -> showMaestroRoom()));
         nav.addView(navButton("+ TRACK", v -> showAddTrack()));
         nav.addView(navButton("TRACKS", v -> showProductionTracks()));
         nav.addView(navButton("PIANO", v -> showPiano()));
@@ -214,6 +215,10 @@ public final class StudioActivity extends Activity {
         scroll.addView(page);
         setPage(scroll);
     }
+
+    private void showMaestroRoom(){ScrollView scroll=new ScrollView(this);LinearLayout page=column();page.setPadding(dp(18),dp(10),dp(18),dp(16));page.addView(text("MAC-MAESTRO ROOM",25,GOLD,true));page.addView(text("AI CREATIVE DIRECTOR · INSIDE DEMONIC",12,MUTED,true));page.addView(text("One native room in this APK. It shares the active Demonic production session and asset lanes. No launcher. No second app. No WebView.",14,WHITE,false));LinearLayout create=row();create.addView(featureCard("MUSIC LAB","Build tracks, import/generated audio and send it straight into the production rack",CYAN,v->showProductionTracks()));create.addView(featureCard("DIRECTOR","Plan a song or audiovisual production around the current Demonic session",PURPLE,v->showMaestroDirector()));create.addView(featureCard("ASSET DESK","Songs · beats · stems · samples · MIDI · instruments",GREEN,v->showSampler()));page.addView(create);LinearLayout work=row();work.addView(featureCard("ARRANGE","Open the shared Demonic timeline",GOLD,v->showTimeline()));work.addView(featureCard("MIX","Open the shared dynamic mixer + FX",PURPLE,v->showMixer()));work.addView(featureCard("DELIVER","Master + all-channel stems",WHITE,v->showExport()));page.addView(work);page.addView(text("ACTIVE SESSION",13,MUTED,true));page.addView(text(production.channels.size()+" production channels · "+project.bpm+" BPM · "+project.name,16,WHITE,true));page.addView(actionButton("+ ADD PRODUCTION TRACK",GREEN,v->showAddTrack()));scroll.addView(page);setPage(scroll);}
+
+    private void showMaestroDirector(){LinearLayout page=column();page.setPadding(dp(20),dp(14),dp(20),dp(14));page.addView(text("MAESTRO · DIRECTOR",23,GOLD,true));page.addView(text("Native production command room for the active Demonic session.",14,MUTED,false));EditText brief=new EditText(this);brief.setHint("Describe the song, scene, arrangement, or production move…");brief.setTextColor(WHITE);brief.setHintTextColor(MUTED);brief.setMinLines(5);brief.setGravity(Gravity.TOP);brief.setBackgroundColor(PANEL_2);page.addView(brief,new LinearLayout.LayoutParams(-1,dp(180)));page.addView(actionButton("ADD TRACK",GREEN,v->showAddTrack()));page.addView(actionButton("OPEN TRACK RACK",CYAN,v->showProductionTracks()));page.addView(actionButton("OPEN PIANO ROLL",PURPLE,v->showPianoRoll()));page.addView(actionButton("IMPORT / SAMPLE AUDIO",GOLD,v->showSampler()));page.addView(text("The room is intentionally native and session-connected. Heavy desktop Maestro model execution is not embedded in this Android APK yet.",12,MUTED,false));setPage(page);}
 
     private void showAddTrack(){String[] types={"DRUMS","BASS","GUITAR","PIANO","SYNTH","SAMPLER","VOCALS","AUDIO","MIDI","SFZ","SF2"};new AlertDialog.Builder(this).setTitle("ADD TRACK").setItems(types,(d,w)->{ProductionProject.Channel ch=production.addChannel(types[w]+" "+(production.channels.size()+1));ch.instrument.type=ProductionProject.InstrumentType.valueOf(types[w]);productionChannel=production.channels.size()-1;autosaveProduction();showProductionTracks();}).show();}
 
