@@ -2,6 +2,7 @@ package com.flymaccin.demonicaistudio;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONException;
 import java.util.*;
 
 final class CanonicalProjectState {
@@ -48,7 +49,7 @@ final class CanonicalProjectState {
         }
     }
 
-    JSONObject toJson() {
+    JSONObject toJson() throws JSONException {
         validate();
         JSONObject root=new JSONObject();
         root.put("schemaVersion",SCHEMA_VERSION).put("projectId",projectId).put("revision",revision)
@@ -60,7 +61,7 @@ final class CanonicalProjectState {
         return root;
     }
 
-    static CanonicalProjectState fromJson(JSONObject root) {
+    static CanonicalProjectState fromJson(JSONObject root) throws JSONException {
         int schema=root.optInt("schemaVersion",0);
         if(schema!=SCHEMA_VERSION) throw new IllegalArgumentException("unsupported schema "+schema);
         CanonicalProjectState s=new CanonicalProjectState(root.getString("projectId"),root.optString("name","Demonic Session"));
@@ -78,19 +79,19 @@ final class CanonicalProjectState {
     static final class Track {
         final String id; String name; String routeId; float gain=1f, pan=0f; boolean mute,solo;
         Track(String id,String name,String routeId){this.id=requireId(id);this.name=name==null?"Track":name;this.routeId=routeId;}
-        JSONObject json(){return new JSONObject().put("id",id).put("name",name).put("routeId",routeId==null?JSONObject.NULL:routeId).put("gain",gain).put("pan",pan).put("mute",mute).put("solo",solo);}
-        static Track from(JSONObject o){Track t=new Track(o.getString("id"),o.optString("name","Track"),o.isNull("routeId")?null:o.optString("routeId",null));t.gain=(float)o.optDouble("gain",1);t.pan=(float)o.optDouble("pan",0);t.mute=o.optBoolean("mute");t.solo=o.optBoolean("solo");return t;}
+        JSONObject json() throws JSONException {return new JSONObject().put("id",id).put("name",name).put("routeId",routeId==null?JSONObject.NULL:routeId).put("gain",gain).put("pan",pan).put("mute",mute).put("solo",solo);}
+        static Track from(JSONObject o) throws JSONException {Track t=new Track(o.getString("id"),o.optString("name","Track"),o.isNull("routeId")?null:o.optString("routeId",null));t.gain=(float)o.optDouble("gain",1);t.pan=(float)o.optDouble("pan",0);t.mute=o.optBoolean("mute");t.solo=o.optBoolean("solo");return t;}
     }
     static final class Clip {
         final String id,trackId; long startTick,lengthTicks; final String assetId;
         Clip(String id,String trackId,long startTick,long lengthTicks,String assetId){this.id=requireId(id);this.trackId=requireId(trackId);this.startTick=startTick;this.lengthTicks=lengthTicks;this.assetId=assetId;}
-        JSONObject json(){return new JSONObject().put("id",id).put("trackId",trackId).put("startTick",startTick).put("lengthTicks",lengthTicks).put("assetId",assetId==null?JSONObject.NULL:assetId);}
-        static Clip from(JSONObject o){return new Clip(o.getString("id"),o.getString("trackId"),o.optLong("startTick"),o.optLong("lengthTicks",1),o.isNull("assetId")?null:o.optString("assetId",null));}
+        JSONObject json() throws JSONException {return new JSONObject().put("id",id).put("trackId",trackId).put("startTick",startTick).put("lengthTicks",lengthTicks).put("assetId",assetId==null?JSONObject.NULL:assetId);}
+        static Clip from(JSONObject o) throws JSONException {return new Clip(o.getString("id"),o.getString("trackId"),o.optLong("startTick"),o.optLong("lengthTicks",1),o.isNull("assetId")?null:o.optString("assetId",null));}
     }
     static final class AssetRef {
         final String id,path,sha256,provenance;
         AssetRef(String id,String path,String sha256,String provenance){this.id=requireId(id);this.path=path;this.sha256=sha256;this.provenance=provenance;}
-        JSONObject json(){return new JSONObject().put("id",id).put("path",path).put("sha256",sha256).put("provenance",provenance);}
-        static AssetRef from(JSONObject o){return new AssetRef(o.getString("id"),o.optString("path"),o.optString("sha256"),o.optString("provenance"));}
+        JSONObject json() throws JSONException {return new JSONObject().put("id",id).put("path",path).put("sha256",sha256).put("provenance",provenance);}
+        static AssetRef from(JSONObject o) throws JSONException {return new AssetRef(o.getString("id"),o.optString("path"),o.optString("sha256"),o.optString("provenance"));}
     }
 }
