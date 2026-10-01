@@ -8,6 +8,7 @@
 #include <cstring>
 #include <GLES3/gl3.h>
 #include <EGL/egl.h>
+#include <android/log.h>
 
 struct retro_game_info { const char *path; const void *data; size_t size; const char *meta; };
 struct retro_system_info { const char *library_name,*library_version,*valid_extensions; bool need_fullpath,block_extract; };
@@ -43,6 +44,10 @@ struct retro_hw_render_callback;
 static bool hw_requested=false; static unsigned hw_context_type=0; static retro_hw_render_callback* active_hw=nullptr; static unsigned hw_w=0,hw_h=0;
 static int16_t buttons[16]={0};
 static std::mutex lock;
+static std::string diagnostic="COLD";
+static unsigned run_count=0, video_count=0;
+#define LLOG(...) __android_log_print(ANDROID_LOG_INFO,"LOOTCHEE-NATIVE",__VA_ARGS__)
+static void mark(const char* s){ diagnostic=s; LLOG("%s",s); }
 
 struct retro_hw_render_callback { unsigned context_type; void (*context_reset)(); uintptr_t (*get_current_framebuffer)(); void* (*get_proc_address)(const char*); bool depth; bool stencil; bool bottom_left_origin; unsigned version_major; unsigned version_minor; bool cache_context; void (*context_destroy)(); bool debug_context; };
 static bool env_cb(unsigned cmd, void* data) {
@@ -60,7 +65,7 @@ static bool env_cb(unsigned cmd, void* data) {
 static uint32_t rgb565(uint16_t p){ unsigned r=(p>>11)&31,g=(p>>5)&63,b=p&31; return 0xff000000u|((r*255/31)<<16)|((g*255/63)<<8)|(b*255/31); }
 static uint32_t rgb1555(uint16_t p){ unsigned r=(p>>10)&31,g=(p>>5)&31,b=p&31; return 0xff000000u|((r*255/31)<<16)|((g*255/31)<<8)|(b*255/31); }
 static void video_cb(const void* data,unsigned w,unsigned h,size_t pitch){
-    if(!data) return; std::lock_guard<std::mutex> g(lock); fw=w; fh=h; frame.resize((size_t)w*h);
+    if(!data) return; video_count++; if(video_count==1){ diagnostic="VIDEO_CALLBACK"; LLOG("VIDEO_CALLBACK %ux%u pitch=%zu fmt=%u",w,h,pitch,pixel_fmt); } std::lock_guard<std::mutex> g(lock); fw=w; fh=h; frame.resize((size_t)w*h);
     for(unsigned y=0;y<h;y++){
         if(pixel_fmt==1){ auto row=(const uint32_t*)((const uint8_t*)data+y*pitch); for(unsigned x=0;x<w;x++) frame[y*w+x]=0xff000000u|(row[x]&0x00ffffffu); }
         else { auto row=(const uint16_t*)((const uint8_t*)data+y*pitch); for(unsigned x=0;x<w;x++) frame[y*w+x]=(pixel_fmt==2)?rgb565(row[x]):rgb1555(row[x]); }
@@ -80,7 +85,7 @@ template<class T> static bool sym(T& out,const char* n){ out=(T)dlsym(core,n); r
 static void clear_runtime(){
     rom.clear(); frame.clear(); audio.clear(); fw=fh=0; pixel_fmt=1; sample_rate=48000.0; fps=60.0;
     system_dir.clear(); save_dir.clear(); content_dir.clear(); pointer_x=pointer_y=pointer_pressed=0;
-    std::memset(buttons,0,sizeof(buttons)); hw_requested=false; hw_context_type=0; active_hw=nullptr; hw_w=hw_h=0;
+    std::memset(buttons,0,sizeof(buttons)); run_count=video_count=0; diagnostic="RUNTIME_CLEARED"; hw_requested=false; hw_context_type=0; active_hw=nullptr; hw_w=hw_h=0;
 }
 static void clear_symbols(){
     p_init=nullptr;p_deinit=nullptr;p_load=nullptr;p_unload=nullptr;p_run=nullptr;p_reset=nullptr;
@@ -98,10 +103,16 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridg
     close_core();
     const char* sd=e->GetStringUTFChars(jsystem,nullptr);system_dir=sd?sd:"";e->ReleaseStringUTFChars(jsystem,sd);
     const char* sv=e->GetStringUTFChars(jsave,nullptr);save_dir=sv?sv:"";e->ReleaseStringUTFChars(jsave,sv);
-    const char* p=e->GetStringUTFChars(path,nullptr); core=dlopen(p,RTLD_NOW|RTLD_LOCAL); e->ReleaseStringUTFChars(path,p); if(!core) return false;
-    bool ok=sym(p_init,"retro_init")&&sym(p_deinit,"retro_deinit")&&sym(p_load,"retro_load_game")&&sym(p_unload,"retro_unload_game")&&sym(p_run,"retro_run")&&sym(p_reset,"retro_reset")&&sym(p_serialize_size,"retro_serialize_size")&&sym(p_serialize,"retro_serialize")&&sym(p_unserialize,"retro_unserialize")&&sym(p_mem_data,"retro_get_memory_data")&&sym(p_mem_size,"retro_get_memory_size")&&sym(p_set_env,"retro_set_environment")&&sym(p_set_video,"retro_set_video_refresh")&&sym(p_set_audio,"retro_set_audio_sample")&&sym(p_set_audio_batch,"retro_set_audio_sample_batch")&&sym(p_set_poll,"retro_set_input_poll")&&sym(p_set_state,"retro_set_input_state")&&sym(p_get_av,"retro_get_system_av_info")&&sym(p_get_info,"retro_get_system_info");
+    const char* p=e->GetStringUTFChars(path,nullptr); std::string core_path=p?p:""; LLOG("DLOPEN_ATTEMPT %s",core_path.c_str()); core=dlopen(core_path.c_str(),RTLD_NOW|RTLD_LOCAL); e->ReleaseStringUTFChars(path,p);
+    if(!core){ const char* err=dlerror(); diagnostic=std::string("DLOPEN_FAILED: ")+(err?err:"unknown"); LLOG("%s",diagnostic.c_str()); return false; }
+    mark("DLOPEN_OK");
+    bool ok=true;
+    #define REQ(ptr,name) do { if(!sym(ptr,name)){ diagnostic=std::string("SYMBOL_MISSING: ")+name; LLOG("%s",diagnostic.c_str()); ok=false; } } while(0)
+    REQ(p_init,"retro_init");REQ(p_deinit,"retro_deinit");REQ(p_load,"retro_load_game");REQ(p_unload,"retro_unload_game");REQ(p_run,"retro_run");REQ(p_reset,"retro_reset");REQ(p_serialize_size,"retro_serialize_size");REQ(p_serialize,"retro_serialize");REQ(p_unserialize,"retro_unserialize");REQ(p_mem_data,"retro_get_memory_data");REQ(p_mem_size,"retro_get_memory_size");REQ(p_set_env,"retro_set_environment");REQ(p_set_video,"retro_set_video_refresh");REQ(p_set_audio,"retro_set_audio_sample");REQ(p_set_audio_batch,"retro_set_audio_sample_batch");REQ(p_set_poll,"retro_set_input_poll");REQ(p_set_state,"retro_set_input_state");REQ(p_get_av,"retro_get_system_av_info");REQ(p_get_info,"retro_get_system_info");
+    #undef REQ
     if(!ok){ close_core(); return false; }
-    p_set_env(env_cb); p_set_video(video_cb); p_set_audio(audio_one); p_set_audio_batch(audio_batch); p_set_poll(input_poll); p_set_state(input_state); p_init(); core_initialized=true; return true;
+    mark("SYMBOLS_OK");
+    p_set_env(env_cb); p_set_video(video_cb); p_set_audio(audio_one); p_set_audio_batch(audio_batch); p_set_poll(input_poll); p_set_state(input_state); mark("RETRO_INIT_BEGIN"); p_init(); core_initialized=true; mark("RETRO_INIT_OK"); return true;
 }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_loadGame(JNIEnv* e,jobject,jstring jpath,jbyteArray a){
     retro_system_info si{}; p_get_info(&si);
@@ -110,9 +121,9 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridg
     retro_game_info info{};
     if(si.need_fullpath){ if(path.empty()) return false; info.path=path.c_str(); }
     else { jsize n=e->GetArrayLength(a); rom.resize(n); e->GetByteArrayRegion(a,0,n,(jbyte*)rom.data()); info.data=rom.data(); info.size=rom.size(); info.path=path.empty()?nullptr:path.c_str(); }
-    if(game_loaded&&p_unload){p_unload();game_loaded=false;} if(!p_load||!p_load(&info)) return false; game_loaded=true; retro_system_av_info av{};p_get_av(&av);sample_rate=av.timing.sample_rate;fps=av.timing.fps>1.0?av.timing.fps:60.0;return true;
+    if(game_loaded&&p_unload){p_unload();game_loaded=false;} mark("RETRO_LOAD_GAME_BEGIN"); if(!p_load||!p_load(&info)){mark("RETRO_LOAD_GAME_FAILED");return false;} game_loaded=true; mark("RETRO_LOAD_GAME_OK"); retro_system_av_info av{};p_get_av(&av);sample_rate=av.timing.sample_rate;fps=av.timing.fps>1.0?av.timing.fps:60.0;return true;
 }
-extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_runFrame(JNIEnv*,jobject){ if(p_run) p_run(); }
+extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_runFrame(JNIEnv*,jobject){ if(p_run){ if(run_count++==0) mark("FIRST_RETRO_RUN"); p_run(); } }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_reset(JNIEnv*,jobject){ if(p_reset) p_reset(); }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setButton(JNIEnv*,jobject,jint id,jboolean down){ if(id>=0&&id<16) buttons[id]=down?1:0; }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setPointer(JNIEnv*,jobject,jfloat x,jfloat y,jboolean down){ pointer_x=(int16_t)(x*32767.0f);pointer_y=(int16_t)(y*32767.0f);pointer_pressed=down?1:0; }
@@ -145,3 +156,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_com_flymaccin_lootcheerom_NativeBri
 extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_restoreSram(JNIEnv* e,jobject,jbyteArray a){
     size_t n=p_mem_size?p_mem_size(0):0; void*d=p_mem_data?p_mem_data(0):nullptr; if(!n||!d||e->GetArrayLength(a)!=(jsize)n) return false; e->GetByteArrayRegion(a,0,n,(jbyte*)d); return true;
 }
+
+extern "C" JNIEXPORT jstring JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_diagnostic(JNIEnv* e,jobject){ return e->NewStringUTF(diagnostic.c_str()); }
+extern "C" JNIEXPORT jint JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_runCount(JNIEnv*,jobject){return (jint)run_count;}
+extern "C" JNIEXPORT jint JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_videoCount(JNIEnv*,jobject){return (jint)video_count;}
