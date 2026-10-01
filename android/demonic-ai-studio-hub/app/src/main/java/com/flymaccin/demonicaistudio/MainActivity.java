@@ -188,6 +188,11 @@ public final class MainActivity extends Activity {
         if ("daw".equals(room.id)) { setPage(new DawRoom(this).build("1")); status.setText("ROOM • DEMONIC DAW"); return; }
         if ("daw2".equals(room.id)) { setPage(new DawRoom(this).build("2")); status.setText("ROOM • DEMONIC DAW 2"); return; }
         if ("8bit".equals(room.id) || "hyphyxels".equals(room.id) || "carnival".equals(room.id)) { setPage(GameRooms.build(this, room.id)); status.setText("GAME ROOM • " + room.title.toUpperCase(Locale.US)); return; }
+        if ("fmegames".equals(room.id)) { setPage(FmeGamesRoom.build(this)); status.setText("ROOM • FME GAMES ARCADE"); return; }
+        if ("agent".equals(room.id)) { setPage(UtilityRooms.agent(this)); status.setText("ROOM • FME AGENT"); return; }
+        if ("potna".equals(room.id)) { setPage(UtilityRooms.potna(this)); status.setText("ROOM • POCKET POTNA"); return; }
+        if ("tv".equals(room.id)) { setPage(UtilityRooms.tv(this)); status.setText("ROOM • DEMONIC TV"); return; }
+        if ("bayauto".equals(room.id)) { setPage(UtilityRooms.bayAuto(this)); status.setText("ROOM • BAY AUTO RP"); return; }
         if ("remote".equals(room.id)) { setPage(NativeRooms.remote(this)); status.setText("ROOM • POCKET POTNA REMOTE"); return; }
         if ("video".equals(room.id)) { setPage(NativeRooms.video(this)); status.setText("ROOM • AI VIDEO GENERATOR"); return; }
         if ("octop".equals(room.id)) { setPage(NativeRooms.octop(this)); status.setText("ROOM • OCTOP FME"); return; }
