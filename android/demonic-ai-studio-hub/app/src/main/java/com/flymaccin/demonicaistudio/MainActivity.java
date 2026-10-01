@@ -117,6 +117,7 @@ public final class MainActivity extends Activity {
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(18), dp(10), dp(18), dp(10));
         TextView brand = text("DEMONIC AI", 23, WHITE, true);
+        brand.setText("DEMONIC FUN HUB");
         header.addView(brand);
         TextView build = text("  STUDIO HUB / NATIVE BUILD 001", 13, PURPLE, true);
         header.addView(build);
@@ -137,6 +138,7 @@ public final class MainActivity extends Activity {
         nav.addView(navButton("◉ RECORD", v -> showRecorder()));
         nav.addView(navButton("▤ PROJECTS", v -> showProjects()));
         nav.addView(navButton("◆ LIBRARY", v -> showLibrary()));
+        nav.addView(navButton("▦ ROOMS", v -> showRooms()));
         root.addView(nav, new LinearLayout.LayoutParams(-1, dp(62)));
         return root;
     }
@@ -156,6 +158,40 @@ public final class MainActivity extends Activity {
         cards.addView(featureCard("VOICE RECORD", "Local takes · no upload", PURPLE, v -> showRecorder()));
         setPage(page);
         status.setText("LOCAL SESSION · ENGINE READY");
+    }
+
+    private void showRooms() {
+        stopBeat();
+        LinearLayout page = column();
+        page.setPadding(dp(18), dp(10), dp(18), dp(10));
+        page.addView(text("DEMONIC FUN HUB • ROOMS", 24, PURPLE, true));
+        page.addView(text("Every FME product is being migrated into this native building. Standalone APKs remain QA mirrors until engine migration is complete.", 14, MUTED, false));
+        GridLayout grid = new GridLayout(this);
+        grid.setColumnCount(3);
+        for (FunRoom room : FunRoomRegistry.ROOMS) {
+            Button card = new Button(this);
+            card.setAllCaps(false);
+            card.setText(room.title + "\\n" + room.kind + "\\n" + room.detail);
+            card.setTextColor(WHITE);
+            card.setBackgroundColor(PANEL_2);
+            card.setOnClickListener(v -> openRoom(room));
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.width = dp(300); lp.height = dp(130); lp.setMargins(dp(6),dp(6),dp(6),dp(6));
+            grid.addView(card, lp);
+        }
+        ScrollView scroll = new ScrollView(this); scroll.addView(grid); page.addView(scroll, new LinearLayout.LayoutParams(-1,0,1));
+        setPage(page); status.setText("FUN HUB • " + FunRoomRegistry.ROOMS.size() + " ROOMS REGISTERED");
+    }
+
+    private void openRoom(FunRoom room) {
+        if ("studio".equals(room.id)) { showHome(); return; }
+        LinearLayout page = column(); page.setGravity(Gravity.CENTER); page.setPadding(dp(24),dp(24),dp(24),dp(24));
+        page.addView(text(room.title, 28, WHITE, true));
+        page.addView(text(room.kind, 14, PURPLE, true));
+        page.addView(text(room.detail, 17, MUTED, false));
+        page.addView(text("ROOM MIGRATION ACTIVE • This surface is reserved for the product engine, not an APK-launch button.", 13, CYAN, true));
+        page.addView(actionButton("← BACK TO ROOMS", PANEL_2, v -> showRooms()));
+        setPage(page); status.setText("ROOM • " + room.title.toUpperCase(Locale.US));
     }
 
     private void showPiano() {
