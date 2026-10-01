@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.PictureInPictureParams;
 import android.util.Rational;
 import android.content.Context;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
@@ -12,6 +13,7 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Process;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
@@ -157,7 +159,7 @@ public class MainActivity extends Activity {
     else if(requestCode==FME_EXPANSION_REQUEST){ importFmeExpansion(uri,data.getFlags()); }
   }
   private void importSf2(Uri uri){
-    try { File dst=new File(importDir,"custom.sf2"); try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(dst)){if(in==null)throw new IOException("No input stream");copy(in,out);} int id=NativeAudioEngine.nativeLoadSoundFont(dst.getAbsolutePath()); boolean ok=id>=0; if(ok)rememberBank("sf2",dst); notifyImport("sf2",ok,dst.getName(),ok?"SoundFont loaded":"FluidSynth rejected the SoundFont"); }
+    try { File dst=new File(importDir,"custom.sf2"); try(InputStream in=openGrantedContentStream(uri);OutputStream out=new FileOutputStream(dst)){copy(in,out);} int id=NativeAudioEngine.nativeLoadSoundFont(dst.getAbsolutePath()); boolean ok=id>=0; if(ok)rememberBank("sf2",dst); notifyImport("sf2",ok,dst.getName(),ok?"SoundFont loaded":"FluidSynth rejected the SoundFont"); }
     catch(Exception e){notifyImport("sf2",false,"",e.getMessage());}
   }
   private void importSfzTree(Uri uri,int flags){
@@ -177,9 +179,19 @@ public class MainActivity extends Activity {
       if(webView!=null)runOnUiThread(()->webView.evaluateJavascript("if(window.renderPacks)renderPacks();",null));
     }catch(Exception e){notifyImport("pack",false,"",e.getMessage());}
   }
+  private InputStream openGrantedContentStream(Uri uri) throws IOException {
+    if (uri == null || !ContentResolver.SCHEME_CONTENT.equals(uri.getScheme())
+        || checkUriPermission(uri, Process.myPid(), Process.myUid(),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
+      throw new IOException("UNSAFE_CONTENT_URI");
+    }
+    InputStream input = getContentResolver().openInputStream(uri);
+    if (input == null) throw new IOException("CONTENT_URI_UNAVAILABLE");
+    return input;
+  }
   private void copyDocumentTree(DocumentFile src,File dst,List<File> sfzFiles)throws IOException{
     if(src.isDirectory()){dst.mkdirs();for(DocumentFile child:src.listFiles()){String n=safeName(child.getName());copyDocumentTree(child,new File(dst,n),sfzFiles);}return;}
-    dst.getParentFile().mkdirs();try(InputStream in=getContentResolver().openInputStream(src.getUri());OutputStream out=new FileOutputStream(dst)){if(in==null)throw new IOException("Cannot read "+src.getName());copy(in,out);}if(dst.getName().toLowerCase(Locale.US).endsWith(".sfz"))sfzFiles.add(dst);
+    dst.getParentFile().mkdirs();try(InputStream in=openGrantedContentStream(src.getUri());OutputStream out=new FileOutputStream(dst)){copy(in,out);}if(dst.getName().toLowerCase(Locale.US).endsWith(".sfz"))sfzFiles.add(dst);
   }
   private void collectWavs(File root,File f,org.json.JSONArray out){
     if(f==null||!f.exists())return;
@@ -209,13 +221,13 @@ public class MainActivity extends Activity {
     @JavascriptInterface public String executeNativeTransaction(String id,String commandsJson,long expectedRevision){ try{return commandTransactions.execute(id,commandsJson,expectedRevision);}catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"TRANSACTION_FAILED":e.getMessage())+"}";} }
     @JavascriptInterface public String importProjectAsset(String projectId,String kind,String uriString,String originalName,String provenance,long expectedRevision){
       try{
-        Uri uri=Uri.parse(uriString);InputStream in=getContentResolver().openInputStream(uri);if(in==null)throw new IOException("ASSET_INPUT_UNAVAILABLE");
-        try(InputStream source=in){return assetStore.importAndRegister(projectId,kind,source,originalName,provenance,expectedRevision);}
+        Uri uri=Uri.parse(uriString);
+        try(InputStream source=openGrantedContentStream(uri)){return assetStore.importAndRegister(projectId,kind,source,originalName,provenance,expectedRevision);}
       }catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"ASSET_IMPORT_FAILED":e.getMessage())+"}";}
     }
     @JavascriptInterface public String installFmeExpansionPack(String projectId,String uriString,String packName,long expectedRevision){
       try{
-        Uri uri=Uri.parse(uriString);InputStream raw=getContentResolver().openInputStream(uri);if(raw==null)throw new IOException("PACK_INPUT_UNAVAILABLE");
+        Uri uri=Uri.parse(uriString);InputStream raw=openGrantedContentStream(uri);
         File root=new File(getFilesDir(),"fme-packs/expansions/"+safeName(packName));deleteTree(root);root.mkdirs();
         String rootPath=root.getCanonicalPath()+File.separator;int wavCount=0;byte[]buf=new byte[32768];
         try(ZipInputStream zin=new ZipInputStream(new BufferedInputStream(raw))){
