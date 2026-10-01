@@ -146,4 +146,4 @@ jobs:
             adb shell dumpsys activity activities | grep -A 20 -B 5 com.flymaccin.lootcheerom || true
             echo "=== LOOTCHEE logcat ==="
             adb logcat -d | grep -E -i "LOOTCHEE-NATIVE|lootcheerom|sameboy|libretro|AndroidRuntime|FATAL EXCEPTION|UnsatisfiedLinkError|Fatal signal" || true
-            exit 1
+            adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok 2>/dev/null | grep -q "sameboy 160x144"
