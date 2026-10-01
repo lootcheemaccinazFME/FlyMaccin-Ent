@@ -124,18 +124,20 @@ public final class StudioActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        hideSystemBars();
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         project = StudioProject.fromJson(prefs.getString(PROJECT_KEY, ""));
         production = ProductionProject.fromJson(prefs.getString("production_project_v2", ""));
         setContentView(buildShell());
+        getWindow().getDecorView().post(this::hideSystemBars);
         showHome();
         if(getIntent()!=null&&getIntent().getData()!=null){incomingAssetUri=getIntent().getData();incomingAssetMime=getIntent().getStringExtra("fme_asset_mime");if(incomingAssetMime==null)incomingAssetMime="";status.setText("LIBRARY ASSET READY · "+incomingAssetMime);}
     }
 
     private void hideSystemBars() {
         if (android.os.Build.VERSION.SDK_INT >= 30) {
-            WindowInsetsController controller = getWindow().getInsetsController();
+            View decor = getWindow().getDecorView();
+            if (decor == null || !decor.isAttachedToWindow()) return;
+            WindowInsetsController controller = decor.getWindowInsetsController();
             if (controller != null) {
                 controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
                 controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
