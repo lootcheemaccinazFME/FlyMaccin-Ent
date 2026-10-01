@@ -2,6 +2,7 @@ package com.flymaccin.demonicaistudio;
 
 import android.content.Context;
 import org.json.JSONObject;
+import org.json.JSONException;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 
@@ -10,6 +11,7 @@ final class TransactionalProjectStore {
     TransactionalProjectStore(Context context){root=new File(context.getFilesDir(),"demonic-projects"); if(!root.exists()&&!root.mkdirs()) throw new IllegalStateException("project root");}
 
     synchronized void save(CanonicalProjectState state) throws IOException {
+        try {
         state.validate();
         File dir=dir(state.projectId); if(!dir.exists()&&!dir.mkdirs()) throw new IOException("mkdir");
         File live=new File(dir,"project.json"), next=new File(dir,"project.next"), journal=new File(dir,"project.journal");
@@ -17,6 +19,7 @@ final class TransactionalProjectStore {
         writeSync(next,state.toJson().toString());
         atomicReplace(next,live);
         if(journal.exists()&&!journal.delete()) throw new IOException("journal cleanup");
+        } catch (JSONException e) { throw new IOException("canonical project JSON", e); }
     }
 
     synchronized CanonicalProjectState load(String projectId) throws IOException {
