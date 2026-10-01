@@ -16,7 +16,7 @@ final class CommandTransactionCore {
         try{mutation.apply(state);state.validate();if(state.revision==beforeRevision)state.revision++;undo.push(before);redo.clear();return new Result(state.revision,transactionId);}
         catch(Exception e){state=CanonicalProjectState.fromJson(new JSONObject(before));throw e;}
     }
-    synchronized CanonicalProjectState undo() { if(undo.isEmpty())return state;redo.push(state.toJson().toString());state=CanonicalProjectState.fromJson(new JSONObject(undo.pop()));state.revision++;return state; }
-    synchronized CanonicalProjectState redo() { if(redo.isEmpty())return state;undo.push(state.toJson().toString());state=CanonicalProjectState.fromJson(new JSONObject(redo.pop()));state.revision++;return state; }
+    synchronized CanonicalProjectState undo() throws Exception { if(undo.isEmpty())return state;redo.push(state.toJson().toString());state=CanonicalProjectState.fromJson(new JSONObject(undo.pop()));state.revision++;return state; }
+    synchronized CanonicalProjectState redo() throws Exception { if(redo.isEmpty())return state;undo.push(state.toJson().toString());state=CanonicalProjectState.fromJson(new JSONObject(redo.pop()));state.revision++;return state; }
     synchronized CanonicalProjectState state(){return state;}
 }
