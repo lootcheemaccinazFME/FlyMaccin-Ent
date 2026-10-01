@@ -185,6 +185,10 @@ public final class MainActivity extends Activity {
 
     private void openRoom(FunRoom room) {
         if ("studio".equals(room.id)) { showHome(); return; }
+        if ("remote".equals(room.id)) { setPage(NativeRooms.remote(this)); status.setText("ROOM • POCKET POTNA REMOTE"); return; }
+        if ("video".equals(room.id)) { setPage(NativeRooms.video(this)); status.setText("ROOM • AI VIDEO GENERATOR"); return; }
+        if ("octop".equals(room.id)) { setPage(NativeRooms.octop(this)); status.setText("ROOM • OCTOP FME"); return; }
+        if ("emulator".equals(room.id)) { setPage(NativeRooms.emulator(this)); status.setText("ROOM • UNIVERSAL EMULATOR"); return; }
         LinearLayout page = column(); page.setGravity(Gravity.CENTER); page.setPadding(dp(24),dp(24),dp(24),dp(24));
         page.addView(text(room.title, 28, WHITE, true));
         page.addView(text(room.kind, 14, PURPLE, true));
