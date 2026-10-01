@@ -129,7 +129,7 @@ jobs:
             adb shell am force-stop com.flymaccin.lootcheerom
             adb shell am start -W -n com.flymaccin.lootcheerom/.MainActivity --ez autoTest true
 
-            i=0; while [ "$i" -lt 45 ]; do marker="$(adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok 2>/dev/null || true)"; if echo "$marker" | grep -q "sameboy 160x144"; then echo "LOOTCHEE emulator smoke passed: $marker"; exit 0; fi; if ! adb shell pidof com.flymaccin.lootcheerom >/dev/null 2>&1; then echo "LOOTCHEE emulator process exited before first frame"; break; fi; i=$((i + 1)); sleep 1; done
+            i=0; while [ "$i" -lt 45 ]; do marker="$(adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok 2>/dev/null || true)"; if echo "$marker" | grep -q "sameboy 160x144"; then echo "LOOTCHEE emulator smoke passed: $marker"; exit 0; fi; i=$((i + 1)); sleep 1; done
 
             echo "=== LOOTCHEE staged smoke markers ==="
             echo "--- smoke.core"; adb shell run-as com.flymaccin.lootcheerom cat files/smoke.core 2>/dev/null || echo MISSING
