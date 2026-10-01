@@ -5,6 +5,8 @@ on:
     branches: [ 'build/demonic-daw-apk-20260917' ]
     paths:
       - '.github/qa-trigger-demonic-daw.txt'
+permissions:
+  contents: read
 jobs:
   emulator-smoke:
     runs-on: ubuntu-latest
