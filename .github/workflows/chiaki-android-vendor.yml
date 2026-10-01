@@ -60,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f build/fme-ps5-arm64/CMakeCache.txt
-          if grep -E 'OPENSSL_(CRYPTO_LIBRARY|INCLUDE_DIR):.*(/usr/|/lib/)' build/fme-ps5-arm64/CMakeCache.txt; then
+          if grep -E 'OPENSSL_(CRYPTO_LIBRARY|INCLUDE_DIR):[^=]*=/(usr|lib)/' build/fme-ps5-arm64/CMakeCache.txt; then
             echo "FME ERROR: host OpenSSL leaked into Android cross-build"
             exit 1
           fi
