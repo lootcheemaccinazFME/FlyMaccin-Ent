@@ -8,7 +8,7 @@ This repository is configured for Codemagic / GitHub Android debug APK builds.
 
 The first reusable House is **Music & Media House**. It owns audio creation and entertainment through this core loop:
 
-**Enter House → make/select beat → write lyrics → record vocals → mix/play song → save project → kick back at TV (optional).**
+**Enter House → Import/Export (optional)  →  /select beat → write lyrics → record vocals → mix/play song → save project → kick back at TV (optional).**
 
 House state persists locally, required stages unlock in sequence, and the TV Lounge remains optional after the production loop. The same House pattern is intended for future specialized Houses such as Comic Studio, Bookwriter, Video Studio, and Visual Studio without flattening their individual workflows.
 
