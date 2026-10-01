@@ -230,9 +230,12 @@ public final class StudioActivity extends Activity {
         page.addView(text("Audio clips are independent production objects with timeline position, trim boundaries, gain, fades and reverse state.",12,MUTED,false));
         page.addView(actionButton("IMPORT BEAT / SONG / STEM / SAMPLE",CYAN,v->pickProduction("audio","audio/*")));
         ProductionProject.Channel ch=prodChannel();
-        for(int i=0;i<ch.audio.size();i++){ProductionProject.AudioClip clip=ch.audio.get(i);final int ix=i;LinearLayout r=row();r.addView(text(new File(clip.path).getName()+" · "+clip.trimStartMs+"ms → "+(clip.trimEndMs<0?"END":clip.trimEndMs+"ms")+" · tick "+clip.startTick,12,WHITE,true));r.addView(smallButton("TRIM +100",v->{clip.trimStartMs+=100;autosaveProduction();showSampler();}));r.addView(smallButton("END −100",v->{clip.trimEndMs=clip.trimEndMs<0?1000:Math.max(clip.trimStartMs+20,clip.trimEndMs-100);autosaveProduction();showSampler();}));r.addView(smallButton("SLICE",v->{ProductionProject.AudioClip b=ProductionProject.AudioClip.from(jsonClip(clip));long mid=clip.trimEndMs<0?clip.trimStartMs+500:(clip.trimStartMs+clip.trimEndMs)/2;b.trimStartMs=mid;clip.trimEndMs=mid;b.startTick=clip.startTick+ProductionProject.PPQ;ch.audio.add(b);autosaveProduction();showSampler();}));r.addView(smallButton(clip.reverse?"REVERSE ON":"REVERSE",v->{clip.reverse=!clip.reverse;autosaveProduction();showSampler();}));page.addView(r);}
+        for(int i=0;i<ch.audio.size();i++){ProductionProject.AudioClip clip=ch.audio.get(i);final int ix=i;LinearLayout r=row();r.addView(text(new File(clip.path).getName()+" · "+clip.trimStartMs+"ms → "+(clip.trimEndMs<0?"END":clip.trimEndMs+"ms")+" · tick "+clip.startTick,12,WHITE,true));r.addView(smallButton("▶ PLAY",v->playImportedClip(ch,clip)));r.addView(smallButton("■ STOP",v->stopImportedClip()));r.addView(smallButton("TRIM +100",v->{clip.trimStartMs+=100;autosaveProduction();showSampler();}));r.addView(smallButton("END −100",v->{clip.trimEndMs=clip.trimEndMs<0?1000:Math.max(clip.trimStartMs+20,clip.trimEndMs-100);autosaveProduction();showSampler();}));r.addView(smallButton("SLICE",v->{ProductionProject.AudioClip b=ProductionProject.AudioClip.from(jsonClip(clip));long mid=clip.trimEndMs<0?clip.trimStartMs+500:(clip.trimStartMs+clip.trimEndMs)/2;b.trimStartMs=mid;clip.trimEndMs=mid;b.startTick=clip.startTick+ProductionProject.PPQ;ch.audio.add(b);autosaveProduction();showSampler();}));r.addView(smallButton(clip.reverse?"REVERSE ON":"REVERSE",v->{clip.reverse=!clip.reverse;autosaveProduction();showSampler();}));page.addView(r);}
         setPage(page);
     }
+
+    private void playImportedClip(ProductionProject.Channel ch, ProductionProject.AudioClip clip){stopImportedClip();try{importedPlayer=new MediaPlayer();importedPlayer.setDataSource(clip.path);float left=ch.volume*(ch.pan<=0?1f:1f-ch.pan),right=ch.volume*(ch.pan>=0?1f:1f+ch.pan);importedPlayer.setVolume(left,right);importedPlayer.setOnPreparedListener(p->{try{if(clip.trimStartMs>0)p.seekTo((int)Math.min(Integer.MAX_VALUE,clip.trimStartMs));p.start();status.setText("PLAYING · "+new File(clip.path).getName());if(clip.trimEndMs>clip.trimStartMs){long stopAfter=clip.trimEndMs-clip.trimStartMs;transportHandler.postDelayed(()->{if(importedPlayer==p)stopImportedClip();},stopAfter);}}catch(Exception e){stopImportedClip();status.setText("PLAYBACK FAILED · "+e.getClass().getSimpleName());}});importedPlayer.setOnCompletionListener(p->{if(importedPlayer==p)stopImportedClip();});importedPlayer.prepareAsync();}catch(Exception e){stopImportedClip();status.setText("PLAYBACK FAILED · "+e.getMessage());}}
+    private void stopImportedClip(){if(importedPlayer!=null){try{importedPlayer.stop();}catch(Exception ignored){}try{importedPlayer.release();}catch(Exception ignored){}importedPlayer=null;}}
 
     private org.json.JSONObject jsonClip(ProductionProject.AudioClip c){try{return c.json();}catch(Exception e){return new org.json.JSONObject();}}
 
@@ -902,6 +905,7 @@ public final class StudioActivity extends Activity {
     @Override protected void onPause() {
         super.onPause();
         pauseTransport();
+        stopImportedClip();
         if (wavRecorder.isRunning()) {
             File take = wavRecorder.stop();
             if (take != null) {
@@ -915,6 +919,7 @@ public final class StudioActivity extends Activity {
     @Override protected void onDestroy() {
         super.onDestroy();
         transportHandler.removeCallbacksAndMessages(null);
+        stopImportedClip();
         stopVoicePlayer();
     }
 }
