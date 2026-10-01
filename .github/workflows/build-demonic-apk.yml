@@ -1,6 +1,11 @@
 name: Build Demonic AI Studio APK
 
 on:
+  push:
+    branches: [integrate/mac-maestro-demonic-v2]
+    paths:
+      - "android/demonic-ai-studio-hub/**"
+      - ".github/workflows/build-demonic-apk.yml"
   pull_request:
     branches: [main]
     paths:
