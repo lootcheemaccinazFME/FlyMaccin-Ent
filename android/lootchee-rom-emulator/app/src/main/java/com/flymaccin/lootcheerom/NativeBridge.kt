@@ -20,6 +20,9 @@ object NativeBridge {
     external fun drainAudio():ShortArray
     external fun sampleRate():Int
     external fun fps():Double
+    external fun diagnostic():String
+    external fun runCount():Int
+    external fun videoCount():Int
     external fun close()
     external fun saveState():ByteArray?
     external fun loadState(data:ByteArray):Boolean
