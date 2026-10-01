@@ -3,8 +3,7 @@ package com.flymaccin.demonicaistudio;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.Arrays;
-
+/** The complete, serializable state of one 16-step studio session. */
 final class StudioProject {
     static final int STEPS = 16;
     static final int TRACK_PIANO = 0;
@@ -12,63 +11,55 @@ final class StudioProject {
     static final int TRACK_DRUMS = 2;
     static final int TRACK_VOICE = 3;
     static final int TRACK_COUNT = 4;
+    private static final int MAX_NOTES_PER_STEP = 16;
 
     String name = "Demonic Session";
     int bpm = 96;
-    int swing = 0;
+    int swing;
     boolean loop = true;
-    final String[] piano = new String[STEPS];
-    final String[] guitar = new String[STEPS];
+    final int[][] pianoMidi = new int[STEPS][MAX_NOTES_PER_STEP];
+    final int[][] guitarMidi = new int[STEPS][MAX_NOTES_PER_STEP];
+    final int[] pianoNoteCount = new int[STEPS];
+    final int[] guitarNoteCount = new int[STEPS];
     final boolean[][] drums = new boolean[4][STEPS];
     String voicePath = "";
-    int voiceStartStep = 0;
+    int voiceStartStep;
     final float[] volume = {0.86f, 0.82f, 0.90f, 0.90f};
-    final float[] pan = {0f, 0f, 0f, 0f};
+    final float[] pan = new float[TRACK_COUNT];
     final boolean[] muted = new boolean[TRACK_COUNT];
     final boolean[] solo = new boolean[TRACK_COUNT];
     final boolean[] delay = new boolean[TRACK_COUNT];
     final boolean[] reverb = new boolean[TRACK_COUNT];
 
-    StudioProject() {
-        Arrays.fill(piano, "");
-        Arrays.fill(guitar, "");
+    void addMidi(int track, int step, int midi) {
+        int[][] notes = notesFor(track);
+        int[] counts = countsFor(track);
+        step = normalizeStep(step);
+        midi = clamp(midi, 0, 127);
+        for (int i = 0; i < counts[step]; i++) if (notes[step][i] == midi) return;
+        if (counts[step] < MAX_NOTES_PER_STEP) notes[step][counts[step]++] = midi;
     }
 
-    void addFrequency(int track, int step, double frequency) {
-        String[] lane = track == TRACK_PIANO ? piano : guitar;
-        String value = String.format(java.util.Locale.US, "%.3f", frequency);
-        lane[normalizeStep(step)] = lane[normalizeStep(step)].isEmpty()
-                ? value : lane[normalizeStep(step)] + "," + value;
+    void setMidiNotes(int track, int step, int[] values) {
+        int[][] notes = notesFor(track);
+        int[] counts = countsFor(track);
+        step = normalizeStep(step);
+        counts[step] = 0;
+        if (values == null) return;
+        for (int value : values) addMidi(track, step, value);
     }
 
-    void setFrequencies(int track, int step, double[] frequencies) {
-        StringBuilder value = new StringBuilder();
-        for (double frequency : frequencies) {
-            if (value.length() > 0) value.append(',');
-            value.append(String.format(java.util.Locale.US, "%.3f", frequency));
-        }
-        (track == TRACK_PIANO ? piano : guitar)[normalizeStep(step)] = value.toString();
-    }
-
-    double[] frequenciesAt(int track, int step) {
-        String raw = (track == TRACK_PIANO ? piano : guitar)[normalizeStep(step)];
-        if (raw == null || raw.isEmpty()) return new double[0];
-        String[] values = raw.split(",");
-        double[] frequencies = new double[values.length];
-        for (int index = 0; index < values.length; index++) {
-            try {
-                frequencies[index] = Double.parseDouble(values[index]);
-            } catch (NumberFormatException ignored) {
-                frequencies[index] = 0;
-            }
-        }
-        return frequencies;
+    int[] midiNotesAt(int track, int step) {
+        int[] notes = notesFor(track)[normalizeStep(step)];
+        int count = countsFor(track)[normalizeStep(step)];
+        int[] result = new int[count];
+        System.arraycopy(notes, 0, result, 0, count);
+        return result;
     }
 
     boolean hasClip(int track, int step) {
         step = normalizeStep(step);
-        if (track == TRACK_PIANO) return !piano[step].isEmpty();
-        if (track == TRACK_GUITAR) return !guitar[step].isEmpty();
+        if (track == TRACK_PIANO || track == TRACK_GUITAR) return countsFor(track)[step] > 0;
         if (track == TRACK_DRUMS) {
             for (boolean[] lane : drums) if (lane[step]) return true;
             return false;
@@ -78,28 +69,44 @@ final class StudioProject {
 
     void clearClip(int track, int step) {
         step = normalizeStep(step);
-        if (track == TRACK_PIANO) piano[step] = "";
-        else if (track == TRACK_GUITAR) guitar[step] = "";
-        else if (track == TRACK_DRUMS) for (boolean[] lane : drums) lane[step] = false;
-        else if (track == TRACK_VOICE && voiceStartStep == step) voicePath = "";
+        if (track == TRACK_PIANO || track == TRACK_GUITAR) {
+            countsFor(track)[step] = 0;
+        } else if (track == TRACK_DRUMS) {
+            for (boolean[] lane : drums) lane[step] = false;
+        } else if (track == TRACK_VOICE && voiceStartStep == step) {
+            voicePath = "";
+        }
     }
 
     void moveClip(int track, int from, int to) {
         from = normalizeStep(from);
         to = normalizeStep(to);
         if (from == to || !hasClip(track, from)) return;
-        if (track == TRACK_PIANO) {
-            piano[to] = piano[from];
-            piano[from] = "";
-        } else if (track == TRACK_GUITAR) {
-            guitar[to] = guitar[from];
-            guitar[from] = "";
+        if (track == TRACK_PIANO || track == TRACK_GUITAR) {
+            int[][] notes = notesFor(track);
+            int[] counts = countsFor(track);
+            System.arraycopy(notes[from], 0, notes[to], 0, MAX_NOTES_PER_STEP);
+            counts[to] = counts[from];
+            counts[from] = 0;
         } else if (track == TRACK_DRUMS) {
             for (boolean[] lane : drums) {
                 lane[to] = lane[from];
                 lane[from] = false;
             }
-        } else if (track == TRACK_VOICE) {
+        } else {
+            voiceStartStep = to;
+        }
+    }
+
+    void copyClipTo(StudioProject source, int track, int from, int to) {
+        from = normalizeStep(from);
+        to = normalizeStep(to);
+        if (track == TRACK_PIANO || track == TRACK_GUITAR) {
+            setMidiNotes(track, to, source.midiNotesAt(track, from));
+        } else if (track == TRACK_DRUMS) {
+            for (int lane = 0; lane < drums.length; lane++) drums[lane][to] = source.drums[lane][from];
+        } else if (!source.voicePath.isEmpty() && source.voiceStartStep == from) {
+            voicePath = source.voicePath;
             voiceStartStep = to;
         }
     }
@@ -113,49 +120,56 @@ final class StudioProject {
     String toJson() {
         try {
             JSONObject root = new JSONObject();
+            root.put("schema", 2);
             root.put("name", name);
             root.put("bpm", bpm);
             root.put("swing", swing);
             root.put("loop", loop);
-            root.put("piano", new JSONArray(Arrays.asList(piano)));
-            root.put("guitar", new JSONArray(Arrays.asList(guitar)));
-            JSONArray drumArray = new JSONArray();
+            root.put("pianoMidi", noteGrid(pianoMidi, pianoNoteCount));
+            root.put("guitarMidi", noteGrid(guitarMidi, guitarNoteCount));
+            JSONArray drumGrid = new JSONArray();
             for (boolean[] lane : drums) {
                 JSONArray values = new JSONArray();
                 for (boolean value : lane) values.put(value);
-                drumArray.put(values);
+                drumGrid.put(values);
             }
-            root.put("drums", drumArray);
+            root.put("drums", drumGrid);
             root.put("voicePath", voicePath);
             root.put("voiceStartStep", voiceStartStep);
-            root.put("volume", floats(volume));
-            root.put("pan", floats(pan));
-            root.put("muted", booleans(muted));
-            root.put("solo", booleans(solo));
-            root.put("delay", booleans(delay));
-            root.put("reverb", booleans(reverb));
+            root.put("volume", floatArray(volume));
+            root.put("pan", floatArray(pan));
+            root.put("muted", booleanArray(muted));
+            root.put("solo", booleanArray(solo));
+            root.put("delay", booleanArray(delay));
+            root.put("reverb", booleanArray(reverb));
             return root.toString();
         } catch (Exception ignored) {
             return "{}";
         }
     }
 
-    static StudioProject fromJson(String raw) {
+    static StudioProject fromJson(String json) {
         StudioProject project = new StudioProject();
-        if (raw == null || raw.isEmpty()) return project;
+        if (json == null || json.trim().isEmpty()) return project;
         try {
-            JSONObject root = new JSONObject(raw);
+            JSONObject root = new JSONObject(json);
             project.name = root.optString("name", project.name);
             project.bpm = clamp(root.optInt("bpm", project.bpm), 50, 190);
             project.swing = clamp(root.optInt("swing", 0), 0, 35);
             project.loop = root.optBoolean("loop", true);
-            readStrings(root.optJSONArray("piano"), project.piano);
-            readStrings(root.optJSONArray("guitar"), project.guitar);
-            JSONArray drumArray = root.optJSONArray("drums");
-            if (drumArray != null) {
-                for (int lane = 0; lane < Math.min(4, drumArray.length()); lane++) {
-                    JSONArray values = drumArray.optJSONArray(lane);
-                    if (values != null) for (int step = 0; step < Math.min(STEPS, values.length()); step++)
+            JSONArray piano = root.optJSONArray("pianoMidi");
+            JSONArray guitar = root.optJSONArray("guitarMidi");
+            if (piano != null) readNoteGrid(piano, project.pianoMidi, project.pianoNoteCount);
+            else readLegacyFrequencyGrid(root.optJSONArray("piano"), project, TRACK_PIANO);
+            if (guitar != null) readNoteGrid(guitar, project.guitarMidi, project.guitarNoteCount);
+            else readLegacyFrequencyGrid(root.optJSONArray("guitar"), project, TRACK_GUITAR);
+
+            JSONArray drumGrid = root.optJSONArray("drums");
+            if (drumGrid != null) {
+                for (int lane = 0; lane < Math.min(4, drumGrid.length()); lane++) {
+                    JSONArray values = drumGrid.optJSONArray(lane);
+                    if (values == null) continue;
+                    for (int step = 0; step < Math.min(STEPS, values.length()); step++)
                         project.drums[lane][step] = values.optBoolean(step, false);
                 }
             }
@@ -168,34 +182,92 @@ final class StudioProject {
             readBooleans(root.optJSONArray("delay"), project.delay);
             readBooleans(root.optJSONArray("reverb"), project.reverb);
         } catch (Exception ignored) {
+            return new StudioProject();
         }
         return project;
     }
 
-    private static JSONArray floats(float[] values) {
-        JSONArray array = new JSONArray();
-        for (float value : values) {
-            try { array.put((double) value); } catch (Exception ignored) { }
+    static int normalizeStep(int step) {
+        return ((step % STEPS) + STEPS) % STEPS;
+    }
+
+    static double frequencyForMidi(int midi) {
+        return 440.0 * Math.pow(2.0, (midi - 69) / 12.0);
+    }
+
+    private int[][] notesFor(int track) {
+        if (track == TRACK_PIANO) return pianoMidi;
+        if (track == TRACK_GUITAR) return guitarMidi;
+        throw new IllegalArgumentException("Track does not contain pitched notes");
+    }
+
+    private int[] countsFor(int track) {
+        if (track == TRACK_PIANO) return pianoNoteCount;
+        if (track == TRACK_GUITAR) return guitarNoteCount;
+        throw new IllegalArgumentException("Track does not contain pitched notes");
+    }
+
+    private static JSONArray noteGrid(int[][] notes, int[] counts) {
+        JSONArray grid = new JSONArray();
+        for (int step = 0; step < STEPS; step++) {
+            JSONArray values = new JSONArray();
+            for (int note = 0; note < counts[step]; note++) values.put(notes[step][note]);
+            grid.put(values);
         }
-        return array;
+        return grid;
     }
 
-    private static JSONArray booleans(boolean[] values) {
-        JSONArray array = new JSONArray();
-        for (boolean value : values) array.put(value);
-        return array;
+    private static void readNoteGrid(JSONArray grid, int[][] notes, int[] counts) {
+        for (int step = 0; step < Math.min(STEPS, grid.length()); step++) {
+            JSONArray values = grid.optJSONArray(step);
+            if (values == null) continue;
+            for (int index = 0; index < Math.min(MAX_NOTES_PER_STEP, values.length()); index++) {
+                int midi = values.optInt(index, -1);
+                if (midi >= 0 && midi <= 127) notes[step][counts[step]++] = midi;
+            }
+        }
     }
 
-    private static void readStrings(JSONArray array, String[] target) {
+    private static void readLegacyFrequencyGrid(JSONArray grid, StudioProject project, int track) {
+        if (grid == null) return;
+        for (int step = 0; step < Math.min(STEPS, grid.length()); step++) {
+            String[] values = grid.optString(step, "").split(",");
+            for (String value : values) {
+                try {
+                    double frequency = Double.parseDouble(value);
+                    if (frequency > 0 && !Double.isNaN(frequency) && !Double.isInfinite(frequency)) {
+                        int midi = (int) Math.round(69 + 12 * (Math.log(frequency / 440.0) / Math.log(2)));
+                        project.addMidi(track, step, midi);
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Skip malformed note data and keep the rest of the project.
+                }
+            }
+        }
+    }
+
+    private static JSONArray floatArray(float[] values) {
+        JSONArray result = new JSONArray();
+        for (float value : values) {
+            try {
+                result.put((double) value);
+            } catch (Exception ignored) {
+                // A primitive float is always JSON-serializable.
+            }
+        }
+        return result;
+    }
+
+    private static JSONArray booleanArray(boolean[] values) {
+        JSONArray result = new JSONArray();
+        for (boolean value : values) result.put(value);
+        return result;
+    }
+
+    private static void readFloats(JSONArray array, float[] target, float min, float max) {
         if (array == null) return;
         for (int index = 0; index < Math.min(array.length(), target.length); index++)
-            target[index] = array.optString(index, "");
-    }
-
-    private static void readFloats(JSONArray array, float[] target, float low, float high) {
-        if (array == null) return;
-        for (int index = 0; index < Math.min(array.length(), target.length); index++)
-            target[index] = Math.max(low, Math.min(high, (float) array.optDouble(index, target[index])));
+            target[index] = Math.max(min, Math.min(max, (float) array.optDouble(index, target[index])));
     }
 
     private static void readBooleans(JSONArray array, boolean[] target) {
@@ -204,11 +276,7 @@ final class StudioProject {
             target[index] = array.optBoolean(index, target[index]);
     }
 
-    private static int normalizeStep(int step) {
-        return ((step % STEPS) + STEPS) % STEPS;
-    }
-
-    private static int clamp(int value, int low, int high) {
-        return Math.max(low, Math.min(high, value));
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 }

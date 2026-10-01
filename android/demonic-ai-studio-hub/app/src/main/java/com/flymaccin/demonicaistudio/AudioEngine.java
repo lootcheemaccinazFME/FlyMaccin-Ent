@@ -3,158 +3,251 @@ package com.flymaccin.demonicaistudio;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
+import android.os.Process;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Random;
 
+/** Small offline PCM synthesizer shared by the instrument screens and transport. */
 final class AudioEngine {
     static final int SAMPLE_RATE = 44100;
-    private final Random random = new Random();
+    private static final int BLOCK_FRAMES = 512;
+    private final Object lock = new Object();
+    private final List<Voice> voices = new ArrayList<>();
+    private volatile boolean running;
+    private volatile long renderedFrames;
+    private Thread outputThread;
 
-    void playPiano(double frequency, int durationMs) {
-        playPiano(frequency, durationMs, 0.8f, 0f, false, false);
-    }
-
-    void playPiano(double frequency, int durationMs, float volume, float pan, boolean reverb, boolean delay) {
-        start("demonic-piano", () -> playBuffer(piano(frequency, durationMs), volume, pan, reverb, delay));
-    }
-
-    void playGuitarNote(double frequency, float volume, float pan, boolean reverb, boolean delay) {
-        start("demonic-guitar", () -> playBuffer(pluck(frequency, 1200), volume, pan, reverb, delay));
-    }
-
-    void playGuitarChord(double[] frequencies) {
-        playGuitarChord(frequencies, true, 0.82f, 0f, false, false);
-    }
-
-    void playGuitarChord(double[] frequencies, boolean downStroke, float volume, float pan,
-                         boolean reverb, boolean delay) {
-        for (int index = 0; index < frequencies.length; index++) {
-            int source = downStroke ? index : frequencies.length - index - 1;
-            final double frequency = frequencies[source];
-            final long wait = index * 32L;
-            start("demonic-strum", () -> {
-                try { Thread.sleep(wait); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
-                playBuffer(pluck(frequency, 1350), volume * 0.72f, pan, reverb, delay);
-            });
+    void start() {
+        synchronized (lock) {
+            if (outputThread != null && outputThread.isAlive()) return;
+            running = true;
+            outputThread = new Thread(this::renderAudio, "studio-audio-output");
+            outputThread.setPriority(Thread.MAX_PRIORITY);
+            outputThread.start();
         }
     }
 
-    void playDrum(int lane) {
-        playDrum(lane, 0.9f, 0f, false, false);
+    void playPiano(int midi, int durationMs, float volume, float pan, boolean reverb, boolean delay) {
+        enqueue(InstrumentSynth.piano(midi, durationMs), volume, pan, reverb, delay, 0);
+    }
+
+    void playGuitar(int midi, float volume, float pan, boolean reverb, boolean delay) {
+        enqueue(InstrumentSynth.guitar(midi, 1350), volume * 0.82f, pan, reverb, delay, 0);
+    }
+
+    void playGuitarChord(int[] midiNotes, boolean downStroke, float volume, float pan,
+                         boolean reverb, boolean delay) {
+        for (int index = 0; index < midiNotes.length; index++) {
+            int note = midiNotes[downStroke ? index : midiNotes.length - index - 1];
+            enqueue(InstrumentSynth.guitar(note, 1250), volume * 0.76f, pan,
+                    reverb, delay, index * SAMPLE_RATE * 28L / 1000L);
+        }
     }
 
     void playDrum(int lane, float volume, float pan, boolean reverb, boolean delay) {
-        start("demonic-drum", () -> playBuffer(drum(lane), volume, pan, reverb, delay));
+        enqueue(InstrumentSynth.drum(lane), volume, pan, reverb, delay, 0);
     }
 
-    private float[] piano(double frequency, int durationMs) {
-        int count = SAMPLE_RATE * durationMs / 1000;
-        float[] pcm = new float[count];
-        for (int i = 0; i < count; i++) {
-            double t = i / (double) SAMPLE_RATE;
-            double attack = Math.min(1, t * 55);
-            double release = Math.max(0, 1 - t / (durationMs / 1000.0));
-            double envelope = attack * Math.pow(release, 0.7);
-            double fundamental = Math.sin(2 * Math.PI * frequency * t);
-            double second = Math.sin(2 * Math.PI * frequency * 2 * t) * 0.28;
-            double third = Math.sin(2 * Math.PI * frequency * 3 * t) * 0.10;
-            pcm[i] = (float) ((fundamental + second + third) * envelope * 0.62);
+    void release() {
+        Thread thread;
+        synchronized (lock) {
+            running = false;
+            voices.clear();
+            thread = outputThread;
         }
-        return pcm;
-    }
-
-    private float[] pluck(double frequency, int durationMs) {
-        int count = SAMPLE_RATE * durationMs / 1000;
-        int period = Math.max(2, (int) (SAMPLE_RATE / Math.max(35, frequency)));
-        float[] ring = new float[period];
-        for (int index = 0; index < period; index++) ring[index] = random.nextFloat() * 2f - 1f;
-        float[] pcm = new float[count];
-        for (int index = 0; index < count; index++) {
-            int slot = index % period;
-            float value = ring[slot];
-            ring[slot] = 0.498f * (value + ring[(slot + 1) % period]);
-            double t = index / (double) SAMPLE_RATE;
-            pcm[index] = (float) (value * Math.exp(-t * 1.25) * 0.78);
-        }
-        return pcm;
-    }
-
-    private float[] drum(int lane) {
-        int durationMs = lane == 0 ? 320 : lane == 1 ? 210 : lane == 2 ? 105 : 160;
-        int count = SAMPLE_RATE * durationMs / 1000;
-        float[] pcm = new float[count];
-        double phase = 0;
-        for (int i = 0; i < count; i++) {
-            double t = i / (double) SAMPLE_RATE;
-            double envelope = Math.exp(-t * (lane == 0 ? 15 : lane == 1 ? 25 : 42));
-            double sample;
-            if (lane == 0) {
-                double frequency = 160 - 112 * Math.min(1, t * 8);
-                phase += 2 * Math.PI * frequency / SAMPLE_RATE;
-                sample = Math.sin(phase) * envelope;
-            } else if (lane == 1) {
-                sample = (random.nextDouble() * 2 - 1) * envelope * 0.82
-                        + Math.sin(2 * Math.PI * 185 * t) * envelope * 0.26;
-            } else if (lane == 2) {
-                sample = (random.nextDouble() * 2 - 1) * envelope * 0.52;
-            } else {
-                sample = Math.sin(2 * Math.PI * 520 * t) * envelope * 0.52
-                        + (random.nextDouble() * 2 - 1) * envelope * 0.16;
+        if (thread != null) {
+            thread.interrupt();
+            try {
+                thread.join(1500);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
             }
-            pcm[i] = (float) sample;
         }
-        return pcm;
+        synchronized (lock) {
+            if (outputThread == thread && (thread == null || !thread.isAlive())) outputThread = null;
+        }
     }
 
-    private void playBuffer(float[] mono, float volume, float pan, boolean reverb, boolean delay) {
-        float[] processed = mono.clone();
-        if (delay) addEcho(processed, (int) (SAMPLE_RATE * 0.27), 0.28f);
-        if (reverb) {
-            addEcho(processed, (int) (SAMPLE_RATE * 0.063), 0.18f);
-            addEcho(processed, (int) (SAMPLE_RATE * 0.101), 0.12f);
+    private void enqueue(float[] samples, float volume, float pan, boolean reverb,
+                         boolean delay, long frameDelay) {
+        if (!running) start();
+        float[] effected = InstrumentSynth.effects(samples, reverb, delay);
+        float left = volume * (pan > 0 ? 1f - pan : 1f);
+        float right = volume * (pan < 0 ? 1f + pan : 1f);
+        synchronized (lock) {
+            voices.add(new Voice(effected, left, right, renderedFrames + frameDelay));
         }
-        float leftGain = volume * (pan <= 0 ? 1f : 1f - pan);
-        float rightGain = volume * (pan >= 0 ? 1f : 1f + pan);
-        short[] stereo = new short[processed.length * 2];
-        for (int index = 0; index < processed.length; index++) {
-            stereo[index * 2] = sample(processed[index] * leftGain);
-            stereo[index * 2 + 1] = sample(processed[index] * rightGain);
-        }
-        AudioTrack track = new AudioTrack.Builder()
-                .setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build())
-                .setAudioFormat(new AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setSampleRate(SAMPLE_RATE)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
-                        .build())
-                .setBufferSizeInBytes(stereo.length * 2)
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build();
+    }
+
+    private void renderAudio() {
+        AudioTrack track = null;
         try {
-            track.write(stereo, 0, stereo.length);
+            Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO);
+            int minBytes = AudioTrack.getMinBufferSize(SAMPLE_RATE,
+                    AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT);
+            if (minBytes <= 0) throw new IllegalStateException("Audio output is unavailable");
+            track = new AudioTrack.Builder()
+                    .setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build())
+                    .setAudioFormat(new AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(SAMPLE_RATE)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                            .build())
+                    .setBufferSizeInBytes(Math.max(minBytes * 2, BLOCK_FRAMES * 8))
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build();
+            if (track.getState() != AudioTrack.STATE_INITIALIZED)
+                throw new IllegalStateException("Audio output could not start");
             track.play();
-            Thread.sleep(Math.max(100, processed.length * 1000L / SAMPLE_RATE + 40));
-        } catch (Exception error) {
-            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            float[] mix = new float[BLOCK_FRAMES * 2];
+            short[] pcm = new short[BLOCK_FRAMES * 2];
+            while (running) {
+                java.util.Arrays.fill(mix, 0f);
+                long blockStart = renderedFrames;
+                renderedFrames = blockStart + BLOCK_FRAMES;
+                synchronized (lock) {
+                    Iterator<Voice> iterator = voices.iterator();
+                    while (iterator.hasNext()) {
+                        Voice voice = iterator.next();
+                        long start = Math.max(0, voice.startFrame - blockStart);
+                        if (voice.startFrame >= blockStart + BLOCK_FRAMES) continue;
+                        for (int frame = (int) start; frame < BLOCK_FRAMES; frame++) {
+                            int source = (int) (blockStart + frame - voice.startFrame);
+                            if (source >= voice.samples.length) break;
+                            float sample = voice.samples[source];
+                            mix[frame * 2] += sample * voice.left;
+                            mix[frame * 2 + 1] += sample * voice.right;
+                        }
+                        if (blockStart + BLOCK_FRAMES - voice.startFrame >= voice.samples.length)
+                            iterator.remove();
+                    }
+                }
+                for (int index = 0; index < mix.length; index++)
+                    pcm[index] = (short) (Math.max(-1f, Math.min(1f, mix[index])) * 32767);
+                int offset = 0;
+                while (running && offset < pcm.length) {
+                    int written = track.write(pcm, offset, pcm.length - offset, AudioTrack.WRITE_BLOCKING);
+                    if (written < 0) throw new IllegalStateException("Audio write failed: " + written);
+                    if (written == 0) continue;
+                    offset += written;
+                }
+            }
+        } catch (Exception ignored) {
+            // Audio is optional on devices without a usable output route.
         } finally {
-            try { if (track.getPlayState() != AudioTrack.PLAYSTATE_STOPPED) track.stop(); } catch (Exception ignored) { }
-            track.release();
+            if (track != null) {
+                try { track.pause(); } catch (Exception ignored) { }
+                try { track.flush(); } catch (Exception ignored) { }
+                track.release();
+            }
+            synchronized (lock) {
+                voices.clear();
+                running = false;
+                if (outputThread == Thread.currentThread()) outputThread = null;
+            }
         }
     }
 
-    private static void addEcho(float[] samples, int offset, float gain) {
-        for (int index = offset; index < samples.length; index++)
-            samples[index] += samples[index - offset] * gain;
+    private static final class Voice {
+        final float[] samples;
+        final float left;
+        final float right;
+        final long startFrame;
+
+        Voice(float[] samples, float left, float right, long startFrame) {
+            this.samples = samples;
+            this.left = left;
+            this.right = right;
+            this.startFrame = startFrame;
+        }
     }
 
-    private static short sample(float value) {
-        return (short) (Math.max(-1f, Math.min(1f, value)) * Short.MAX_VALUE);
-    }
+    /** Pure synthesis routines also drive the deterministic offline WAV renderer. */
+    static final class InstrumentSynth {
+        private InstrumentSynth() { }
 
-    private static void start(String name, Runnable action) {
-        new Thread(action, name).start();
+        static float[] piano(int midi, int durationMs) {
+            double frequency = StudioProject.frequencyForMidi(midi);
+            int count = SAMPLE_RATE * durationMs / 1000;
+            float[] samples = new float[count];
+            for (int index = 0; index < count; index++) {
+                double time = index / (double) SAMPLE_RATE;
+                double envelope = Math.min(1, time * 55)
+                        * Math.pow(Math.max(0, 1 - time / (durationMs / 1000.0)), 0.7);
+                double wave = Math.sin(2 * Math.PI * frequency * time)
+                        + 0.28 * Math.sin(4 * Math.PI * frequency * time)
+                        + 0.10 * Math.sin(6 * Math.PI * frequency * time);
+                samples[index] = (float) (wave * envelope * 0.52);
+            }
+            return samples;
+        }
+
+        static float[] guitar(int midi, int durationMs) {
+            double frequency = StudioProject.frequencyForMidi(midi);
+            int count = SAMPLE_RATE * durationMs / 1000;
+            int period = Math.max(2, Math.min(SAMPLE_RATE, (int) (SAMPLE_RATE / frequency)));
+            float[] ring = new float[period];
+            Random random = new Random(210903L + midi * 31L);
+            for (int index = 0; index < period; index++) ring[index] = random.nextFloat() * 2f - 1f;
+            float[] samples = new float[count];
+            for (int index = 0; index < count; index++) {
+                int slot = index % period;
+                float value = ring[slot];
+                ring[slot] = 0.498f * (value + ring[(slot + 1) % period]);
+                samples[index] = (float) (value * Math.exp(-index / (double) SAMPLE_RATE * 1.45) * 0.64);
+            }
+            return samples;
+        }
+
+        static float[] drum(int lane) {
+            lane = Math.max(0, Math.min(3, lane));
+            int durationMs = lane == 0 ? 360 : lane == 1 ? 230 : lane == 2 ? 110 : 170;
+            int count = SAMPLE_RATE * durationMs / 1000;
+            float[] samples = new float[count];
+            double phase = 0;
+            Random random = new Random(57721L + lane * 7919L);
+            for (int index = 0; index < count; index++) {
+                double time = index / (double) SAMPLE_RATE;
+                double envelope = Math.exp(-time * (lane == 0 ? 14 : lane == 1 ? 24 : 42));
+                if (lane == 0) {
+                    double frequency = 155 - 105 * Math.min(1, time * 7);
+                    phase += 2 * Math.PI * frequency / SAMPLE_RATE;
+                    samples[index] = (float) (Math.sin(phase) * envelope);
+                } else if (lane == 1) {
+                    samples[index] = (float) (((random.nextDouble() * 2 - 1) * 0.72
+                            + Math.sin(2 * Math.PI * 185 * time) * 0.24) * envelope);
+                } else if (lane == 2) {
+                    samples[index] = (float) ((random.nextDouble() * 2 - 1) * envelope * 0.5);
+                } else {
+                    samples[index] = (float) ((Math.sin(2 * Math.PI * 520 * time) * 0.48
+                            + (random.nextDouble() * 2 - 1) * 0.13) * envelope);
+                }
+            }
+            return samples;
+        }
+
+        static float[] effects(float[] source, boolean reverb, boolean delay) {
+            if (!reverb && !delay) return source;
+            int maximumTail = SAMPLE_RATE * (delay ? 1 : 0) + SAMPLE_RATE / 5;
+            float[] result = new float[source.length + maximumTail];
+            System.arraycopy(source, 0, result, 0, source.length);
+            if (delay) echo(result, SAMPLE_RATE * 27 / 100, 0.25f);
+            if (reverb) {
+                echo(result, SAMPLE_RATE * 61 / 1000, 0.16f);
+                echo(result, SAMPLE_RATE * 97 / 1000, 0.10f);
+            }
+            return result;
+        }
+
+        private static void echo(float[] samples, int offset, float gain) {
+            for (int index = offset; index < samples.length; index++)
+                samples[index] += samples[index - offset] * gain;
+        }
     }
 }
