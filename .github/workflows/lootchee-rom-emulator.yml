@@ -121,12 +121,4 @@ jobs:
             adb install -r /tmp/apk/app-debug.apk
             adb shell am force-stop com.flymaccin.lootcheerom
             adb shell am start -n com.flymaccin.lootcheerom/.MainActivity --ez autoTest true
-            for i in $(seq 1 30); do
-              if adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok 2>/dev/null | grep -q "sameboy 160x144"; then
-                adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok
-                exit 0
-              fi
-              sleep 1
-            done
-            adb logcat -d | tail -300
-            exit 1
+            bash -lc 'for i in $(seq 1 30); do marker="$(adb shell run-as com.flymaccin.lootcheerom cat files/boot.ok 2>/dev/null || true)"; if echo "$marker" | grep -q "sameboy 160x144"; then echo "$marker"; exit 0; fi; sleep 1; done; adb logcat -d | tail -300; exit 1'
