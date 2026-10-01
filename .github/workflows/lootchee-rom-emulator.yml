@@ -103,6 +103,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Enable KVM
+        run: sudo chmod 666 /dev/kvm
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
