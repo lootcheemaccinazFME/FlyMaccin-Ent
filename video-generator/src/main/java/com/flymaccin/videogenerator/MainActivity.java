@@ -1,22 +1,35 @@
 package com.flymaccin.videogenerator;
-import android.app.*; import android.os.*; import android.content.*; import android.graphics.Color; import android.net.Uri; import android.view.*; import android.widget.*; import java.util.*;
+import android.app.*; import android.os.*; import android.content.*; import android.graphics.Color; import android.net.Uri; import android.view.*; import android.widget.*; import java.io.*; import java.net.*; import java.nio.charset.StandardCharsets; import java.util.*; import java.util.concurrent.*; import java.util.regex.*;
 public class MainActivity extends Activity {
- LinearLayout refs; TextView status; EditText prompt; final ArrayList<Uri> images=new ArrayList<>();
+ static final String SPACE="https://deeprat-ltx-video-zerogpu-optimized.hf.space";
+ LinearLayout refs,root; TextView status; EditText prompt,token; Spinner ratio; VideoView preview; final ArrayList<Uri> images=new ArrayList<>(); final ExecutorService io=Executors.newSingleThreadExecutor();
  public void onCreate(Bundle b){super.onCreate(b); render();}
  TextView t(String s,int sp){TextView v=new TextView(this);v.setText(s);v.setTextColor(Color.WHITE);v.setTextSize(sp);v.setPadding(0,10,0,10);return v;}
+ Button button(String s){Button b=new Button(this);b.setText(s);return b;}
  public void render(){
-  ScrollView sc=new ScrollView(this); LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(28,36,28,36);root.setBackgroundColor(Color.rgb(7,7,7));sc.addView(root);
-  TextView h=t("FME AI VIDEO GENERATOR",27);h.setTextColor(Color.rgb(212,175,55));root.addView(h);root.addView(t("PROMPT → REFERENCES → GENERATE → PREVIEW → SAVE",12));
+  ScrollView sc=new ScrollView(this);root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(28,36,28,36);root.setBackgroundColor(Color.rgb(7,7,7));sc.addView(root);
+  TextView h=t("FME AI VIDEO GENERATOR",27);h.setTextColor(Color.rgb(212,175,55));root.addView(h);root.addView(t("FREE ZEROGPU ENGINE • LTX VIDEO",12));
   prompt=new EditText(this);prompt.setHint("Describe the video you want...");prompt.setHintTextColor(Color.GRAY);prompt.setTextColor(Color.WHITE);prompt.setMinLines(5);prompt.setGravity(Gravity.TOP);root.addView(prompt,new LinearLayout.LayoutParams(-1,-2));
-  refs=new LinearLayout(this);refs.setOrientation(LinearLayout.VERTICAL);root.addView(refs); refreshRefs();
-  Button add=new Button(this);add.setText("+ ADD REFERENCE IMAGE (MAX 3)");add.setOnClickListener(v->pick());root.addView(add);
-  Spinner ratio=new Spinner(this);ratio.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"16:9 Widescreen","9:16 Vertical"}));root.addView(ratio);
-  Button gen=new Button(this);gen.setText("GENERATE VIDEO");gen.setOnClickListener(v->{ if(prompt.getText().toString().trim().isEmpty()){status.setText("Add a prompt first.");return;} status.setText("Generator connector ready. Choose/configure a free generation backend to create the clip.");});root.addView(gen);
-  status=t("Ready. No paid API is hard-wired.",14);root.addView(status);
-  root.addView(t("Safe-frame engine reserved for a later editing stage. Character artwork will not be cropped just to fill a frame.",12));
+  refs=new LinearLayout(this);refs.setOrientation(LinearLayout.VERTICAL);root.addView(refs);refreshRefs();
+  Button add=button("+ ADD REFERENCE IMAGE (MAX 3)");add.setOnClickListener(v->pick());root.addView(add);
+  ratio=new Spinner(this);ratio.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"16:9 Widescreen","9:16 Vertical"}));root.addView(ratio);
+  token=new EditText(this);token.setHint("Optional Hugging Face token (more free daily quota)");token.setHintTextColor(Color.GRAY);token.setTextColor(Color.WHITE);token.setSingleLine(true);root.addView(token);
+  Button gen=button("GENERATE VIDEO");gen.setOnClickListener(v->generate());root.addView(gen);
+  status=t("Ready. Anonymous ZeroGPU works with a smaller shared quota.",14);root.addView(status);
+  preview=new VideoView(this);root.addView(preview,new LinearLayout.LayoutParams(-1,700));
+  Button play=button("PLAY / PAUSE");play.setOnClickListener(v->{if(preview.isPlaying())preview.pause();else preview.start();});root.addView(play);
+  root.addView(t("v0.2 free engine: text-to-video + first-reference image-to-video. Extra reference slots stay preserved for upcoming multi-reference engines.",12));
   setContentView(sc);
  }
  void pick(){if(images.size()>=3){Toast.makeText(this,"Maximum 3 reference images",Toast.LENGTH_SHORT).show();return;}Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("image/*");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,44);}
  protected void onActivityResult(int r,int c,Intent d){super.onActivityResult(r,c,d);if(r==44&&c==RESULT_OK&&d!=null&&d.getData()!=null){images.add(d.getData());refreshRefs();}}
  void refreshRefs(){refs.removeAllViews();refs.addView(t("REFERENCE IMAGES  "+images.size()+"/3",14));for(int i=0;i<images.size();i++)refs.addView(t("✓ Reference "+(i+1),13));}
+ void generate(){String p=prompt.getText().toString().trim();if(p.isEmpty()){status.setText("Add a prompt first.");return;}status.setText("Submitting to free ZeroGPU…");io.submit(()->{try{String imagePath=images.isEmpty()?null:upload(images.get(0));String api=imagePath==null?"text_to_video":"image_to_video";String mode=imagePath==null?"text-to-video":"image-to-video";boolean portrait=ratio.getSelectedItemPosition()==1;int height=portrait?768:448,width=portrait?448:768;String img=imagePath==null?"null":"{\"path\":\""+esc(imagePath)+"\",\"meta\":{\"_type\":\"gradio.FileData\"}}";String data="["+q(p)+","+q("worst quality, blurry, jittery, distorted") + ","+img+",null,"+height+","+width+","+q(mode)+",4.0,9,42,true,1.0,false,false]";String event=postJson(SPACE+"/gradio_api/call/"+api,"{\"data\":"+data+"}");Matcher em=Pattern.compile("\\\"event_id\\\"\\s*:\\s*\\\"([^\\\"]+)").matcher(event);if(!em.find())throw new IOException("No event id: "+event);String result=getSse(SPACE+"/gradio_api/call/"+api+"/"+em.group(1));String videoUrl=findVideoUrl(result);if(videoUrl==null)throw new IOException("Generation ended without a video URL.");runOnUiThread(()->{status.setText("Generated. Loading preview…");preview.setVideoURI(Uri.parse(videoUrl));preview.setOnPreparedListener(mp->{status.setText("Video ready.");preview.start();});});}catch(Exception e){runOnUiThread(()->status.setText("Generation error: "+e.getMessage()));}});}
+ String upload(Uri uri)throws Exception{String boundary="----FME"+System.currentTimeMillis();HttpURLConnection c=conn(SPACE+"/gradio_api/upload","POST");c.setRequestProperty("Content-Type","multipart/form-data; boundary="+boundary);try(OutputStream o=c.getOutputStream();InputStream in=getContentResolver().openInputStream(uri)){o.write(("--"+boundary+"\r\nContent-Disposition: form-data; name=\"files\"; filename=\"reference.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n").getBytes());byte[] b=new byte[8192];for(int n;(n=in.read(b))>0;)o.write(b,0,n);o.write(("\r\n--"+boundary+"--\r\n").getBytes());}String s=read(c);Matcher m=Pattern.compile("\\"([^\\\"]+)\\\"").matcher(s);if(!m.find())throw new IOException("Reference upload failed.");return m.group(1);}
+ String postJson(String u,String body)throws Exception{HttpURLConnection c=conn(u,"POST");c.setRequestProperty("Content-Type","application/json");try(OutputStream o=c.getOutputStream()){o.write(body.getBytes(StandardCharsets.UTF_8));}return read(c);}
+ String getSse(String u)throws Exception{HttpURLConnection c=conn(u,"GET");c.setReadTimeout(600000);return read(c);}
+ HttpURLConnection conn(String u,String method)throws Exception{HttpURLConnection c=(HttpURLConnection)new URL(u).openConnection();c.setRequestMethod(method);c.setConnectTimeout(30000);c.setReadTimeout(120000);c.setDoInput(true);if(method.equals("POST"))c.setDoOutput(true);String tok=token.getText().toString().trim();if(!tok.isEmpty())c.setRequestProperty("Authorization","Bearer "+tok);return c;}
+ String read(HttpURLConnection c)throws Exception{InputStream in=c.getResponseCode()<400?c.getInputStream():c.getErrorStream();ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[8192];for(int n;(n=in.read(b))>0;)out.write(b,0,n);String s=out.toString("UTF-8");if(c.getResponseCode()>=400)throw new IOException("HTTP "+c.getResponseCode()+" "+s);return s;}
+ String findVideoUrl(String s){Matcher m=Pattern.compile("https?[^\\\"' ]+\\.mp4[^\\\"' ]*").matcher(s.replace("\\\/","/"));return m.find()?m.group(0):null;}
+ String q(String s){return "\"" + esc(s) + "\"";} String esc(String s){return s.replace("\\","\\\\").replace("\"","\\\"").replace("\n","\\n");}
 }
