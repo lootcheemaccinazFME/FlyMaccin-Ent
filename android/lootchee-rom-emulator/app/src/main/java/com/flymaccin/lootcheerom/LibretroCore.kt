@@ -23,11 +23,14 @@ class LibretroCore(private val context:Context, private val spec:CoreSpec, priva
         if(running.getAndSet(true))return@runCatching
         val rate=NativeBridge.sampleRate().coerceIn(8000,384000)
         val frameNs=(1_000_000_000.0/NativeBridge.fps().coerceIn(10.0,240.0)).toLong()
-        if(audio==null){
-            val min=AudioTrack.getMinBufferSize(rate,AudioFormat.CHANNEL_OUT_STEREO,AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(rate/5)
-            audio=AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()).setAudioFormat(AudioFormat.Builder().setSampleRate(rate).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build()).setBufferSizeInBytes(min*2).setTransferMode(AudioTrack.MODE_STREAM).build()
-        }
-        runCatching{audio?.play()}.onFailure{smoke("AUDIO_START_SKIPPED "+it.javaClass.simpleName)}
+        smoke("START_BEGIN")
+        runCatching {
+            if(audio==null){
+                val min=AudioTrack.getMinBufferSize(rate,AudioFormat.CHANNEL_OUT_STEREO,AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(rate/5)
+                audio=AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()).setAudioFormat(AudioFormat.Builder().setSampleRate(rate).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build()).setBufferSizeInBytes(min*2).setTransferMode(AudioTrack.MODE_STREAM).build()
+            }
+            audio?.play()
+        }.onFailure{smoke("AUDIO_START_SKIPPED "+it.javaClass.simpleName)}
         thread=Thread{while(running.get()){val s=System.nanoTime();NativeBridge.runFrame();if(NativeBridge.runCount()==1)smoke("FIRST_RETRO_RUN");val p=NativeBridge.frame();val w=NativeBridge.frameWidth();val h=NativeBridge.frameHeight();if(p.isNotEmpty()&&w>0&&h>0){onFrame(p,w,h);if(!bootMarked){smoke("VIDEO_CALLBACK "+w+"x"+h+" count="+NativeBridge.videoCount());File(context.filesDir,"boot.ok").writeText(spec.id+" "+w+"x"+h);bootMarked=true}};val pcm=NativeBridge.drainAudio();if(pcm.isNotEmpty())audio?.write(pcm,0,pcm.size,AudioTrack.WRITE_NON_BLOCKING);val wait=frameNs-(System.nanoTime()-s);if(wait>0)Thread.sleep(wait/1_000_000,(wait%1_000_000).toInt())}}.apply{name="Lootchee-"+spec.id;start()}
     }
     override fun pause(){running.set(false);thread?.join(250);audio?.pause();persistSram()}
