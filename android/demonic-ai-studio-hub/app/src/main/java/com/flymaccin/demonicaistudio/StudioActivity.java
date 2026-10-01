@@ -46,6 +46,7 @@ public final class StudioActivity extends Activity {
     private static final int WHITE = Color.rgb(239, 241, 248);
     private static final int MUTED = Color.rgb(157, 163, 180);
     private static final int MIC_PERMISSION = 2201;
+    private static final int PRODUCTION_IMPORT = 3301;
     private static final String PREFS = "demonic_studio_v110";
     private static final String PROJECT_KEY = "autosave_project";
     private static final String[] TRACK_NAMES = {"PIANO", "GUITAR", "DRUMS", "VOICE"};
@@ -80,6 +81,11 @@ public final class StudioActivity extends Activity {
     private Uri lastExportUri;
     private String lastExportName = "No export yet";
     private boolean pendingRecord;
+    private Uri incomingAssetUri;
+    private ProductionProject production = new ProductionProject();
+    private int productionChannel = 0;
+    private String productionImportKind = "";
+    private String incomingAssetMime="";
 
     private final String[] chordNames = {"C", "G", "D", "Am", "Em", "F", "E", "A"};
     private final int[][] chordMidi = {
@@ -118,17 +124,18 @@ public final class StudioActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        hideSystemBars();
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         project = StudioProject.fromJson(prefs.getString(PROJECT_KEY, ""));
+        production = ProductionProject.fromJson(prefs.getString("production_project_v2", ""));
         setContentView(buildShell());
-        hideSystemBars();
         showHome();
+        if(getIntent()!=null&&getIntent().getData()!=null){incomingAssetUri=getIntent().getData();incomingAssetMime=getIntent().getStringExtra("fme_asset_mime");if(incomingAssetMime==null)incomingAssetMime="";status.setText("LIBRARY ASSET READY · "+incomingAssetMime);}
     }
 
     private void hideSystemBars() {
         if (android.os.Build.VERSION.SDK_INT >= 30) {
-            View decor = getWindow().getDecorView();
-            WindowInsetsController controller = decor != null ? decor.getWindowInsetsController() : null;
+            WindowInsetsController controller = getWindow().getInsetsController();
             if (controller != null) {
                 controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
                 controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
@@ -162,6 +169,9 @@ public final class StudioActivity extends Activity {
         nav.setPadding(dp(5), dp(5), dp(5), dp(7));
         nav.addView(navButton("HOME", v -> showHome()));
         nav.addView(navButton("PIANO", v -> showPiano()));
+        nav.addView(navButton("SAMPLER", v -> showSampler()));
+        nav.addView(navButton("PIANO ROLL", v -> showPianoRoll()));
+        nav.addView(navButton("INSTRUMENTS", v -> showInstruments()));
         nav.addView(navButton("GUITAR", v -> showGuitar()));
         nav.addView(navButton("DRUMS", v -> showDrums()));
         nav.addView(navButton("TIMELINE", v -> showTimeline()));
@@ -189,10 +199,39 @@ public final class StudioActivity extends Activity {
         rowTwo.addView(featureCard("TIMELINE", "Edit and arrange all four tracks", GREEN, v -> showTimeline()));
         rowTwo.addView(featureCard("MIXER + FX", "Volume · pan · solo · effects", PURPLE, v -> showMixer()));
         rowTwo.addView(featureCard("WAV EXPORT", "Master mix and four stems", WHITE, v -> showExport()));
+        if(incomingAssetUri!=null)rowTwo.addView(featureCard("LIBRARY ASSET","Preview / attach shared asset",CYAN,v->showIncomingAsset()));
         page.addView(rowTwo);
         scroll.addView(page);
         setPage(scroll);
     }
+
+    private void showIncomingAsset(){LinearLayout page=column();page.setGravity(Gravity.CENTER);page.addView(text("SHARED LIBRARY ASSET",24,CYAN,true));page.addView(text(incomingAssetMime+"\n"+incomingAssetUri,13,MUTED,false));page.addView(actionButton("PREVIEW AS MEDIA",CYAN,v->{try{Intent i=new Intent(Intent.ACTION_VIEW,incomingAssetUri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);if(!incomingAssetMime.isEmpty())i.setDataAndType(incomingAssetUri,incomingAssetMime);startActivity(i);}catch(Exception e){status.setText("NO COMPATIBLE PREVIEW");}}));page.addView(text("Direct sampler ingestion is not enabled yet. This screen prevents a received asset from being mistaken for an imported instrument.",12,GOLD,false));setPage(page);}
+
+    private ProductionProject.Channel prodChannel(){while(production.channels.size()<=productionChannel)production.addChannel("Track "+(production.channels.size()+1));return production.channels.get(productionChannel);}
+
+    private void pickProduction(String kind,String mime){productionImportKind=kind;Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType(mime);if(kind.equals("instrument"))i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"audio/wav","application/octet-stream","text/plain"});startActivityForResult(i,PRODUCTION_IMPORT);}
+
+    private void showSampler(){
+        LinearLayout page=column();page.setPadding(dp(12),dp(8),dp(12),dp(8));page.addView(text("SAMPLE LAB · CHOP / TRIM / ARRANGE",20,CYAN,true));
+        page.addView(text("Audio clips are independent production objects with timeline position, trim boundaries, gain, fades and reverse state.",12,MUTED,false));
+        page.addView(actionButton("IMPORT WAV",CYAN,v->pickProduction("sample","audio/wav")));
+        ProductionProject.Channel ch=prodChannel();
+        for(int i=0;i<ch.audio.size();i++){ProductionProject.AudioClip clip=ch.audio.get(i);final int ix=i;LinearLayout r=row();r.addView(text(new File(clip.path).getName()+" · "+clip.trimStartMs+"ms → "+(clip.trimEndMs<0?"END":clip.trimEndMs+"ms")+" · tick "+clip.startTick,12,WHITE,true));r.addView(smallButton("TRIM +100",v->{clip.trimStartMs+=100;autosaveProduction();showSampler();}));r.addView(smallButton("END −100",v->{clip.trimEndMs=clip.trimEndMs<0?1000:Math.max(clip.trimStartMs+20,clip.trimEndMs-100);autosaveProduction();showSampler();}));r.addView(smallButton("SLICE",v->{ProductionProject.AudioClip b=ProductionProject.AudioClip.from(jsonClip(clip));long mid=clip.trimEndMs<0?clip.trimStartMs+500:(clip.trimStartMs+clip.trimEndMs)/2;b.trimStartMs=mid;clip.trimEndMs=mid;b.startTick=clip.startTick+ProductionProject.PPQ;ch.audio.add(b);autosaveProduction();showSampler();}));r.addView(smallButton(clip.reverse?"REVERSE ON":"REVERSE",v->{clip.reverse=!clip.reverse;autosaveProduction();showSampler();}));page.addView(r);}
+        setPage(page);
+    }
+
+    private org.json.JSONObject jsonClip(ProductionProject.AudioClip c){try{return c.json();}catch(Exception e){return new org.json.JSONObject();}}
+
+    private void showPianoRoll(){
+        LinearLayout page=column();page.setPadding(dp(10),dp(6),dp(10),dp(6));LinearLayout bar=row();bar.addView(text("PIANO ROLL · MIDI",20,PURPLE,true));bar.addView(actionButton("IMPORT .MID",PURPLE,v->pickProduction("midi","audio/midi")));bar.addView(smallButton("CLEAR",v->{prodChannel().notes.clear();autosaveProduction();showPianoRoll();}));page.addView(bar);
+        PianoRollView roll=new PianoRollView(this);roll.bind(prodChannel().notes,production.bars);roll.setListener((midi,tick)->{prodChannel().notes.add(new ProductionProject.MidiNote(midi,100,tick,ProductionProject.PPQ));audio.playPiano(440.0*Math.pow(2,(midi-69)/12.0),400);autosaveProduction();roll.bind(prodChannel().notes,production.bars);status.setText("MIDI NOTE "+midi+" @ "+tick);});page.addView(roll,new LinearLayout.LayoutParams(-1,0,1));page.addView(text("Tap the grid to add quantized quarter notes. Imported Standard MIDI note events become editable roll blocks.",11,MUTED,false));setPage(page);
+    }
+
+    private void showInstruments(){
+        LinearLayout page=column();page.setPadding(dp(14),dp(10),dp(14),dp(10));ProductionProject.Channel ch=prodChannel();page.addView(text("INSTRUMENT RACK · WAV / SFZ / SF2",20,GOLD,true));page.addView(text("Current: "+ch.instrument.type+(ch.instrument.path.isEmpty()?" · built-in synth":" · "+new File(ch.instrument.path).getName()),13,WHITE,true));page.addView(actionButton("LOAD WAV / SFZ / SF2",GOLD,v->pickProduction("instrument","application/octet-stream")));page.addView(text("WAV: PCM16 sample instrument with root-key mapping. SFZ: region/sample/key mapping parser. SF2: SoundFont container validation and bank/preset state. Full SF2 voice rendering is the next engine layer.",12,MUTED,false));setPage(page);
+    }
+
+    private void autosaveProduction(){getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("production_project_v2",production.toJson()).apply();}
 
     private void showPiano() {
         LinearLayout page = column();
@@ -828,6 +867,20 @@ public final class StudioActivity extends Activity {
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+
+    @Deprecated
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode!=PRODUCTION_IMPORT||resultCode!=RESULT_OK||data==null||data.getData()==null)return;
+        Uri uri=data.getData();try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+        try{String name="import_"+System.currentTimeMillis();android.database.Cursor q=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null);if(q!=null){try{if(q.moveToFirst())name=q.getString(0);}finally{q.close();}}
+            File dir=new File(getFilesDir(),"studio_assets");dir.mkdirs();File out=new File(dir,name.replaceAll("[^A-Za-z0-9._-]","_"));try(java.io.InputStream in=getContentResolver().openInputStream(uri);java.io.FileOutputStream os=new java.io.FileOutputStream(out)){byte[] b=new byte[32768];int n;while((n=in.read(b))>0)os.write(b,0,n);}
+            String lower=out.getName().toLowerCase(Locale.US);ProductionProject.Channel ch=prodChannel();
+            if(productionImportKind.equals("midi")){ch.notes.addAll(MidiFileIO.read(out));status.setText("MIDI IMPORTED · "+ch.notes.size()+" NOTES");showPianoRoll();}
+            else if(productionImportKind.equals("sample")){WavFile.Data wav=WavFile.read(out);ProductionProject.AudioClip clip=new ProductionProject.AudioClip();clip.path=out.getAbsolutePath();clip.trimEndMs=wav.frames()*1000L/wav.rate;ch.audio.add(clip);status.setText("WAV READY · "+wav.frames()+" FRAMES");showSampler();}
+            else {if(lower.endsWith(".wav")){WavFile.read(out);ch.instrument.type=ProductionProject.InstrumentType.WAV;}else if(lower.endsWith(".sfz")){InstrumentDefinition.sfz(out);ch.instrument.type=ProductionProject.InstrumentType.SFZ;}else if(lower.endsWith(".sf2")&&InstrumentDefinition.sf2Header(out)){ch.instrument.type=ProductionProject.InstrumentType.SF2;}else throw new IllegalArgumentException("Unsupported instrument");ch.instrument.path=out.getAbsolutePath();status.setText(ch.instrument.type+" INSTRUMENT LOADED");showInstruments();}autosaveProduction();
+        }catch(Exception e){status.setText("IMPORT ERROR · "+e.getMessage());}
+    }
 
     @Override protected void onPause() {
         super.onPause();
