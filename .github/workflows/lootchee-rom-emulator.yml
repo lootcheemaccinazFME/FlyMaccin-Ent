@@ -120,7 +120,7 @@ jobs:
           emulator-boot-timeout: 600
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -cores 2 -memory 4096
           script: |
-            set -euxo pipefail
+            set -eu
             adb install --no-streaming -r /tmp/apk/app-debug.apk
             adb logcat -c
             echo "=== Installed x86_64 native libraries ==="
