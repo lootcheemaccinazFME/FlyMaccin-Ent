@@ -15,6 +15,9 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.9' }
+      - name: Restore studio debug keystore
+        run: |
+          base64 -d .github/demonic-studio-debug.keystore.b64 > android/demonic-ai-studio-hub/app/studio-debug.keystore
       - name: Build Fun Hub
         working-directory: android/demonic-ai-studio-hub
         run: gradle --no-daemon :app:assembleDebug
