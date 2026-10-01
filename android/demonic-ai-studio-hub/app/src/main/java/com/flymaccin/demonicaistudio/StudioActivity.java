@@ -421,15 +421,12 @@ public final class StudioActivity extends Activity {
         setPage(page);
     }
 
-    private void showMixer() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout page = column();
-        page.setPadding(dp(12), dp(7), dp(12), dp(10));
-        page.addView(text("MIXER + EFFECTS", 20, PURPLE, true));
-        for (int track = 0; track < StudioProject.TRACK_COUNT; track++) page.addView(mixerStrip(track));
-        scroll.addView(page);
-        setPage(scroll);
-    }
+    private void showMixer() {ScrollView scroll=new ScrollView(this);LinearLayout page=column();page.setPadding(dp(12),dp(7),dp(12),dp(10));page.addView(text("DYNAMIC MIXER + FX · "+production.channels.size()+" CHANNELS",20,PURPLE,true));for(int i=0;i<production.channels.size();i++)page.addView(productionMixerStrip(i));scroll.addView(page);setPage(scroll);}
+
+    private View productionMixerStrip(int ix){ProductionProject.Channel ch=production.channels.get(ix);LinearLayout strip=column();strip.setPadding(dp(8),dp(5),dp(8),dp(5));strip.setBackgroundColor(PANEL);LinearLayout head=row();head.addView(text(ch.name+" · "+ch.instrument.type,15,CYAN,true));head.addView(toggleButton(ch.mute?"MUTED":"MUTE",ch.mute,v->{ch.mute=!ch.mute;autosaveProduction();showMixer();}));head.addView(toggleButton(ch.solo?"SOLO ON":"SOLO",ch.solo,v->{ch.solo=!ch.solo;autosaveProduction();showMixer();}));strip.addView(head);LinearLayout controls=row();controls.addView(text("VOL",10,MUTED,true));SeekBar vol=new SeekBar(this);vol.setMax(100);vol.setProgress(Math.round(ch.volume*100));vol.setOnSeekBarChangeListener(seekListener(v->{ch.volume=v/100f;autosaveProduction();}));controls.addView(vol,new LinearLayout.LayoutParams(dp(130),dp(42)));controls.addView(text("PAN",10,MUTED,true));SeekBar pan=new SeekBar(this);pan.setMax(200);pan.setProgress(Math.round(ch.pan*100+100));pan.setOnSeekBarChangeListener(seekListener(v->{ch.pan=(v-100)/100f;autosaveProduction();}));controls.addView(pan,new LinearLayout.LayoutParams(dp(120),dp(42)));controls.addView(fxSeek("LOW",ch.eqLow,v->ch.eqLow=v));controls.addView(fxSeek("MID",ch.eqMid,v->ch.eqMid=v));controls.addView(fxSeek("HIGH",ch.eqHigh,v->ch.eqHigh=v));controls.addView(fxSeek("COMP",ch.compressor,v->ch.compressor=v));controls.addView(fxSeek("DRIVE",ch.drive,v->ch.drive=v));controls.addView(fxSeek("REV",ch.reverb,v->ch.reverb=v));controls.addView(fxSeek("DELAY",ch.delay,v->ch.delay=v));strip.addView(controls);return strip;}
+
+    private View fxSeek(String label,float current,FloatSetter setter){LinearLayout box=column();box.addView(text(label,9,MUTED,true));SeekBar s=new SeekBar(this);s.setMax(100);s.setProgress(Math.round(Math.max(0,Math.min(1,current))*100));s.setOnSeekBarChangeListener(seekListener(v->{setter.set(v/100f);autosaveProduction();}));box.addView(s,new LinearLayout.LayoutParams(dp(90),dp(38)));return box;}
+    private interface FloatSetter{void set(float value);}
 
     private View mixerStrip(int track) {
         LinearLayout strip = row();
@@ -482,8 +479,8 @@ public final class StudioActivity extends Activity {
         page.setGravity(Gravity.CENTER);
         page.addView(text("MASTER + STEM DELIVERY", 24, WHITE, true));
         page.addView(text("Offline 44.1 kHz / 16-bit stereo WAV. Exports appear in Music/DemonicAIStudio.", 14, MUTED, false));
-        page.addView(actionButton("EXPORT MASTER WAV", CYAN, v -> exportProject(false)));
-        page.addView(actionButton("EXPORT MASTER + 4 STEMS", PURPLE, v -> exportProject(true)));
+        page.addView(actionButton("EXPORT PRODUCTION MASTER WAV", CYAN, v -> exportProduction(false)));
+        page.addView(actionButton("EXPORT MASTER + ALL CHANNEL STEMS", PURPLE, v -> exportProduction(true)));
         page.addView(text(lastExportName, 13, GREEN, true));
         Button share = actionButton("SHARE LAST MASTER", GOLD, v -> shareLastExport());
         share.setEnabled(lastExportUri != null);
@@ -644,6 +641,8 @@ public final class StudioActivity extends Activity {
             voicePlayer = null;
         }
     }
+
+    private void exportProduction(boolean stems){status.setText("RENDERING "+production.channels.size()+" CHANNELS…");new Thread(()->{try{StudioRenderer.Result result=new StudioRenderer().renderProduction(this,production,project.name,stems);Uri published=StudioRenderer.publish(this,result.master);runOnUiThread(()->{lastExportUri=published;lastExportName=result.master.getName()+" · "+result.stems.size()+" stems";status.setText("PRODUCTION EXPORT COMPLETE");showExport();});}catch(Exception e){runOnUiThread(()->status.setText("EXPORT FAILED · "+e.getClass().getSimpleName()));}},"demonic-production-render").start();}
 
     private void exportProject(boolean stems) {
         stopTransport();
