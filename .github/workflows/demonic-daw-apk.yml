@@ -3,6 +3,8 @@ on:
   push:
     branches: [ 'build/demonic-daw-apk-20260917' ]
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
