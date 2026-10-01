@@ -72,19 +72,12 @@ jobs:
             adb logcat -c
             adb shell am force-stop com.flymaccin.demonicaistudio
             adb shell am start -W -n com.flymaccin.demonicaistudio/.PocketBandSmokeActivity
-            PASS=0
-            for i in $(seq 1 45); do
-              LOGS="$(adb logcat -d -s PocketBandSmoke:V '*:S' || true)"
-              echo "$LOGS" | grep -q "POCKETBAND_SMOKE_FAIL" && { echo "$LOGS"; exit 2; }
-              if echo "$LOGS" | grep -q "POCKETBAND_SMOKE_PASS"; then PASS=1; break; fi
-              sleep 1
-            done
-            LOGS="$(adb logcat -d -s PocketBandSmoke:V '*:S' || true)"
-            echo "$LOGS"
-            test "$PASS" -eq 1
-            echo "$LOGS" | grep "POCKETBAND_RENDER_PASS"
-            echo "$LOGS" | grep "POCKETBAND_PLAYBACK_STARTED"
-            echo "$LOGS" | grep "POCKETBAND_SMOKE_PASS"
+            sleep 12
+            adb logcat -d -s PocketBandSmoke:V "*:S"
+            adb logcat -d -s PocketBandSmoke:E "*:S" | grep -q "POCKETBAND_SMOKE_FAIL" && exit 2 || true
+            adb logcat -d -s PocketBandSmoke:I "*:S" | grep "POCKETBAND_RENDER_PASS"
+            adb logcat -d -s PocketBandSmoke:I "*:S" | grep "POCKETBAND_PLAYBACK_STARTED"
+            adb logcat -d -s PocketBandSmoke:I "*:S" | grep "POCKETBAND_SMOKE_PASS"
 
       - name: Upload APK
         if: always()
