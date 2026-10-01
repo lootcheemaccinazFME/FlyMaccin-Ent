@@ -228,7 +228,7 @@ final class StudioRenderer {
     }
 
     private static int stepOffset(int step, int baseFrames, int swingFrames) {
-        return step * baseFrames + (step % 2 == 1 ? swingFrames : 0);
+        return step * baseFrames - (step % 2 == 1 ? swingFrames : 0);
     }
 
     private static String safeName(String name) {
