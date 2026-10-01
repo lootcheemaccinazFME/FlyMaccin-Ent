@@ -27,8 +27,8 @@ jobs:
           APK=android/demonic-ai-studio-hub/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
-          grep -q "application-label" /tmp/badging.txt
-          grep -q "Demonic Fun Hub" /tmp/badging.txt
+          grep -q "package: name='com.flymaccin.demonicaistudio'" /tmp/badging.txt
+          grep -q 'android:label="Demonic Fun Hub"' android/demonic-ai-studio-hub/app/src/main/AndroidManifest.xml
           grep -q 'new FunRoom("emulator","FME Universal Emulator"' android/demonic-ai-studio-hub/app/src/main/java/com/flymaccin/demonicaistudio/FunRoomRegistry.java
           grep -q 'new FunRoom("remote","Pocket Potna Remote"' android/demonic-ai-studio-hub/app/src/main/java/com/flymaccin/demonicaistudio/FunRoomRegistry.java
           grep -q 'new FunRoom("video","FME AI Video Generator"' android/demonic-ai-studio-hub/app/src/main/java/com/flymaccin/demonicaistudio/FunRoomRegistry.java
