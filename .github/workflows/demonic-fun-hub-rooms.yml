@@ -1,0 +1,38 @@
+name: Demonic Fun Hub Rooms CI
+on:
+  workflow_dispatch:
+  push:
+    branches: [ build/demonic-fun-hub-rooms-v1 ]
+    paths: [ 'android/demonic-ai-studio-hub/**', '.github/workflows/demonic-fun-hub-rooms.yml' ]
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.9' }
+      - name: Build Fun Hub
+        working-directory: android/demonic-ai-studio-hub
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Verify Fun Hub identity and room contract
+        run: |
+          set -euo pipefail
+          APK=android/demonic-ai-studio-hub/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "application-label:'Demonic Fun Hub'" /tmp/badging.txt
+          grep -q 'new FunRoom("emulator","FME Universal Emulator"' android/demonic-ai-studio-hub/app/src/main/java/com/flymaccin/demonicaistudio/FunRoomRegistry.java
+          grep -q 'new FunRoom("remote","Pocket Potna Remote"' android/demonic-ai-studio-hub/app/src/main/java/com/flymaccin/demonicaistudio/FunRoomRegistry.java
+          grep -q 'new FunRoom("video","FME AI Video Generator"' android/demonic-ai-studio-hub/app/src/main/java/com/flymaccin/demonicaistudio/FunRoomRegistry.java
+          sha256sum "$APK" > /tmp/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Demonic-Fun-Hub-Rooms-v1-debug
+          path: |
+            android/demonic-ai-studio-hub/app/build/outputs/apk/debug/app-debug.apk
+            /tmp/SHA256SUMS.txt
+          if-no-files-found: error
