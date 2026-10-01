@@ -1,0 +1,27 @@
+name: FME AI Video Generator APK
+on:
+  push:
+    branches: [ fme-ai-video-generator ]
+    paths:
+      - 'video-generator/**'
+      - '.github/workflows/fme-ai-video-generator.yml'
+      - 'settings.gradle.kts'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build APK
+        run: gradle :video-generator:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FME-AI-Video-Generator-v0.1-debug
+          path: video-generator/build/outputs/apk/debug/video-generator-debug.apk
