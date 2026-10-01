@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "FMEBookwriter"
-include(":app")
+include(":app")\ninclude(":video-generator")
