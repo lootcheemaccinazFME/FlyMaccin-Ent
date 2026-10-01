@@ -170,6 +170,8 @@ public final class StudioActivity extends Activity {
         LinearLayout nav = row();
         nav.setPadding(dp(5), dp(5), dp(5), dp(7));
         nav.addView(navButton("HOME", v -> showHome()));
+        nav.addView(navButton("+ TRACK", v -> showAddTrack()));
+        nav.addView(navButton("TRACKS", v -> showProductionTracks()));
         nav.addView(navButton("PIANO", v -> showPiano()));
         nav.addView(navButton("SAMPLER", v -> showSampler()));
         nav.addView(navButton("PIANO ROLL", v -> showPianoRoll()));
@@ -206,6 +208,10 @@ public final class StudioActivity extends Activity {
         scroll.addView(page);
         setPage(scroll);
     }
+
+    private void showAddTrack(){String[] types={"DRUMS","BASS","GUITAR","PIANO","SYNTH","SAMPLER","VOCALS","AUDIO","MIDI","SFZ","SF2"};new AlertDialog.Builder(this).setTitle("ADD TRACK").setItems(types,(d,w)->{ProductionProject.Channel ch=production.addChannel(types[w]+" "+(production.channels.size()+1));ch.instrument.type=ProductionProject.InstrumentType.valueOf(types[w]);productionChannel=production.channels.size()-1;autosaveProduction();showProductionTracks();}).show();}
+
+    private void showProductionTracks(){ScrollView sc=new ScrollView(this);LinearLayout page=column();page.setPadding(dp(10),dp(8),dp(10),dp(8));LinearLayout top=row();top.addView(text("PRODUCTION TRACKS · "+production.channels.size(),20,CYAN,true));top.addView(actionButton("+ TRACK",GREEN,v->showAddTrack()));page.addView(top);for(int i=0;i<production.channels.size();i++){final int ix=i;ProductionProject.Channel ch=production.channels.get(i);LinearLayout r=row();r.setPadding(dp(6),dp(4),dp(6),dp(4));r.setBackgroundColor(ix==productionChannel?PANEL_2:PANEL);r.addView(actionButton(ch.name+" · "+ch.instrument.type,ix==productionChannel?CYAN:WHITE,v->{productionChannel=ix;showProductionTracks();}));r.addView(smallButton("ROLL",v->{productionChannel=ix;showPianoRoll();}));r.addView(smallButton("CLIPS",v->{productionChannel=ix;showSampler();}));r.addView(smallButton("INST",v->{productionChannel=ix;showInstruments();}));r.addView(toggleButton(ch.mute?"MUTED":"MUTE",ch.mute,v->{ch.mute=!ch.mute;autosaveProduction();showProductionTracks();}));r.addView(toggleButton(ch.solo?"SOLO ON":"SOLO",ch.solo,v->{ch.solo=!ch.solo;autosaveProduction();showProductionTracks();}));page.addView(r);}sc.addView(page);setPage(sc);}
 
     private void showIncomingAsset(){LinearLayout page=column();page.setGravity(Gravity.CENTER);page.addView(text("SHARED LIBRARY ASSET",24,CYAN,true));page.addView(text(incomingAssetMime+"\n"+incomingAssetUri,13,MUTED,false));page.addView(actionButton("PREVIEW AS MEDIA",CYAN,v->{try{Intent i=new Intent(Intent.ACTION_VIEW,incomingAssetUri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);if(!incomingAssetMime.isEmpty())i.setDataAndType(incomingAssetUri,incomingAssetMime);startActivity(i);}catch(Exception e){status.setText("NO COMPATIBLE PREVIEW");}}));page.addView(text("Direct sampler ingestion is not enabled yet. This screen prevents a received asset from being mistaken for an imported instrument.",12,GOLD,false));setPage(page);}
 
