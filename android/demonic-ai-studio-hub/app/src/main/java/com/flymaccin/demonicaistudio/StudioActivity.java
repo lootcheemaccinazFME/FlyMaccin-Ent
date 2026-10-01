@@ -118,10 +118,10 @@ public final class StudioActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        hideSystemBars();
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         project = StudioProject.fromJson(prefs.getString(PROJECT_KEY, ""));
         setContentView(buildShell());
+        getWindow().getDecorView().post(this::hideSystemBars);
         showHome();
     }
 
