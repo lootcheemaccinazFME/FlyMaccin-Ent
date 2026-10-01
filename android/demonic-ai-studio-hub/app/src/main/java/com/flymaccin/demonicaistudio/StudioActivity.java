@@ -88,6 +88,8 @@ public final class StudioActivity extends Activity {
     private MaestroBridge maestro;
     private EditText maestroHost, maestroPrompt, maestroDuration, maestroModel;
     private String maestroJobId="";
+    private String maestroPipelineId="";
+    private org.json.JSONObject maestroLastPlan;
     private Uri incomingAssetUri;
     private ProductionProject production = new ProductionProject();
     private int productionChannel = 0;
@@ -207,15 +209,36 @@ public final class StudioActivity extends Activity {
         maestroHost=new EditText(this); maestroHost.setText(maestro.getBaseUrl()); maestroHost.setHint("Maestro host, e.g. http://100.x.x.x:7860"); maestroHost.setTextColor(WHITE); maestroHost.setHintTextColor(MUTED); page.addView(maestroHost);
         LinearLayout connect=row();
         connect.addView(actionButton("CONNECT",CYAN,v->{String host=maestroHost.getText().toString().trim();maestro.setBaseUrl(host);getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("maestro_host",host).apply();status.setText("CONNECTING TO MAESTRO…");maestro.models((json,error)->runOnUiThread(()->status.setText(error==null?"MAESTRO CONNECTED · MODELS READY":"MAESTRO OFFLINE · "+error.getMessage())));}));
-        connect.addView(smallButton("REFRESH JOB",v->refreshMaestroJob())); page.addView(connect);
+        connect.addView(smallButton("REFRESH JOB",v->refreshMaestroJob())); connect.addView(smallButton("DIRECTOR STATUS",v->refreshMaestroDirector())); page.addView(connect);
         maestroPrompt=new EditText(this); maestroPrompt.setHint("Describe the full video, scene, image or music concept…"); maestroPrompt.setTextColor(WHITE); maestroPrompt.setHintTextColor(MUTED); maestroPrompt.setMinLines(5); page.addView(maestroPrompt);
         LinearLayout settings=row();
         maestroModel=new EditText(this); maestroModel.setHint("Model type (blank = Maestro default)"); maestroModel.setTextColor(WHITE); maestroModel.setHintTextColor(MUTED); settings.addView(maestroModel,new LinearLayout.LayoutParams(0,-2,1));
         maestroDuration=new EditText(this); maestroDuration.setHint("Seconds"); maestroDuration.setText("60"); maestroDuration.setTextColor(WHITE); maestroDuration.setHintTextColor(MUTED); maestroDuration.setInputType(2); settings.addView(maestroDuration,new LinearLayout.LayoutParams(dp(140),-2)); page.addView(settings);
         page.addView(text("Longform duration is a project target. Maestro may use native long windows, sliding-window continuation, or multiple clips depending on the selected model.",12,MUTED,false));
-        page.addView(actionButton("GENERATE WITH MAESTRO",GOLD,v->submitMaestro()));
+        LinearLayout genrow=row(); genrow.addView(actionButton("GENERATE WITH MAESTRO",GOLD,v->submitMaestro())); genrow.addView(actionButton("DIRECTOR PLAN",PURPLE,v->planMaestroDirector())); genrow.addView(actionButton("START DIRECTOR",CYAN,v->startMaestroDirector())); page.addView(genrow);
         page.addView(text("Generated media remains a Maestro job until completion. Refresh Job reads live progress and output files; completed assets can then enter the Demonic production workflow.",12,MUTED,false));
         sc.addView(page); setPage(sc);
+    }
+
+
+    private void planMaestroDirector(){
+        String p=maestroPrompt==null?"":maestroPrompt.getText().toString().trim(); if(p.isEmpty()){status.setText("MAESTRO DIRECTOR · ADD A CONCEPT");return;}
+        int seconds=60;try{seconds=Math.max(1,Integer.parseInt(maestroDuration.getText().toString().trim()));}catch(Exception ignored){}
+        status.setText("MAESTRO DIRECTOR · PLANNING "+seconds+"s…");
+        maestro.directorPlan(p,seconds,"cinematic",(json,error)->runOnUiThread(()->{if(error!=null){status.setText("DIRECTOR PLAN ERROR · "+error.getMessage());return;}maestroLastPlan=json;int clips=json.optJSONArray("clip_plans")==null?0:json.optJSONArray("clip_plans").length();status.setText("DIRECTOR PLAN READY · "+clips+" CLIPS");}));
+    }
+    private void startMaestroDirector(){
+        if(maestroLastPlan==null){planMaestroDirector();status.setText("CREATE DIRECTOR PLAN FIRST");return;}
+        try{org.json.JSONObject body=new org.json.JSONObject();body.put("clip_plans",maestroLastPlan.optJSONArray("clip_plans"));body.put("production_plan",maestroLastPlan.optJSONObject("production_plan"));body.put("skill_type",maestroLastPlan.optString("skill_type","story"));body.put("prompt",maestroPrompt.getText().toString().trim());status.setText("MAESTRO DIRECTOR · STARTING…");maestro.startDirector(body,(json,error)->runOnUiThread(()->{if(error!=null){status.setText("DIRECTOR START ERROR · "+error.getMessage());return;}maestroPipelineId=json.optString("pipeline_id","");status.setText("DIRECTOR PIPELINE · "+maestroPipelineId);}));}catch(Exception e){status.setText("DIRECTOR ERROR · "+e.getMessage());}
+    }
+    private void refreshMaestroDirector(){
+        if(maestroPipelineId.isEmpty()){status.setText("MAESTRO · NO DIRECTOR PIPELINE");return;}
+        maestro.directorStatus(maestroPipelineId,(json,error)->runOnUiThread(()->{if(error!=null){status.setText("DIRECTOR STATUS ERROR · "+error.getMessage());return;}String state=json.optString("status",json.optString("phase","RUNNING"));int pct=json.optInt("progress",0);status.setText("DIRECTOR · "+state.toUpperCase(Locale.US)+" · "+pct+"%");}));
+    }
+    private void importMaestroOutputs(org.json.JSONObject json){
+        org.json.JSONArray files=json.optJSONArray("output_files");if(files==null||files.length()==0)return;
+        for(int i=0;i<files.length();i++){String source=files.optString(i,"");if(source.isEmpty())continue;ProductionProject.Channel ch=prodChannel();ProductionProject.AudioClip clip=new ProductionProject.AudioClip();clip.path=maestro.mediaUrl(source);clip.startTick=0;clip.trimStartMs=0;clip.trimEndMs=-1;ch.audio.add(clip);}
+        autosaveProduction();status.setText("MAESTRO OUTPUTS ADDED TO DEMONIC · "+files.length()+" ASSET(S)");
     }
 
     private void submitMaestro(){
@@ -227,7 +250,7 @@ public final class StudioActivity extends Activity {
 
     private void refreshMaestroJob(){
         if(maestroJobId.isEmpty()){status.setText("MAESTRO · NO ACTIVE JOB");return;} status.setText("MAESTRO · CHECKING "+maestroJobId+"…");
-        maestro.status(maestroJobId,(json,error)->runOnUiThread(()->{if(error!=null){status.setText("MAESTRO STATUS ERROR · "+error.getMessage());return;}String state=json.optString("status","unknown");int pct=json.optInt("progress",0);String msg=json.optString("message","");status.setText("MAESTRO · "+state.toUpperCase(Locale.US)+" · "+pct+"%"+(msg.isEmpty()?"":" · "+msg));}));
+        maestro.status(maestroJobId,(json,error)->runOnUiThread(()->{if(error!=null){status.setText("MAESTRO STATUS ERROR · "+error.getMessage());return;}String state=json.optString("status","unknown");int pct=json.optInt("progress",0);String msg=json.optString("message","");status.setText("MAESTRO · "+state.toUpperCase(Locale.US)+" · "+pct+"%"+(msg.isEmpty()?"":" · "+msg));if("completed".equalsIgnoreCase(state))importMaestroOutputs(json);}));
     }
 
     private void showHome() {
