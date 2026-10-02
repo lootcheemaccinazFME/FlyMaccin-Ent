@@ -44,6 +44,10 @@ jobs:
           grep -q 'FmeGameRooms.build' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
           grep -q 'FmeUtilityRooms.agent' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
           grep -q 'FmeControlRooms.octop' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
+          COCKPIT="$ROOT/app/src/main/java/com/flymaccin/lootcheerom/FmeCockpit.kt"
+          grep -q 'FLYMACCIN ENT' "$COCKPIT"
+          grep -q 'ONE APP • EVERYTHING FME' "$COCKPIT"
+          grep -q 'FmeCockpit.nav' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
       - name: Build canonical single APK
         working-directory: android/lootchee-rom-emulator
         run: gradle --no-daemon :app:assembleDebug
