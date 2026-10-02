@@ -135,7 +135,7 @@ public final class StudioActivity extends Activity {
         p.addView(btn("SAVE NAME",GREEN,v->{String n=name.getText().toString().trim();if(!n.isEmpty())project.name=n;autosave("PROJECT SAVED");}));
         LinearLayout tempo=row();tempo.addView(text("BPM "+Math.round(project.transport.bpm()),13,CYAN,true));tempo.addView(simpleSeek(270,(int)Math.round(project.transport.bpm()-30),v->{project.transport.setBpm(v+30);updatePosition();autosaveSilent();}),new LinearLayout.LayoutParams(dp(300),dp(44)));tempo.addView(btn(loopLabel(),PURPLE,v->cycleLoop()));p.addView(tempo);
         LinearLayout loops=row();loops.addView(text("LOOP BARS",11,MUTED,true));
-        for(int bars:loopChoices){final int choice=bars;loops.addView(btn(choice<0?"UNLIMITED":String.valueOf(choice),project.transport.loopBars()==choice?PURPLE:PANEL2,v->setLoopChoice(choice)));}p.addView(loops);
+        for(int bars:loopChoices){final int choice=bars;loops.addView(btn(choice<0?"UNLIMITED":String.valueOf(choice),project.transport.loopBars()==choice?PURPLE:PANEL2,v->{setLoopChoice(choice);showProject();}));}p.addView(loops);
         p.addView(btn("EXPORT MASTER WAV",CYAN,v->export(false)));p.addView(btn("EXPORT MASTER + TRACK/BUS STEMS",PURPLE,v->export(true)));p.addView(btn("UNDO "+(runtime.commands.history.canUndo()?"●":"○"),PANEL2,v->undo()));p.addView(btn("REDO "+(runtime.commands.history.canRedo()?"●":"○"),PANEL2,v->redo()));
         p.addView(text(summary(),13,WHITE,false));setPage(scroll(p));
     }
@@ -144,7 +144,7 @@ public final class StudioActivity extends Activity {
     private void pauseTransport(){playing=false;handler.removeCallbacks(transportRunner);runtime.stopPlayback();status.setText("PAUSED");autosaveSilent();}
     private void stopTransport(){playing=false;handler.removeCallbacks(transportRunner);runtime.stopPlayback();project.transport.seek(0);updatePosition();status.setText("STOPPED");autosaveSilent();}
     private void cycleLoop(){int cur=project.transport.loopBars(),idx=0;for(int i=0;i<loopChoices.length;i++)if(loopChoices[i]==cur)idx=i;setLoopChoice(loopChoices[(idx+1)%loopChoices.length]);}
-    private void setLoopChoice(int bars){project.transport.setLoopBars(bars);loopButton.setText(loopLabel());autosave("LOOP "+loopLabel());showProject();}
+    private void setLoopChoice(int bars){project.transport.setLoopBars(bars);loopButton.setText(loopLabel());autosave("LOOP "+loopLabel());}
     private String loopLabel(){return project.transport.looping()?("LOOP "+project.transport.loopBars()+" BAR"):"LOOP UNLIMITED";}
     private void updatePosition(){long t=project.transport.tick(),bar=t/project.transport.ticksPerBar()+1,beat=(t%project.transport.ticksPerBar())/UnifiedTransport.PPQ+1;position.setText(String.format(Locale.US," %d:%d · %.0f BPM ",bar,beat,project.transport.bpm()));}
 
