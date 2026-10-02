@@ -314,8 +314,33 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
 
     private void openChannel(String name, String url) {
         if (url == null || url.isEmpty()) return;
-        status.setText("CHANNEL • " + name);
-        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        Uri uri = Uri.parse(url);
+        String lower = url.toLowerCase();
+        boolean directMedia = lower.contains(".m3u8") || lower.endsWith(".mp4") || lower.endsWith(".3gp") || lower.endsWith(".webm");
+        if (!directMedia) {
+            status.setText("CHANNEL • " + name + " • provider page");
+            startActivity(new Intent(Intent.ACTION_VIEW, uri));
+            return;
+        }
+
+        stopMoviePlayback();
+        receiver.detachSurface();
+        video.setVisibility(View.GONE);
+        watermark.setVisibility(View.GONE);
+        movieView.setVisibility(View.VISIBLE);
+        movieView.setVideoURI(uri);
+        movieView.setOnPreparedListener(player -> {
+            status.setText("LIVE • " + name);
+            movieView.start();
+        });
+        movieView.setOnErrorListener((player, what, extra) -> {
+            status.setText("Stream needs provider/browser playback • " + name);
+            stopMoviePlayback();
+            startActivity(new Intent(Intent.ACTION_VIEW, uri));
+            return true;
+        });
+        status.setText("TUNING • " + name);
+        movieView.requestFocus();
     }
 
     private void toggleFavorite(String channel) {
@@ -326,8 +351,17 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
     }
 
     private void showGuide() {
-        status.setText("EPG / GUIDE • live channel schedule");
-        toast("Electronic program guide");
+        movieLibrary.removeAllViews();
+        movieLibrary.addView(text("LIVE TV GUIDE", 14));
+        movieLibrary.addView(button("FREE TV GUIDE", v ->
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://watch.plex.tv/live-tv")))));
+        for (String channel : savedChannels) {
+            String[] parts = channel.split("\\|", 2);
+            String name = parts[0];
+            String url = parts.length > 1 ? parts[1] : "";
+            movieLibrary.addView(button(name + " • WATCH", v -> openChannel(name, url)));
+        }
+        status.setText("EPG / GUIDE • " + savedChannels.size() + " saved channels • provider schedules where available");
     }
 
     private void enterTvPip() {
