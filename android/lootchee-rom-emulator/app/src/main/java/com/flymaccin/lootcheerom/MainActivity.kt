@@ -34,9 +34,18 @@ class MainActivity:Activity(){
             when(r.id){
                 "tv"->showDemonicTv()
                 "emulator"->{status.text="UNIVERSAL EMULATOR • IMPORT A ROM";pickRom()}
+                "games","8bit","hyphyxels","carnival"->openRoom(r,FmeGameRooms.build(this,r.id))
+                "agent"->openRoom(r,FmeUtilityRooms.agent(this))
+                "potna"->openRoom(r,FmeUtilityRooms.potna(this))
+                "bayauto"->openRoom(r,FmeUtilityRooms.bayAuto(this))
+                "octop"->openRoom(r,FmeControlRooms.octop(this))
+                "remote"->openRoom(r,FmeControlRooms.remote(this))
                 else->showRoomNotMigrated(r)
             }
         }.setNegativeButton("CLOSE",null).show()
+    }
+    private fun openRoom(r:FmeRoom,v:View){
+        core?.pause();liveTv?.stop();display.removeAllViews();display.addView(v,FrameLayout.LayoutParams(-1,-1));status.text="FME ROOM • "+r.title+" • "+r.kind
     }
     private fun showRoomNotMigrated(r:FmeRoom){
         android.app.AlertDialog.Builder(this).setTitle(r.title).setMessage("This engine is not migrated into the one-APK runtime yet. It is intentionally not being presented as functional.").setPositiveButton("OK",null).show()
