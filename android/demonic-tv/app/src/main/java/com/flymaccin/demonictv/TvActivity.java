@@ -3,6 +3,7 @@ package com.flymaccin.demonictv;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
@@ -57,83 +58,148 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         v.setPadding(18,12,18,12); return v;
     }
 
+    private GradientDrawable panelBg(int color, float radius, int strokeColor) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(color);
+        bg.setCornerRadius(radius);
+        if (strokeColor != Color.TRANSPARENT) bg.setStroke(1, strokeColor);
+        return bg;
+    }
+
     private Button button(String s, View.OnClickListener l) {
-        Button b = new Button(this); b.setText(s); b.setOnClickListener(l); return b;
+        Button b = new Button(this);
+        b.setText(s);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(12);
+        b.setAllCaps(false);
+        b.setPadding(18, 10, 18, 10);
+        b.setBackground(panelBg(Color.rgb(88, 7, 16), 18f, Color.rgb(170, 18, 34)));
+        b.setOnClickListener(l);
+        return b;
+    }
+
+    private Button navButton(String s, View.OnClickListener l) {
+        Button b = button(s, l);
+        b.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        b.setBackground(panelBg(Color.rgb(22, 12, 16), 16f, Color.rgb(74, 24, 32)));
+        return b;
     }
 
     private void buildUi() {
-        root = new FrameLayout(this); root.setBackgroundColor(Color.rgb(8,5,13));
-        LinearLayout shell = new LinearLayout(this); shell.setOrientation(LinearLayout.VERTICAL);
-        root.addView(shell, new FrameLayout.LayoutParams(-1,-1));
+        final int BLACK = Color.rgb(5, 4, 7);
+        final int PANEL = Color.rgb(15, 10, 14);
+        final int PANEL_2 = Color.rgb(24, 12, 17);
+        final int RED = Color.rgb(180, 20, 36);
 
-        LinearLayout top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(text("DEMONIC TV",22));
-        top.addView(button("LIVE TV", v -> selectSource(TvSource.FREE_TV)));
-        top.addView(button("BROWSER / TV", v -> selectSource(TvSource.BROWSER)));
-        top.addView(button("IMPORT FILE", v -> importFile()));
-        top.addView(button("PLAYLISTS", v -> showPlaylists()));
-        top.addView(button("FAVORITES", v -> showFavorites()));
-        top.addView(button("SETTINGS", v -> showSettings()));
-        for (TvSource s : TvSource.values()) top.addView(button(s.name().replace('_',' '), v -> selectSource(s)));
-        shell.addView(top, new LinearLayout.LayoutParams(-1,-2));
+        root = new FrameLayout(this);
+        root.setBackgroundColor(BLACK);
 
-        stage = new FrameLayout(this); stage.setBackgroundColor(Color.BLACK);
+        LinearLayout app = new LinearLayout(this);
+        app.setOrientation(LinearLayout.VERTICAL);
+        root.addView(app, new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(18, 8, 18, 8);
+        header.setBackgroundColor(Color.rgb(9, 6, 9));
+        TextView brand = text("DEMONIC TV", 22);
+        brand.setTextColor(Color.rgb(235, 55, 65));
+        header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView clock = text("FME MEDIA CENTER", 12);
+        clock.setTextColor(Color.LTGRAY);
+        header.addView(clock);
+        app.addView(header, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        app.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.VERTICAL);
+        nav.setPadding(10, 12, 10, 12);
+        nav.setBackgroundColor(Color.rgb(10, 7, 10));
+        nav.addView(navButton("▣  Live TV", v -> selectSource(TvSource.FREE_TV)));
+        nav.addView(navButton("⌕  Browser / TV", v -> selectSource(TvSource.BROWSER)));
+        nav.addView(navButton("＋  Import File", v -> importFile()));
+        nav.addView(navButton("▶  My Movies", v -> refreshMovieLibrary()));
+        nav.addView(navButton("☷  Playlists", v -> showPlaylists()));
+        nav.addView(navButton("★  Favorites", v -> showFavorites()));
+        nav.addView(navButton("⚙  Settings", v -> showSettings()));
+        body.addView(nav, new LinearLayout.LayoutParams(230, -1));
+
+        LinearLayout center = new LinearLayout(this);
+        center.setOrientation(LinearLayout.VERTICAL);
+        center.setPadding(12, 12, 12, 12);
+        body.addView(center, new LinearLayout.LayoutParams(0, -1, 1));
+
+        stage = new FrameLayout(this);
+        stage.setBackground(panelBg(Color.BLACK, 18f, Color.rgb(92, 18, 30)));
         video = new SurfaceView(this);
-        stage.addView(video, new FrameLayout.LayoutParams(-1,-1));
+        stage.addView(video, new FrameLayout.LayoutParams(-1, -1));
+
         movieView = new VideoView(this);
         movieView.setVisibility(View.GONE);
         MediaController mediaController = new MediaController(this);
         mediaController.setAnchorView(movieView);
         movieView.setMediaController(mediaController);
-        stage.addView(movieView, new FrameLayout.LayoutParams(-1,-1));
-        watermark = text("PS5 RECEIVER SURFACE",16); watermark.setGravity(Gravity.CENTER);
-        stage.addView(watermark,new FrameLayout.LayoutParams(-1,-1));
-        shell.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
+        stage.addView(movieView, new FrameLayout.LayoutParams(-1, -1));
+
+        watermark = text("DEMONIC TV\nSelect Live TV, a saved channel, or one of My Movies", 17);
+        watermark.setGravity(Gravity.CENTER);
+        watermark.setTextColor(Color.rgb(170, 150, 155));
+        stage.addView(watermark, new FrameLayout.LayoutParams(-1, -1));
+        center.addView(stage, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        LinearLayout playerBar = new LinearLayout(this);
+        playerBar.setGravity(Gravity.CENTER_VERTICAL);
+        playerBar.setPadding(8, 8, 8, 8);
+        playerBar.setBackground(panelBg(PANEL_2, 16f, Color.rgb(82, 24, 34)));
+        playerBar.addView(button("⏮", v -> { if (movieView != null) movieView.seekTo(Math.max(0, movieView.getCurrentPosition()-10000)); }));
+        playerBar.addView(button("▶ / ❚❚", v -> {
+            if (movieView != null && movieView.getVisibility() == View.VISIBLE) {
+                if (movieView.isPlaying()) movieView.pause(); else movieView.start();
+            }
+        }));
+        playerBar.addView(button("⏭", v -> { if (movieView != null) movieView.seekTo(movieView.getCurrentPosition()+10000); }));
+        playerBar.addView(button("FULL", v -> setMode(DisplayMode.FULLSCREEN)));
+        playerBar.addView(button("PiP", v -> enterTvPip()));
+        playerBar.addView(button("AUDIO", v -> toast("Audio track controls")));
+        playerBar.addView(button("SUB", v -> toast("Subtitle controls")));
+        center.addView(playerBar, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        right.setPadding(10, 12, 10, 12);
+        right.setBackgroundColor(PANEL);
+        TextView guideTitle = text("LIVE TV GUIDE", 16);
+        guideTitle.setTextColor(Color.rgb(235, 55, 65));
+        right.addView(guideTitle);
+        right.addView(button("+ ADD CHANNEL", v -> addChannel()));
+        right.addView(button("EPG / GUIDE", v -> showGuide()));
+        right.addView(button("DISCOVER PS5", v -> receiver.discover()));
+        right.addView(button("PAIR", v -> receiver.beginPairing()));
+        right.addView(button("CONNECT", v -> receiver.connect()));
+        right.addView(button("DISCONNECT", v -> receiver.disconnect()));
+        body.addView(right, new LinearLayout.LayoutParams(250, -1));
 
         movieLibrary = new LinearLayout(this);
         movieLibrary.setOrientation(LinearLayout.HORIZONTAL);
-        shell.addView(movieLibrary, new LinearLayout.LayoutParams(-1,-2));
+        movieLibrary.setPadding(10, 6, 10, 6);
+        movieLibrary.setBackgroundColor(Color.rgb(9, 6, 9));
+        app.addView(movieLibrary, new LinearLayout.LayoutParams(-1, -2));
         loadMovieLibrary();
         loadChannelLibrary();
 
-        LinearLayout controls = new LinearLayout(this); controls.setGravity(Gravity.CENTER_VERTICAL);
-        controls.addView(button("DISCOVER",v->receiver.discover()));
-        controls.addView(button("PAIR",v->receiver.beginPairing()));
-        controls.addView(button("CONNECT",v->receiver.connect()));
-        controls.addView(button("DISCONNECT",v->receiver.disconnect()));
-        controls.addView(button("DOCK",v->setMode(DisplayMode.DOCKED)));
-        controls.addView(button("FULL",v->setMode(DisplayMode.FULLSCREEN)));
-        controls.addView(button("PiP",v->setMode(DisplayMode.PIP)));
-        controls.addView(button("INPUT LOCK",v->receiver.setControllerLocked(!receiver.isControllerLocked())));
-        controls.addView(button("BG AUDIO",v->receiver.setBackgroundAudio(!receiver.isBackgroundAudio())));
-        SeekBar volume = new SeekBar(this); volume.setMax(100); volume.setProgress(75);
-        volume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                // VideoView follows the device media volume.
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        controls.addView(volume,new LinearLayout.LayoutParams(220,-2));
-        shell.addView(controls,new LinearLayout.LayoutParams(-1,-2));
-
-        status = text("PS5: idle • import ready • capture into DAW: OFF",14);
-        shell.addView(status,new LinearLayout.LayoutParams(-1,-2));
+        status = text("Ready • My Movies + Live TV + PS5", 13);
+        status.setTextColor(Color.LTGRAY);
+        status.setBackgroundColor(Color.rgb(8, 5, 8));
+        app.addView(status, new LinearLayout.LayoutParams(-1, -2));
         setContentView(root);
 
         video.getHolder().addCallback(new SurfaceHolder.Callback() {
-            public void surfaceCreated(SurfaceHolder h) {
-                receiver.attachSurface(h.getSurface());
-                // Imported movies render through the VideoView.
-            }
-            public void surfaceChanged(SurfaceHolder h,int f,int w,int he) {
-                receiver.attachSurface(h.getSurface());
-                // Imported movies render through the VideoView.
-            }
-            public void surfaceDestroyed(SurfaceHolder h) {
-                receiver.detachSurface();
-                // Imported movies render through the VideoView.
-            }
+            public void surfaceCreated(SurfaceHolder h) { receiver.attachSurface(h.getSurface()); }
+            public void surfaceChanged(SurfaceHolder h,int f,int w,int he) { receiver.attachSurface(h.getSurface()); }
+            public void surfaceDestroyed(SurfaceHolder h) { receiver.detachSurface(); }
         });
     }
 
