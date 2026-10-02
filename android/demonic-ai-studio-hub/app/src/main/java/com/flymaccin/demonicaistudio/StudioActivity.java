@@ -47,6 +47,7 @@ public final class StudioActivity extends Activity {
     private static final int MUTED = Color.rgb(157, 163, 180);
     private static final int MIC_PERMISSION = 2201;
     private static final int PRODUCTION_IMPORT = 3301;
+    private static final int TV_IMPORT = 4401;
     private static final String PREFS = "demonic_studio_v110";
     private static final String PROJECT_KEY = "autosave_project";
     private static final String[] TRACK_NAMES = {"PIANO", "GUITAR", "DRUMS", "VOICE"};
@@ -182,6 +183,7 @@ public final class StudioActivity extends Activity {
         nav.setPadding(dp(5), dp(5), dp(5), dp(7));
         nav.addView(navButton("HOME", v -> showHome()));
         nav.addView(navButton("MAESTRO", v -> showMaestroRoom()));
+        nav.addView(navButton("DEMONIC TV", v -> showDemonicTv()));
         nav.addView(navButton("GENERIC", v -> showGenericDawRoom()));
         nav.addView(navButton("+ TRACK", v -> showAddTrack()));
         nav.addView(navButton("TRACKS", v -> showProductionTracks()));
@@ -254,6 +256,34 @@ public final class StudioActivity extends Activity {
 
         page.addView(text("Generic source concepts adopted here: unified transport state, loop range, audio/MIDI clips, clip trim/move/stretch/reverse/slip model, channel graph/routing model, recording paths and plugin-slot architecture. Rust CLAP/audio-thread runtime itself is not embedded in Android yet.",12,MUTED,false));
         scroll.addView(page);setPage(scroll);
+    }
+
+    private void showDemonicTv() {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout page = column();
+        page.setPadding(dp(18), dp(10), dp(18), dp(16));
+        page.addView(text("DEMONIC TV", 25, RED, true));
+        page.addView(text("VIDEO · IMAGE · AUDIO · PROJECT MEDIA", 12, MUTED, true));
+        page.addView(text("Import media and project files directly into the Demonic hub. Files stay inside the current Demonic workflow instead of launching another studio.", 15, WHITE, false));
+        page.addView(actionButton("IMPORT FILE", CYAN, v -> importDemonicTvFile()));
+        if (incomingAssetUri != null) {
+            page.addView(featureCard("IMPORTED FILE", incomingAssetUri.toString(), GREEN, v -> showIncomingAsset()));
+        }
+        page.addView(featureCard("MAESTRO VIDEO", "Generate / continue video from the Creative AI room", PURPLE, v -> showMaestroGenerator(MaestroProject.Kind.VIDEO)));
+        page.addView(featureCard("AUDIO + MUSIC", "Use imported/generated sound in the Demonic production session", GOLD, v -> showProductionTracks()));
+        scroll.addView(page);
+        setPage(scroll);
+    }
+
+    private void importDemonicTvFile() {
+        Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        pick.addCategory(Intent.CATEGORY_OPENABLE);
+        pick.setType("*/*");
+        pick.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
+                "video/*", "image/*", "audio/*", "application/json",
+                "text/plain", "application/zip", "application/octet-stream"
+        });
+        startActivityForResult(pick, TV_IMPORT);
     }
 
     private void showMaestroRoom(){ScrollView scroll=new ScrollView(this);LinearLayout page=column();page.setPadding(dp(18),dp(10),dp(18),dp(16));page.addView(text("CREATIVE AI · MAC-MAESTRO",25,GOLD,true));page.addView(text("DIRECTOR + IMAGE + VIDEO + MUSIC + AUDIO",12,MUTED,true));LinearLayout modes=row();modes.addView(featureCard("DIRECTOR","Music video · short film · long-form shot plans",PURPLE,v->showMaestroDirector()));modes.addView(featureCard("IMAGE AI","Qwen / Z-Image generation jobs",CYAN,v->showMaestroGenerator(MaestroProject.Kind.IMAGE)));modes.addView(featureCard("VIDEO AI","T2V · I2V · A2V · extend / continuation",RED,v->showMaestroGenerator(MaestroProject.Kind.VIDEO)));page.addView(modes);LinearLayout modes2=row();modes2.addView(featureCard("MUSIC AI","Generated music returns to Demonic assets",GREEN,v->showMaestroGenerator(MaestroProject.Kind.MUSIC)));modes2.addView(featureCard("AUDIO AI","Voice / audio generation lane",GOLD,v->showMaestroGenerator(MaestroProject.Kind.AUDIO)));modes2.addView(featureCard("JOBS","Generation queue · progress · outputs",WHITE,v->showMaestroJobs()));page.addView(modes2);page.addView(text("DAW SESSION · "+production.channels.size()+" channels · "+project.bpm+" BPM · "+project.name,14,WHITE,true));page.addView(actionButton("OPEN DEMONIC TRACK RACK",GREEN,v->showProductionTracks()));scroll.addView(page);setPage(scroll);}
