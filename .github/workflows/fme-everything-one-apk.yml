@@ -19,6 +19,13 @@ jobs:
           ROOT=android/lootchee-rom-emulator
           ! grep -R --include='*.kt' --include='*.java' -E 'getLaunchIntentForPackage|com\.flymaccin\.(pocketpotna|demonictv|octop|videogenerator|demonicdaw)' "$ROOT/app/src/main" || { echo 'FME launcher dependency found'; exit 1; }
           grep -q '1 APP → 0 LAUNCHER → 1 APK → EVERYTHING FME INSIDE' "$ROOT/FME_ONE_APP_LAW.md"
+          REG="$ROOT/app/src/main/java/com/flymaccin/lootcheerom/FmeRoomRegistry.kt"
+          test "$(grep -c 'FmeRoom("daw","Demonic DAW"' "$REG")" -eq 1
+          ! grep -q 'FmeRoom("studio"' "$REG"
+          ! grep -q 'FmeRoom("daw2"' "$REG"
+          MOD="$ROOT/app/src/main/java/com/flymaccin/lootcheerom/DemonicDawModules.kt"
+          grep -q 'Piano Studio' "$MOD"
+          grep -q 'DAW 2 Generation' "$MOD"
       - name: Build canonical single APK
         working-directory: android/lootchee-rom-emulator
         run: gradle --no-daemon :app:assembleDebug
