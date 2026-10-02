@@ -5,9 +5,7 @@ object FmeRoomRegistry {
     val rooms=listOf(
         FmeRoom("home","FME Home","SYSTEM"),
         FmeRoom("emulator","Universal Emulator","NATIVE ENGINE"),
-        FmeRoom("studio","Demonic Studio","NATIVE AUDIO"),
-        FmeRoom("daw","Demonic DAW","NATIVE AUDIO"),
-        FmeRoom("daw2","Demonic DAW 2","NATIVE AUDIO"),
+        FmeRoom("daw","Demonic DAW","UNIFIED NATIVE AUDIO"),
         FmeRoom("games","FME Games","NATIVE GAMES"),
         FmeRoom("8bit","8-Bit Ism","NATIVE GAME"),
         FmeRoom("hyphyxels","HY-PHYXELS: Arcade Invasion","NATIVE GAME"),
