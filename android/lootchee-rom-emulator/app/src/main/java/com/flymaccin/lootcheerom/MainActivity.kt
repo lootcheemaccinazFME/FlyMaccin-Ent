@@ -28,7 +28,17 @@ class MainActivity:Activity(){
     }
     private fun showFmeRooms(){
         val labels=FmeRoomRegistry.rooms.map{it.title+"  •  "+it.kind}.toTypedArray()
-        android.app.AlertDialog.Builder(this).setTitle("FME • EVERYTHING INSIDE").setItems(labels){_,i->val r=FmeRoomRegistry.rooms[i];status.text="FME ROOM • "+r.title+" • "+r.kind}.setNegativeButton("CLOSE",null).show()
+        android.app.AlertDialog.Builder(this).setTitle("FME • EVERYTHING INSIDE").setItems(labels){_,i->val r=FmeRoomRegistry.rooms[i];if(r.id=="tv")showDemonicTv() else status.text="FME ROOM • "+r.title+" • "+r.kind}.setNegativeButton("CLOSE",null).show()
+    }
+    private fun showDemonicTv(){
+        val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(24,16,24,16)}
+        val now=TextView(this).apply{text=DemonicTvRoom.currentName()?.let{"IMPORTED • "+it}?:"NO LOCAL MEDIA IMPORTED"}
+        box.addView(now)
+        val import=Button(this).apply{text="IMPORT FILE";setOnClickListener{DemonicTvRoom.importFile(this@MainActivity)}}
+        box.addView(import)
+        box.addView(TextView(this).apply{text="Accepts local video/audio through Android Storage Access Framework. The file stays in Demonic TV inside the FME APK."})
+        android.app.AlertDialog.Builder(this).setTitle("DEMONIC TV").setView(box).setNegativeButton("CLOSE",null).show()
+        status.text="FME ROOM • DEMONIC TV • MEDIA ROOM"
     }
     private fun showSystems(){
         val names=CoreRegistry.specs.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()
@@ -48,7 +58,7 @@ class MainActivity:Activity(){
     private fun switchCore(spec:CoreSpec){core?.stop();core=runCatching{LibretroCore(this,spec){p,w,h->runOnUiThread{screen.submit(p,w,h)}}}.getOrElse{status.text="CORE ERROR "+spec.id+": "+it.message;null}}
     private fun pickRom(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/octet-stream";addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)},100)}
     @Deprecated("compat")
-    override fun onActivityResult(req:Int,result:Int,data:Intent?){super.onActivityResult(req,result,data);if(req==100&&result==RESULT_OK&&data?.data!=null){
+    override fun onActivityResult(req:Int,result:Int,data:Intent?){super.onActivityResult(req,result,data);if(req==DemonicTvRoom.IMPORT_REQUEST&&result==RESULT_OK){val name=DemonicTvRoom.accept(this,data);status.text=if(name!=null)"DEMONIC TV • IMPORTED • "+name else "DEMONIC TV • IMPORT FAILED";showDemonicTv();return};if(req==100&&result==RESULT_OK&&data?.data!=null){
         val uri=data.data!!;runCatching{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}
         val matches=CoreRegistry.candidates(this,uri);if(matches.isEmpty()){status.text="UNSUPPORTED ROM TYPE";return};if(matches.size>1){chooseCore(uri,matches);return};loadUriWithCore(uri,matches.first())
     }}
