@@ -18,13 +18,17 @@ class MainActivity:Activity(){
         val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
         fun button(label:String,run:()->Unit)=Button(this).apply{text=label;setOnClickListener{run()}}
         status=TextView(this).apply{setTextColor(Color.WHITE);text="FME UNIVERSAL EMULATOR • 16 CORES • ONE APP";setPadding(12,8,12,8)}
-        bar.addView(button("SYSTEMS"){showSystems()}); bar.addView(button("TEST ROM"){loadTest()}); bar.addView(button("IMPORT ROM"){pickRom()})
+        bar.addView(button("FME ROOMS"){showFmeRooms()}); bar.addView(button("SYSTEMS"){showSystems()}); bar.addView(button("TEST ROM"){loadTest()}); bar.addView(button("IMPORT ROM"){pickRom()})
         bar.addView(button("SAVE STATE"){if(core?.saveState(0)==true) status.text="STATE SAVED"})
         bar.addView(button("LOAD STATE"){if(core?.loadState(0)==true) status.text="STATE LOADED"})
         bar.addView(button("RESET"){core?.reset()})
         root.addView(status); root.addView(bar)
         display=FrameLayout(this); screen=EmulatorView(this); screen.touchSink={x,y,down->NativeBridge.setPointer(x,y,down)}; hardware=HardwareRenderView(this); display.addView(screen,FrameLayout.LayoutParams(-1,-1)); root.addView(display,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
         if(intent.getBooleanExtra("autoTest",false)) loadTest()
+    }
+    private fun showFmeRooms(){
+        val labels=FmeRoomRegistry.rooms.map{it.title+"  •  "+it.kind}.toTypedArray()
+        android.app.AlertDialog.Builder(this).setTitle("FME • EVERYTHING INSIDE").setItems(labels){_,i->val r=FmeRoomRegistry.rooms[i];status.text="FME ROOM • "+r.title+" • "+r.kind}.setNegativeButton("CLOSE",null).show()
     }
     private fun showSystems(){
         val names=CoreRegistry.specs.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()
