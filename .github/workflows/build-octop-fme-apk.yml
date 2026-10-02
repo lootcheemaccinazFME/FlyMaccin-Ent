@@ -1,0 +1,34 @@
+name: Build Octop FME APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - integration/octop-fme-unified
+    paths:
+      - "android/octop-fme-client/**"
+      - ".github/workflows/build-octop-fme-apk.yml"
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Build debug APK
+        working-directory: android/octop-fme-client
+        run: gradle :app:assembleDebug --stacktrace
+      - name: Verify APK
+        run: test -s android/octop-fme-client/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload Octop FME APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Octop-FME-APK
+          path: android/octop-fme-client/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
