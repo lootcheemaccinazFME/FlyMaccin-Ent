@@ -44,16 +44,50 @@ final class SessionRuntime {
 
     void triggerPad(int pad, float velocity) {
         FmeFunProject.SampleMap s = project.sample(pad);
-        sampler.trigger(pad, velocity * s.gain, s.pan);
+        float[] mix = liveMix(Math.min(2, project.mixer.channels.length - 1));
+        float pan = clamp(s.pan + mix[1], -1f, 1f);
+        sampler.trigger(pad, velocity * s.gain * mix[0], pan);
     }
+
+    private float[] liveMix(int track) {
+        track = Math.max(0, Math.min(project.mixer.channels.length - 1, track));
+        MixerGraph.Channel ch = project.mixer.channels[track];
+        if (ch.mute) return new float[]{0f, 0f};
+        boolean anySolo = false;
+        for (MixerGraph.Channel c : project.mixer.channels) if (c.solo) { anySolo = true; break; }
+        if (anySolo && !ch.solo) return new float[]{0f, 0f};
+        float chL = ch.gain * (ch.pan <= 0 ? 1f : 1f - ch.pan);
+        float chR = ch.gain * (ch.pan >= 0 ? 1f : 1f + ch.pan);
+        float busL = 0f, busR = 0f;
+        int primary = Math.max(0, Math.min(project.mixer.buses.length - 1, ch.bus));
+        MixerGraph.Channel main = project.mixer.buses[primary];
+        if (!main.mute) {
+            busL += main.gain * (main.pan <= 0 ? 1f : 1f - main.pan);
+            busR += main.gain * (main.pan >= 0 ? 1f : 1f + main.pan);
+        }
+        for (int b = 0; b < Math.min(ch.sends.length, project.mixer.buses.length); b++) {
+            float send = ch.sends[b];
+            MixerGraph.Channel bus = project.mixer.buses[b];
+            if (send <= 0f || bus.mute) continue;
+            busL += send * bus.gain * (bus.pan <= 0 ? 1f : 1f - bus.pan);
+            busR += send * bus.gain * (bus.pan >= 0 ? 1f : 1f + bus.pan);
+        }
+        float left = chL * busL, right = chR * busR;
+        float gain = Math.max(left, right);
+        if (gain <= 0.0001f) return new float[]{0f, 0f};
+        float pan = right >= left ? 1f - left / right : right / left - 1f;
+        return new float[]{gain, clamp(pan, -1f, 1f)};
+    }
+
+    private static float clamp(float v, float a, float b) { return Math.max(a, Math.min(b, v)); }
 
     void playRange(long fromTick, long toTick, AudioEngine audio) {
         scheduler.fireMidi(project.midi, fromTick, toTick, new PatternScheduler.Sink() {
             public void drum(int lane, float velocity, float pitch) { }
             public void midi(int pitch, int velocity, int channel, boolean on) {
                 if (on) {
-                    MixerGraph.Channel ch = project.mixer.channels[0];
-                    if (!ch.mute) audio.playMidi(pitch, velocity, ch.gain, ch.pan);
+                    float[] mix = liveMix(0);
+                    if (mix[0] > 0f) audio.playMidi(pitch, velocity, mix[0], mix[1]);
                 }
             }
         });
@@ -63,12 +97,12 @@ final class SessionRuntime {
         scheduler.fireStep(project.drums, step, new PatternScheduler.Sink() {
             public void midi(int pitch, int velocity, int channel, boolean on) { }
             public void drum(int lane, float velocity, float pitch) {
-                MixerGraph.Channel ch = project.mixer.channels[Math.min(2, project.mixer.channels.length - 1)];
-                if (ch.mute) return;
+                float[] mix = liveMix(Math.min(2, project.mixer.channels.length - 1));
+                if (mix[0] <= 0f) return;
                 FmeFunProject.SampleMap map = null;
                 for (FmeFunProject.SampleMap s : project.samples) if (s.pad == lane) { map = s; break; }
                 if (map != null && map.source != null && !map.source.isEmpty()) triggerPad(lane, velocity);
-                else audio.playDrum(lane, velocity * ch.gain, ch.pan, false, false);
+                else audio.playDrum(lane, velocity * mix[0], mix[1], false, false);
             }
         });
 
@@ -82,9 +116,9 @@ final class SessionRuntime {
         try {
             MediaPlayer p = new MediaPlayer();
             p.setDataSource(c.source);
-            MixerGraph.Channel ch = project.mixer.channels[Math.max(0, Math.min(project.mixer.channels.length - 1, c.track))];
-            float gain = c.gain * ch.gain;
-            float pan = Math.max(-1f, Math.min(1f, c.pan + ch.pan));
+            float[] mix = liveMix(c.track);
+            float gain = c.gain * mix[0];
+            float pan = clamp(c.pan + mix[1], -1f, 1f);
             float left = gain * (pan <= 0 ? 1f : 1f - pan);
             float right = gain * (pan >= 0 ? 1f : 1f + pan);
             p.setVolume(left, right);
