@@ -91,6 +91,7 @@ public final class StudioActivity extends Activity {
     private int productionChannel = 0;
     private String productionImportKind = "";
     private String incomingAssetMime="";
+    private String incomingMeshPayload="";
 
     private final String[] chordNames = {"C", "G", "D", "Am", "Em", "F", "E", "A"};
     private final int[][] chordMidi = {
@@ -132,10 +133,41 @@ public final class StudioActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         project = StudioProject.fromJson(prefs.getString(PROJECT_KEY, ""));
         production = ProductionProject.fromJson(prefs.getString("production_project_v2", ""));
+        maestro = MaestroProject.fromJson(prefs.getString("maestro_project_v1", ""));
+        incomingMeshPayload = StudioMesh.receive(this);
+        applyStudioMeshPayload(incomingMeshPayload);
         setContentView(buildShell());
         getWindow().getDecorView().post(this::hideSystemBars);
         showHome();
-        if(getIntent()!=null&&getIntent().getData()!=null){incomingAssetUri=getIntent().getData();incomingAssetMime=getIntent().getStringExtra("fme_asset_mime");if(incomingAssetMime==null)incomingAssetMime="";status.setText("LIBRARY ASSET READY · "+incomingAssetMime);}
+        if(incomingMeshPayload!=null&&!incomingMeshPayload.isEmpty())status.setText("STUDIO MESH READY · "+StudioMesh.field(incomingMeshPayload,"source"));
+        if(getIntent()!=null&&getIntent().getData()!=null&&!Intent.ACTION_VIEW.equals(getIntent().getAction())){incomingAssetUri=getIntent().getData();incomingAssetMime=getIntent().getStringExtra("fme_asset_mime");if(incomingAssetMime==null)incomingAssetMime="";status.setText("LIBRARY ASSET READY · "+incomingAssetMime);}
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        incomingMeshPayload = StudioMesh.receive(this);
+        applyStudioMeshPayload(incomingMeshPayload);
+        if(incomingMeshPayload!=null&&!incomingMeshPayload.isEmpty()){
+            status.setText("STUDIO MESH RECEIVED · "+StudioMesh.field(incomingMeshPayload,"source"));
+            showStudioMesh();
+        }
+    }
+
+    private void applyStudioMeshPayload(String payload){
+        if(payload==null||payload.isEmpty())return;
+        String productionJson=StudioMesh.field(payload,"production_project");
+        String maestroJson=StudioMesh.field(payload,"maestro_project");
+        String legacyJson=StudioMesh.field(payload,"legacy_project");
+        SharedPreferences.Editor e=getSharedPreferences(PREFS,MODE_PRIVATE).edit();
+        if(!productionJson.isEmpty()){production=ProductionProject.fromJson(productionJson);e.putString("production_project_v2",productionJson);}
+        if(!maestroJson.isEmpty()){maestro=MaestroProject.fromJson(maestroJson);e.putString("maestro_project_v1",maestroJson);}
+        if(!legacyJson.isEmpty()){project=StudioProject.fromJson(legacyJson);e.putString(PROJECT_KEY,legacyJson);}
+        e.apply();
+    }
+
+    private String studioMeshBundle(String workspace){
+        return StudioMesh.demonicBundle(workspace,project.toJson(),production.toJson(),maestro.toJson());
     }
 
     private void hideSystemBars() {
@@ -178,6 +210,7 @@ public final class StudioActivity extends Activity {
         nav.setPadding(dp(5), dp(5), dp(5), dp(7));
         nav.addView(navButton("HOME", v -> showHome()));
         nav.addView(navButton("MAESTRO", v -> showMaestroRoom()));
+        nav.addView(navButton("MESH", v -> showStudioMesh()));
         nav.addView(navButton("+ TRACK", v -> showAddTrack()));
         nav.addView(navButton("TRACKS", v -> showProductionTracks()));
         nav.addView(navButton("PIANO", v -> showPiano()));
@@ -213,6 +246,27 @@ public final class StudioActivity extends Activity {
         rowTwo.addView(featureCard("WAV EXPORT", "Master mix and four stems", WHITE, v -> showExport()));
         if(incomingAssetUri!=null)rowTwo.addView(featureCard("LIBRARY ASSET","Preview / attach shared asset",CYAN,v->showIncomingAsset()));
         page.addView(rowTwo);
+        scroll.addView(page);
+        setPage(scroll);
+    }
+
+    private void showStudioMesh(){
+        ScrollView scroll=new ScrollView(this);
+        LinearLayout page=column();
+        page.setPadding(dp(18),dp(10),dp(18),dp(16));
+        page.addView(text("FME STUDIO MESH",25,GOLD,true));
+        page.addView(text("ONE PROJECT GRAPH · EVERY STUDIO",12,MUTED,true));
+        page.addView(text("Demonic can hand the current DAW + Maestro state to any installed studio APK and receive compatible bundles back.",14,WHITE,false));
+        String src=StudioMesh.field(StudioMesh.last(this),"source");
+        String workspace=StudioMesh.field(StudioMesh.last(this),"workspace");
+        page.addView(text(src.isEmpty()?"NO INCOMING PROJECT":"LAST IN · "+src+" · "+workspace,12,src.isEmpty()?MUTED:GREEN,true));
+        page.addView(actionButton("SEND → theDAW",CYAN,v->StudioMesh.send(this,"com.flymaccin.thedaw",studioMeshBundle("DEMONIC"))));
+        page.addView(actionButton("SEND → GENERIC DAW",GOLD,v->StudioMesh.send(this,"com.flymaccin.genericdaw",studioMeshBundle("DEMONIC"))));
+        page.addView(actionButton("SEND → MEADOWLARK DEMONIC",PURPLE,v->StudioMesh.send(this,"com.flymaccin.meadowlarkdemonic",studioMeshBundle("DEMONIC"))));
+        page.addView(actionButton("SEND → TUNEFLOW",GREEN,v->StudioMesh.send(this,"com.flymaccin.tuneflow",studioMeshBundle("DEMONIC"))));
+        page.addView(actionButton("SEND → MAC-MAESTRO",RED,v->StudioMesh.send(this,"com.flymaccin.macmaestro",studioMeshBundle("CREATIVE_AI"))));
+        page.addView(actionButton("SHARE TO ANY STUDIO",WHITE,v->StudioMesh.share(this,studioMeshBundle("DEMONIC"))));
+        page.addView(text("Bundle carries legacy session JSON, dynamic ProductionProject JSON and Maestro project/job JSON. Standalone shells currently cache the full bundle for their own adapters.",12,MUTED,false));
         scroll.addView(page);
         setPage(scroll);
     }
