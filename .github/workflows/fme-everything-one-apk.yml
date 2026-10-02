@@ -31,6 +31,12 @@ jobs:
           grep -q 'video/\*' "$TV"
           grep -q 'audio/\*' "$TV"
           grep -q 'IMPORT FILE' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
+          LIVE="$ROOT/app/src/main/java/com/flymaccin/lootcheerom/FreeLiveTv.kt"
+          PLAYER="$ROOT/app/src/main/java/com/flymaccin/lootcheerom/LiveTvPlayer.kt"
+          grep -q 'FREE LIVE TV' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
+          grep -q 'http' "$LIVE"
+          grep -q 'MediaPlayer' "$PLAYER"
+          grep -q 'SurfaceView' "$PLAYER"
       - name: Build canonical single APK
         working-directory: android/lootchee-rom-emulator
         run: gradle --no-daemon :app:assembleDebug
