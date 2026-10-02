@@ -414,7 +414,7 @@ public final class StudioActivity extends Activity {
 
     private void showPianoRoll(){
         LinearLayout page=column();page.setPadding(dp(10),dp(6),dp(10),dp(6));LinearLayout bar=row();bar.addView(text("PIANO ROLL · MIDI",20,PURPLE,true));bar.addView(actionButton("IMPORT .MID",PURPLE,v->pickProduction("midi","audio/midi")));bar.addView(smallButton("CLEAR",v->{prodChannel().notes.clear();autosaveProduction();showPianoRoll();}));page.addView(bar);
-        PianoRollView roll=new PianoRollView(this);roll.bind(prodChannel().notes,production.bars);roll.setListener((midi,tick)->{prodChannel().notes.add(new ProductionProject.MidiNote(midi,100,tick,ProductionProject.PPQ));audio.playPiano(440.0*Math.pow(2,(midi-69)/12.0),400);autosaveProduction();roll.bind(prodChannel().notes,production.bars);status.setText("MIDI NOTE "+midi+" @ "+tick);});page.addView(roll,new LinearLayout.LayoutParams(-1,0,1));page.addView(text("Tap the grid to add quantized quarter notes. Imported Standard MIDI note events become editable roll blocks.",11,MUTED,false));setPage(page);
+        PianoRollView roll=new PianoRollView(this);roll.bind(prodChannel().notes,production.bars);roll.setListener(new PianoRollView.Listener(){public void onChanged(){autosaveProduction();status.setText("PIANO ROLL EDIT AUTOSAVED");}public void onPreview(int midi){audio.playPiano(440.0*Math.pow(2,(midi-69)/12.0),260);}});page.addView(roll,new LinearLayout.LayoutParams(-1,0,1));page.addView(text("Tap empty grid to add. Drag notes to move/pitch. Drag the right edge to resize. Velocity is preserved on imported MIDI notes.",11,MUTED,false));setPage(page);
     }
 
     private void showInstruments(){
