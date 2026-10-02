@@ -71,6 +71,9 @@ public final class StudioActivity extends Activity {
     private TextView status;
     private TextView position;
     private boolean playing;
+    private boolean productionPlaying;
+    private long productionStartedAtMs;
+    private int productionStartTick;
     private int transportStep;
     private int lastPlayedStep;
     private int selectedStep;
@@ -106,6 +109,22 @@ public final class StudioActivity extends Activity {
             {48, 52, 55, 60, 64}, {43, 47, 50, 55, 59, 67}, {50, 54, 57, 62, 66},
             {45, 52, 57, 60, 64}, {40, 47, 52, 55, 59, 64}, {41, 48, 53, 57, 60, 65},
             {40, 47, 52, 56, 59, 64}, {45, 52, 57, 61, 64, 69}
+    };
+
+    private final Runnable productionTransportRunner = new Runnable() {
+        @Override public void run() {
+            if (!productionPlaying) return;
+            long now=android.os.SystemClock.elapsedRealtime();
+            double ticksPerMs=production.bpm*ProductionProject.PPQ/60000.0;
+            int tick=productionStartTick+(int)Math.round((now-productionStartedAtMs)*ticksPerMs);
+            int end=Math.max(ProductionProject.PPQ,production.bars*4*ProductionProject.PPQ);
+            int loopStart=Math.max(0,production.loopStartTick),loopEnd=Math.min(end,Math.max(loopStart+1,production.loopEndTick));
+            if(production.loop&&tick>=loopEnd){productionStartTick=loopStart;productionStartedAtMs=now;tick=loopStart;}
+            else if(tick>=end){production.playheadTick=end;productionPlaying=false;status.setText("PRODUCTION COMPLETE");autosaveProduction();return;}
+            production.playheadTick=Math.max(0,Math.min(end,tick));
+            position.setText(String.format(Locale.US,"BAR %d · %d BPM",1+production.playheadTick/(ProductionProject.PPQ*4),production.bpm));
+            transportHandler.postDelayed(this,25);
+        }
     };
 
     private final Runnable transportRunner = new Runnable() {
@@ -681,33 +700,57 @@ public final class StudioActivity extends Activity {
     }
 
     private void startTransport() {
-        if (playing) return;
-        playing = true;
-        transportStep = selectedStep;
-        transportHandler.removeCallbacks(transportRunner);
-        transportHandler.post(transportRunner);
-        status.setText("TRANSPORT PLAYING");
+        if (productionPlaying) return;
+        production.bpm=project.bpm=Math.max(40,Math.min(240,production.bpm));
+        productionPlaying=true;
+        productionStartTick=Math.max(0,production.playheadTick);
+        productionStartedAtMs=android.os.SystemClock.elapsedRealtime();
+        transportHandler.removeCallbacks(productionTransportRunner);
+        transportHandler.post(productionTransportRunner);
+        startProductionAudioPreview();
+        status.setText("PRODUCTION TRANSPORT PLAYING · "+production.channels.size()+" CHANNELS");
     }
 
     private void pauseTransport() {
-        playing = false;
-        transportHandler.removeCallbacks(transportRunner);
-        selectedStep = lastPlayedStep;
-        stopVoicePlayer();
-        status.setText("TRANSPORT PAUSED");
-        refreshTimeline();
+        productionPlaying=false;
+        transportHandler.removeCallbacks(productionTransportRunner);
+        stopImportedClip(); stopVoicePlayer();
+        autosaveProduction();
+        status.setText("PRODUCTION TRANSPORT PAUSED");
     }
 
     private void stopTransport() {
-        playing = false;
+        productionPlaying=false;
+        playing=false;
+        transportHandler.removeCallbacks(productionTransportRunner);
         transportHandler.removeCallbacks(transportRunner);
-        transportStep = 0;
-        lastPlayedStep = 0;
-        selectedStep = 0;
-        stopVoicePlayer();
-        position.setText("01/16 · " + project.bpm + " BPM");
-        status.setText("TRANSPORT STOPPED");
+        production.playheadTick=0; transportStep=0; lastPlayedStep=0; selectedStep=0;
+        stopImportedClip(); stopVoicePlayer();
+        position.setText("BAR 1 · " + production.bpm + " BPM");
+        autosaveProduction();
+        status.setText("PRODUCTION TRANSPORT STOPPED");
         refreshTimeline();
+    }
+
+    private void startProductionAudioPreview(){
+        boolean anySolo=false;for(ProductionProject.Channel c:production.channels)if(c.solo)anySolo=true;
+        for(ProductionProject.Channel c:production.channels){
+            if(c.mute||(anySolo&&!c.solo))continue;
+            for(ProductionProject.AudioClip clip:c.audio){
+                if(clip.path==null||clip.path.isEmpty())continue;
+                if(clip.startTick<=production.playheadTick){playImportedClip(c,clip);return;}
+            }
+        }
+        for(ProductionProject.Channel c:production.channels){
+            if(c.mute||(anySolo&&!c.solo))continue;
+            for(ProductionProject.MidiNote n:c.notes){
+                if(n.startTick<production.playheadTick)continue;
+                double hz=440.0*Math.pow(2,(n.note-69)/12.0);float v=c.volume*Math.max(0f,Math.min(1f,n.velocity/127f));
+                if(c.instrument.type==ProductionProject.InstrumentType.GUITAR||c.instrument.type==ProductionProject.InstrumentType.BASS)audio.playGuitarNote(hz,v,c.pan,c.reverb>0,c.delay>0);
+                else audio.playPiano(hz,Math.max(80,(int)(n.durationTick*60000.0/production.bpm/ProductionProject.PPQ)),v,c.pan,c.reverb>0,c.delay>0);
+                return;
+            }
+        }
     }
 
     private void triggerStep(int step) {
