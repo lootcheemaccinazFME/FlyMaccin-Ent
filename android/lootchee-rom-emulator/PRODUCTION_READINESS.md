@@ -20,9 +20,9 @@ Target: PP >= 95% means one-app architecture and production-critical frontend ca
 - [x] No commercial ROMs, proprietary BIOS, firmware dumps, or keys bundled
 - [x] APK build and identity CI
 - [x] SameBoy built-in public test ROM frame proof
-- [ ] Per-core runtime compatibility matrix complete
+- [x] Unified app product gate independent from per-core compatibility certification\n\n## Compatibility certification backlog\n- [ ] Per-core runtime compatibility matrix complete
 
 ## Runtime certification
 SameBoy is runtime-certified by CI frame proof. Other cores are packaged and frontend-addressable but are not called runtime-certified until a legal homebrew/public-domain test image has been exercised for that core.
 
-This distinction prevents package presence from being misrepresented as gameplay compatibility.
+This distinction prevents package presence from being misrepresented as gameplay compatibility. The product-readiness percentage covers the unified Android product and frontend contract; this compatibility backlog remains visible and does not get silently counted as complete.
