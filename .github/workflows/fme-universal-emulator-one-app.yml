@@ -32,6 +32,12 @@ jobs:
           grep -q 'GLSurfaceView' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/HardwareRenderView.kt
           grep -q 'saveState' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/LibretroCore.kt
           grep -q 'restoreSram' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/LibretroCore.kt
+          grep -q 'Per-core runtime compatibility matrix complete' android/lootchee-rom-emulator/PRODUCTION_READINESS.md
+          COUNT=$(grep -c '^- \[x\]' android/lootchee-rom-emulator/PRODUCTION_READINESS.md)
+          TOTAL=$(grep -c '^- \[' android/lootchee-rom-emulator/PRODUCTION_READINESS.md)
+          PP=$((COUNT*100/TOTAL))
+          echo "PP=$PP%" | tee /tmp/PRODUCTION_PROGRESS.txt
+          test "$PP" -ge 95
           sha256sum "$APK" > /tmp/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
@@ -39,4 +45,6 @@ jobs:
           path: |
             android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk
             /tmp/SHA256SUMS.txt
+            /tmp/PRODUCTION_PROGRESS.txt
+            android/lootchee-rom-emulator/PRODUCTION_READINESS.md
           if-no-files-found: error
