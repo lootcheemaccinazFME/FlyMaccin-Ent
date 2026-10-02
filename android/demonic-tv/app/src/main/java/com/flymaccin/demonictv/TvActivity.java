@@ -185,6 +185,12 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
 
     private void selectSource(TvSource source) {
         releaseImportedPlayer();
+        if (source == TvSource.FREE_TV) {
+            Intent liveTv = new Intent(Intent.ACTION_VIEW, Uri.parse("https://watch.plex.tv/live-tv"));
+            status.setText("FREE LIVE TV • opening free channel guide");
+            startActivity(liveTv);
+            return;
+        }
         receiver.attachSurface(video.getHolder().getSurface());
         status.setText("Source: "+source.name().replace('_',' ')+" • PS5 session preserved");
     }
