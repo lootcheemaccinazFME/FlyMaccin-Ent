@@ -18,7 +18,7 @@ class MainActivity:Activity(){
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.BLACK)}
         val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
         fun button(label:String,run:()->Unit)=Button(this).apply{text=label;setOnClickListener{run()}}
-        status=TextView(this).apply{setTextColor(Color.WHITE);text="FME UNIVERSAL EMULATOR • 16 CORES • ONE APP";setPadding(12,8,12,8)}
+        status=TextView(this).apply{setTextColor(Color.WHITE);text="FME • EVERYTHING INSIDE • ONE APK";setPadding(12,8,12,8)}
         bar.addView(button("FME ROOMS"){showFmeRooms()}); bar.addView(button("SYSTEMS"){showSystems()}); bar.addView(button("TEST ROM"){loadTest()}); bar.addView(button("IMPORT ROM"){pickRom()})
         bar.addView(button("SAVE STATE"){if(core?.saveState(0)==true) status.text="STATE SAVED"})
         bar.addView(button("LOAD STATE"){if(core?.loadState(0)==true) status.text="STATE LOADED"})
@@ -29,7 +29,18 @@ class MainActivity:Activity(){
     }
     private fun showFmeRooms(){
         val labels=FmeRoomRegistry.rooms.map{it.title+"  •  "+it.kind}.toTypedArray()
-        android.app.AlertDialog.Builder(this).setTitle("FME • EVERYTHING INSIDE").setItems(labels){_,i->val r=FmeRoomRegistry.rooms[i];if(r.id=="tv")showDemonicTv() else status.text="FME ROOM • "+r.title+" • "+r.kind}.setNegativeButton("CLOSE",null).show()
+        android.app.AlertDialog.Builder(this).setTitle("FME • EVERYTHING INSIDE").setItems(labels){_,i->
+            val r=FmeRoomRegistry.rooms[i]
+            when(r.id){
+                "tv"->showDemonicTv()
+                "emulator"->{status.text="UNIVERSAL EMULATOR • IMPORT A ROM";pickRom()}
+                else->showRoomNotMigrated(r)
+            }
+        }.setNegativeButton("CLOSE",null).show()
+    }
+    private fun showRoomNotMigrated(r:FmeRoom){
+        android.app.AlertDialog.Builder(this).setTitle(r.title).setMessage("This engine is not migrated into the one-APK runtime yet. It is intentionally not being presented as functional.").setPositiveButton("OK",null).show()
+        status.text="NOT MIGRATED • "+r.title
     }
     private fun showDemonicTv(){
         val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(24,16,24,16)}
