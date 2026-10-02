@@ -1,0 +1,37 @@
+name: FME Universal Emulator One App
+on:
+  push:
+    branches: [ build/fme-universal-emulator-one-app-v1 ]
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.9' }
+      - name: Build one emulator APK
+        working-directory: android/lootchee-rom-emulator
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Verify one-app contract
+        run: |
+          set -euo pipefail
+          APK=android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging
+          grep -q "package: name='com.flymaccin.lootcheerom'" /tmp/badging
+          test "$(find android/lootchee-rom-emulator -type f -name '*.apk' | wc -l)" -eq 1
+          grep -q 'CoreSpec("sameboy"' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/CoreRegistry.kt
+          grep -q 'CoreSpec("play"' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/CoreRegistry.kt
+          sha256sum "$APK" > /tmp/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FME-Universal-Emulator-One-App
+          path: |
+            android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk
+            /tmp/SHA256SUMS.txt
+          if-no-files-found: error
