@@ -42,6 +42,11 @@ final class SessionRuntime {
         }
     }
 
+    void triggerMidi(int pitch, int velocity, int track, AudioEngine audio) {
+        float[] mix = liveMix(track);
+        if (mix[0] > 0f) audio.playMidi(pitch, velocity, mix[0], mix[1]);
+    }
+
     void triggerPad(int pad, float velocity) {
         FmeFunProject.SampleMap s = project.sample(pad);
         float[] mix = liveMix(Math.min(2, project.mixer.channels.length - 1));
