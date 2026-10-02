@@ -972,8 +972,17 @@ public final class StudioActivity extends Activity {
     @Deprecated
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
         super.onActivityResult(requestCode,resultCode,data);
-        if(requestCode!=PRODUCTION_IMPORT||resultCode!=RESULT_OK||data==null||data.getData()==null)return;
+        if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;
         Uri uri=data.getData();try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+        if(requestCode==TV_IMPORT){
+            incomingAssetUri=uri;
+            incomingAssetMime=getContentResolver().getType(uri);
+            if(incomingAssetMime==null)incomingAssetMime="application/octet-stream";
+            status.setText("DEMONIC TV IMPORTED · "+incomingAssetMime);
+            showDemonicTv();
+            return;
+        }
+        if(requestCode!=PRODUCTION_IMPORT)return;
         try{String name="import_"+System.currentTimeMillis();android.database.Cursor q=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null);if(q!=null){try{if(q.moveToFirst())name=q.getString(0);}finally{q.close();}}
             File dir=new File(getFilesDir(),"studio_assets");dir.mkdirs();File out=new File(dir,name.replaceAll("[^A-Za-z0-9._-]","_"));try(java.io.InputStream in=getContentResolver().openInputStream(uri);java.io.FileOutputStream os=new java.io.FileOutputStream(out)){byte[] b=new byte[32768];int n;while((n=in.read(b))>0)os.write(b,0,n);}
             String lower=out.getName().toLowerCase(Locale.US);ProductionProject.Channel ch=prodChannel();
