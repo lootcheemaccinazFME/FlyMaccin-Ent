@@ -21,6 +21,8 @@ import android.widget.TextView;
 import android.widget.VideoView;
 import android.widget.MediaController;
 import android.app.PictureInPictureParams;
+import android.app.AlertDialog;
+import android.widget.EditText;
 import android.util.Rational;
 import android.widget.Toast;
 import android.content.SharedPreferences;
@@ -38,6 +40,8 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
     private Uri importedUri;
     private LinearLayout movieLibrary;
     private final Set<String> savedMovies = new LinkedHashSet<>();
+    private final Set<String> savedChannels = new LinkedHashSet<>();
+    private final Set<String> favoriteChannels = new LinkedHashSet<>();
     private DisplayMode mode = DisplayMode.DOCKED;
 
     @Override public void onCreate(Bundle b) {
@@ -89,6 +93,7 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         movieLibrary.setOrientation(LinearLayout.HORIZONTAL);
         shell.addView(movieLibrary, new LinearLayout.LayoutParams(-1,-2));
         loadMovieLibrary();
+        loadChannelLibrary();
 
         LinearLayout controls = new LinearLayout(this); controls.setGravity(Gravity.CENTER_VERTICAL);
         controls.addView(button("DISCOVER",v->receiver.discover()));
@@ -234,14 +239,45 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         stopMoviePlayback();
     }
 
+    private void loadChannelLibrary() {
+        SharedPreferences prefs = getSharedPreferences("demonic_tv_channels", MODE_PRIVATE);
+        savedChannels.clear();
+        favoriteChannels.clear();
+        savedChannels.addAll(prefs.getStringSet("channels", new LinkedHashSet<>()));
+        favoriteChannels.addAll(prefs.getStringSet("favorites", new LinkedHashSet<>()));
+    }
+
+    private void persistChannels() {
+        getSharedPreferences("demonic_tv_channels", MODE_PRIVATE).edit()
+            .putStringSet("channels", new LinkedHashSet<>(savedChannels))
+            .putStringSet("favorites", new LinkedHashSet<>(favoriteChannels))
+            .apply();
+    }
+
     private void showPlaylists() {
-        status.setText("PLAYLISTS • My Movies + saved TV channels");
-        refreshMovieLibrary();
+        movieLibrary.removeAllViews();
+        movieLibrary.addView(text("PLAYLISTS / CHANNELS", 14));
+        movieLibrary.addView(button("+ ADD CHANNEL", v -> addChannel()));
+        for (String channel : savedChannels) {
+            String[] parts = channel.split("\\|", 2);
+            String name = parts[0];
+            String url = parts.length > 1 ? parts[1] : "";
+            movieLibrary.addView(button(name, v -> openChannel(name, url)));
+            movieLibrary.addView(button(favoriteChannels.contains(channel) ? "★" : "☆", v -> toggleFavorite(channel)));
+        }
+        status.setText("PLAYLISTS • " + savedChannels.size() + " saved channels");
     }
 
     private void showFavorites() {
-        status.setText("FAVORITES • channel favorites ready");
-        toast("Favorites shelf ready");
+        movieLibrary.removeAllViews();
+        movieLibrary.addView(text("FAVORITES", 14));
+        for (String channel : favoriteChannels) {
+            String[] parts = channel.split("\\|", 2);
+            String name = parts[0];
+            String url = parts.length > 1 ? parts[1] : "";
+            movieLibrary.addView(button("★ " + name, v -> openChannel(name, url)));
+        }
+        status.setText("FAVORITES • " + favoriteChannels.size() + " channels");
     }
 
     private void showSettings() {
@@ -250,8 +286,43 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
     }
 
     private void addChannel() {
-        status.setText("ADD CHANNEL • custom legal stream/provider entry");
-        toast("Channel manager ready for provider URLs");
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        final EditText name = new EditText(this);
+        name.setHint("Channel name");
+        final EditText url = new EditText(this);
+        url.setHint("https:// provider or legal stream URL");
+        form.addView(name);
+        form.addView(url);
+        new AlertDialog.Builder(this)
+            .setTitle("Add TV Channel")
+            .setView(form)
+            .setPositiveButton("SAVE", (dialog, which) -> {
+                String n = name.getText().toString().trim();
+                String u = url.getText().toString().trim();
+                if (n.isEmpty() || !(u.startsWith("https://") || u.startsWith("http://"))) {
+                    toast("Enter a channel name and valid web address");
+                    return;
+                }
+                savedChannels.add(n + "|" + u);
+                persistChannels();
+                showPlaylists();
+            })
+            .setNegativeButton("CANCEL", null)
+            .show();
+    }
+
+    private void openChannel(String name, String url) {
+        if (url == null || url.isEmpty()) return;
+        status.setText("CHANNEL • " + name);
+        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+    }
+
+    private void toggleFavorite(String channel) {
+        if (favoriteChannels.contains(channel)) favoriteChannels.remove(channel);
+        else favoriteChannels.add(channel);
+        persistChannels();
+        showPlaylists();
     }
 
     private void showGuide() {
