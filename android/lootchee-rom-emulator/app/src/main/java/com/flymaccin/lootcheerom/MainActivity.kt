@@ -9,6 +9,8 @@ import android.widget.*
 class MainActivity:Activity(){
     private lateinit var status:TextView
     private lateinit var screen:EmulatorView
+    private lateinit var hardware:HardwareRenderView
+    private lateinit var display:FrameLayout
     private var core:LibretroCore?=null
     override fun onCreate(state:Bundle?){
         super.onCreate(state)
@@ -21,7 +23,7 @@ class MainActivity:Activity(){
         bar.addView(button("LOAD STATE"){if(core?.loadState(0)==true) status.text="STATE LOADED"})
         bar.addView(button("RESET"){core?.reset()})
         root.addView(status); root.addView(bar)
-        screen=EmulatorView(this);screen.touchSink={x,y,down->NativeBridge.setPointer(x,y,down)};root.addView(screen,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
+        display=FrameLayout(this); screen=EmulatorView(this); screen.touchSink={x,y,down->NativeBridge.setPointer(x,y,down)}; hardware=HardwareRenderView(this); display.addView(screen,FrameLayout.LayoutParams(-1,-1)); root.addView(display,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
         if(intent.getBooleanExtra("autoTest",false)) loadTest()
     }
     private fun showSystems(){
@@ -32,8 +34,13 @@ class MainActivity:Activity(){
         val labels=matches.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()
         android.app.AlertDialog.Builder(this).setTitle("CHOOSE SYSTEM").setItems(labels){_,i->loadUriWithCore(uri,matches[i])}.setNegativeButton("CANCEL",null).show()
     }
-    private fun loadUriWithCore(uri:android.net.Uri,spec:CoreSpec){switchCore(spec);val c=core?:return;c.load(uri).onSuccess{c.start();status.text="PLAYING "+spec.systems.joinToString("/")+" • "+spec.id}.onFailure{status.text="ROM ERROR: "+it.message}}
-    private fun loadTest(){ switchCore(CoreRegistry.specs.first{it.id=="sameboy"}); val c=core?:return;c.loadBuiltIn(TestRom.build(),"lootchee-test-rom").onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • SAMEBOY"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }
+    private fun loadUriWithCore(uri:android.net.Uri,spec:CoreSpec){prepareDisplay(spec);switchCore(spec);val c=core?:return;c.load(uri).onSuccess{c.start();status.text="PLAYING "+spec.systems.joinToString("/")+" • "+spec.id}.onFailure{status.text="ROM ERROR: "+it.message}}
+    private fun prepareDisplay(spec:CoreSpec){
+        display.removeAllViews()
+        if(RuntimeCapabilities.forCore(spec.id).backend==RenderBackend.OPENGL_ES){display.addView(hardware,FrameLayout.LayoutParams(-1,-1));status.text="HARDWARE RENDER • "+spec.id}
+        else display.addView(screen,FrameLayout.LayoutParams(-1,-1))
+    }
+    private fun loadTest(){ prepareDisplay(CoreRegistry.specs.first{it.id=="sameboy"}); switchCore(CoreRegistry.specs.first{it.id=="sameboy"}); val c=core?:return;c.loadBuiltIn(TestRom.build(),"lootchee-test-rom").onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • SAMEBOY"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }
     private fun switchCore(spec:CoreSpec){core?.stop();core=runCatching{LibretroCore(this,spec){p,w,h->runOnUiThread{screen.submit(p,w,h)}}}.getOrElse{status.text="CORE ERROR "+spec.id+": "+it.message;null}}
     private fun pickRom(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/octet-stream";addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)},100)}
     @Deprecated("compat")
@@ -41,8 +48,8 @@ class MainActivity:Activity(){
         val uri=data.data!!;runCatching{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}
         val matches=CoreRegistry.candidates(this,uri);if(matches.isEmpty()){status.text="UNSUPPORTED ROM TYPE";return};if(matches.size>1){chooseCore(uri,matches);return};loadUriWithCore(uri,matches.first())
     }}
-    override fun onPause(){super.onPause();core?.pause()}
-    override fun onResume(){super.onResume();core?.resume()}
+    override fun onPause(){super.onPause();core?.pause();hardware.onPause()}
+    override fun onResume(){super.onResume();hardware.onResume();core?.resume()}
     override fun onDestroy(){core?.stop();super.onDestroy()}
     override fun dispatchKeyEvent(e:KeyEvent):Boolean{
         if((e.source and InputDevice.SOURCE_GAMEPAD)!=0||(e.source and InputDevice.SOURCE_JOYSTICK)!=0){
