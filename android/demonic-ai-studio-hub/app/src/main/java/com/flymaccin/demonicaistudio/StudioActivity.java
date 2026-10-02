@@ -29,6 +29,9 @@ import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Space;
 import android.widget.TextView;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.webkit.WebSettings;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -262,17 +265,43 @@ public final class StudioActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout page = column();
         page.setPadding(dp(18), dp(10), dp(18), dp(16));
-        page.addView(text("DEMONIC TV", 25, RED, true));
-        page.addView(text("VIDEO · IMAGE · AUDIO · PROJECT MEDIA", 12, MUTED, true));
-        page.addView(text("Import media and project files directly into the Demonic hub. Files stay inside the current Demonic workflow instead of launching another studio.", 15, WHITE, false));
-        page.addView(actionButton("IMPORT FILE", CYAN, v -> importDemonicTvFile()));
-        if (incomingAssetUri != null) {
-            page.addView(featureCard("IMPORTED FILE", incomingAssetUri.toString(), GREEN, v -> showIncomingAsset()));
-        }
-        page.addView(featureCard("MAESTRO VIDEO", "Generate / continue video from the Creative AI room", PURPLE, v -> showMaestroGenerator(MaestroProject.Kind.VIDEO)));
-        page.addView(featureCard("AUDIO + MUSIC", "Use imported/generated sound in the Demonic production session", GOLD, v -> showProductionTracks()));
+        page.addView(text("DEMONIC TV · FREE LIVE", 25, RED, true));
+        page.addView(text("LIVE TV + VIDEO · IMAGE · AUDIO · PROJECT MEDIA", 12, MUTED, true));
+        page.addView(text("Free ad-supported TV providers run inside the Demonic workspace. Availability, channels and regional rights are controlled by each provider.", 14, WHITE, false));
+        LinearLayout live=row();
+        live.addView(featureCard("PLUTO TV","Free live channels",CYAN,v->openLiveTv("Pluto TV","https://pluto.tv/live-tv")));
+        live.addView(featureCard("PLEX LIVE TV","Free live TV channels",GOLD,v->openLiveTv("Plex Live TV","https://watch.plex.tv/live-tv")));
+        live.addView(featureCard("TUBI LIVE","Free live TV",GREEN,v->openLiveTv("Tubi Live","https://tubitv.com/live")));
+        page.addView(live);
+        page.addView(actionButton("IMPORT PROJECT MEDIA", CYAN, v -> importDemonicTvFile()));
+        if (incomingAssetUri != null) page.addView(featureCard("IMPORTED FILE", incomingAssetUri.toString(), GREEN, v -> showIncomingAsset()));
+        LinearLayout studio=row();
+        studio.addView(featureCard("MAESTRO VIDEO", "Generate / continue video in Creative AI", PURPLE, v -> showMaestroGenerator(MaestroProject.Kind.VIDEO)));
+        studio.addView(featureCard("AUDIO + MUSIC", "Use imported/generated sound in this project", GOLD, v -> showProductionTracks()));
+        page.addView(studio);
         scroll.addView(page);
         setPage(scroll);
+    }
+
+    private void openLiveTv(String provider,String url){
+        LinearLayout page=column();
+        LinearLayout bar=row();
+        bar.setPadding(dp(8),dp(4),dp(8),dp(4));
+        bar.addView(actionButton("← TV GUIDE",PANEL_2,v->showDemonicTv()));
+        bar.addView(text(provider+" · FREE LIVE",17,CYAN,true));
+        page.addView(bar,new LinearLayout.LayoutParams(-1,dp(64)));
+        WebView web=new WebView(this);
+        WebSettings s=web.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setLoadWithOverviewMode(true);
+        s.setUseWideViewPort(true);
+        web.setWebViewClient(new WebViewClient());
+        web.loadUrl(url);
+        page.addView(web,new LinearLayout.LayoutParams(-1,0,1));
+        setPage(page);
+        status.setText("DEMONIC TV · "+provider);
     }
 
     private void importDemonicTvFile() {
