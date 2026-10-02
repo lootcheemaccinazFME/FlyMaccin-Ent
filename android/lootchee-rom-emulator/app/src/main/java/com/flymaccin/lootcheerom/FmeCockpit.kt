@@ -7,6 +7,10 @@ import android.widget.*
 
 object FmeCockpit {
  const val BG=0xff05070b.toInt(); const val PANEL=0xff09111a.toInt(); const val RED=0xffff1628.toInt(); const val TEXT=0xfff5f7fa.toInt(); const val MUTED=0xff8f9aa8.toInt()
+ fun title(a:Activity,text:String)=TextView(a).apply{this.text=text;setTextColor(RED);textSize=22f;typeface=android.graphics.Typeface.DEFAULT_BOLD;setPadding(10,8,10,8)}
+ fun subtitle(a:Activity,text:String)=TextView(a).apply{this.text=text;setTextColor(MUTED);textSize=11f;setPadding(10,2,10,8)}
+ fun field(a:Activity,hintText:String)=EditText(a).apply{hint=hintText;setHintTextColor(MUTED);setTextColor(TEXT);setBackgroundColor(0xff060b11.toInt());setPadding(12,10,12,10)}
+ fun section(a:Activity,title:String)=LinearLayout(a).apply{orientation=LinearLayout.VERTICAL;background=panel();setPadding(10,8,10,8);addView(FmeCockpit.title(a,title))}
  fun panel():GradientDrawable=GradientDrawable().apply{setColor(PANEL);setStroke(2,0xff551018.toInt());cornerRadius=10f}
  fun button(a:Activity,label:String,run:()->Unit)=Button(a).apply{text=label;setTextColor(TEXT);textSize=11f;isAllCaps=true;background=GradientDrawable().apply{setColor(0xff08121d.toInt());setStroke(2,0xff7d1520.toInt());cornerRadius=8f};setPadding(8,4,8,4);setOnClickListener{run()}}
  fun header(a:Activity):View=LinearLayout(a).apply{orientation=LinearLayout.VERTICAL;background=panel();setPadding(14,8,14,8)
