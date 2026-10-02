@@ -41,6 +41,9 @@ jobs:
           grep -q 'android.permission.INTERNET' "$MAN"
           grep -q 'android:label="FME"' "$MAN"
           grep -q 'NOT MIGRATED' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
+          grep -q 'FmeGameRooms.build' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
+          grep -q 'FmeUtilityRooms.agent' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
+          grep -q 'FmeControlRooms.octop' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
       - name: Build canonical single APK
         working-directory: android/lootchee-rom-emulator
         run: gradle --no-daemon :app:assembleDebug
