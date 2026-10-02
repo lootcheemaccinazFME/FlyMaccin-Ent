@@ -3,7 +3,6 @@ package com.flymaccin.demonictv;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
-import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
@@ -19,6 +18,11 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.VideoView;
+import android.widget.MediaController;
+import android.content.SharedPreferences;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 public final class TvActivity extends Activity implements Ps5Receiver.Listener {
     private static final int REQUEST_IMPORT_MEDIA = 4101;
@@ -26,9 +30,11 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
     private FrameLayout root, stage;
     private TextView status, watermark;
     private SurfaceView video;
+    private VideoView movieView;
     private Ps5Receiver receiver;
-    private MediaPlayer importedPlayer;
     private Uri importedUri;
+    private LinearLayout movieLibrary;
+    private final Set<String> savedMovies = new LinkedHashSet<>();
     private DisplayMode mode = DisplayMode.DOCKED;
 
     @Override public void onCreate(Bundle b) {
@@ -54,16 +60,27 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
 
         LinearLayout top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL);
         top.addView(text("DEMONIC TV",22));
-        top.addView(button("IMPORT FILE", v -> importFile()));
+        top.addView(button("UPLOAD MOVIE", v -> importFile()));
         for (TvSource s : TvSource.values()) top.addView(button(s.name().replace('_',' '), v -> selectSource(s)));
         shell.addView(top, new LinearLayout.LayoutParams(-1,-2));
 
         stage = new FrameLayout(this); stage.setBackgroundColor(Color.BLACK);
         video = new SurfaceView(this);
         stage.addView(video, new FrameLayout.LayoutParams(-1,-1));
+        movieView = new VideoView(this);
+        movieView.setVisibility(View.GONE);
+        MediaController mediaController = new MediaController(this);
+        mediaController.setAnchorView(movieView);
+        movieView.setMediaController(mediaController);
+        stage.addView(movieView, new FrameLayout.LayoutParams(-1,-1));
         watermark = text("PS5 RECEIVER SURFACE",16); watermark.setGravity(Gravity.CENTER);
         stage.addView(watermark,new FrameLayout.LayoutParams(-1,-1));
         shell.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
+
+        movieLibrary = new LinearLayout(this);
+        movieLibrary.setOrientation(LinearLayout.HORIZONTAL);
+        shell.addView(movieLibrary, new LinearLayout.LayoutParams(-1,-2));
+        loadMovieLibrary();
 
         LinearLayout controls = new LinearLayout(this); controls.setGravity(Gravity.CENTER_VERTICAL);
         controls.addView(button("DISCOVER",v->receiver.discover()));
@@ -78,10 +95,7 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         SeekBar volume = new SeekBar(this); volume.setMax(100); volume.setProgress(75);
         volume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (importedPlayer != null) {
-                    float level = progress / 100f;
-                    importedPlayer.setVolume(level, level);
-                }
+                // VideoView follows the device media volume.
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -96,15 +110,15 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         video.getHolder().addCallback(new SurfaceHolder.Callback() {
             public void surfaceCreated(SurfaceHolder h) {
                 receiver.attachSurface(h.getSurface());
-                if (importedPlayer != null) importedPlayer.setDisplay(h);
+                // Imported movies render through the VideoView.
             }
             public void surfaceChanged(SurfaceHolder h,int f,int w,int he) {
                 receiver.attachSurface(h.getSurface());
-                if (importedPlayer != null) importedPlayer.setDisplay(h);
+                // Imported movies render through the VideoView.
             }
             public void surfaceDestroyed(SurfaceHolder h) {
                 receiver.detachSurface();
-                if (importedPlayer != null) importedPlayer.setDisplay(null);
+                // Imported movies render through the VideoView.
             }
         });
     }
@@ -130,35 +144,54 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         }
 
         importedUri = uri;
+        saveMovie(uri);
         playImportedFile(uri);
     }
 
-    private void playImportedFile(Uri uri) {
-        releaseImportedPlayer();
-        receiver.detachSurface();
+    private void saveMovie(Uri uri) {
+        savedMovies.add(uri.toString());
+        getSharedPreferences("demonic_tv_movies", MODE_PRIVATE)
+            .edit().putStringSet("movies", new LinkedHashSet<>(savedMovies)).apply();
+        refreshMovieLibrary();
+    }
 
-        importedPlayer = new MediaPlayer();
-        try {
-            importedPlayer.setDataSource(this, uri);
-            importedPlayer.setDisplay(video.getHolder());
-            importedPlayer.setOnPreparedListener(player -> {
-                watermark.setVisibility(View.GONE);
-                player.start();
-                status.setText("Imported: " + displayName(uri) + " • playing in Demonic TV");
-            });
-            importedPlayer.setOnCompletionListener(player ->
-                status.setText("Imported: " + displayName(uri) + " • playback complete"));
-            importedPlayer.setOnErrorListener((player, what, extra) -> {
-                status.setText("Import playback error • code " + what);
-                return true;
-            });
-            status.setText("Importing: " + displayName(uri) + "…");
-            importedPlayer.prepareAsync();
-        } catch (Exception e) {
-            status.setText("Import failed: " + e.getClass().getSimpleName());
-            releaseImportedPlayer();
-            receiver.attachSurface(video.getHolder().getSurface());
+    private void loadMovieLibrary() {
+        SharedPreferences prefs = getSharedPreferences("demonic_tv_movies", MODE_PRIVATE);
+        savedMovies.clear();
+        savedMovies.addAll(prefs.getStringSet("movies", new LinkedHashSet<>()));
+        refreshMovieLibrary();
+    }
+
+    private void refreshMovieLibrary() {
+        if (movieLibrary == null) return;
+        movieLibrary.removeAllViews();
+        movieLibrary.addView(text("MY MOVIES", 14));
+        for (String saved : savedMovies) {
+            Uri uri = Uri.parse(saved);
+            movieLibrary.addView(button(displayName(uri), v -> playImportedFile(uri)));
         }
+    }
+
+    private void playImportedFile(Uri uri) {
+        stopMoviePlayback();
+        receiver.detachSurface();
+        importedUri = uri;
+        video.setVisibility(View.GONE);
+        watermark.setVisibility(View.GONE);
+        movieView.setVisibility(View.VISIBLE);
+        movieView.setVideoURI(uri);
+        movieView.setOnPreparedListener(player -> {
+            status.setText("Now playing: " + displayName(uri));
+            movieView.start();
+        });
+        movieView.setOnCompletionListener(player ->
+            status.setText("Movie finished: " + displayName(uri)));
+        movieView.setOnErrorListener((player, what, extra) -> {
+            status.setText("Can't play this movie format • try MP4 (H.264/AAC)");
+            return true;
+        });
+        status.setText("Loading movie: " + displayName(uri));
+        movieView.requestFocus();
     }
 
     private String displayName(Uri uri) {
@@ -174,13 +207,17 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         return name != null ? name : "local media";
     }
 
-    private void releaseImportedPlayer() {
-        if (importedPlayer != null) {
-            try { importedPlayer.stop(); } catch (Exception ignored) {}
-            importedPlayer.release();
-            importedPlayer = null;
+    private void stopMoviePlayback() {
+        if (movieView != null) {
+            try { movieView.stopPlayback(); } catch (Exception ignored) {}
+            movieView.setVisibility(View.GONE);
         }
+        if (video != null) video.setVisibility(View.VISIBLE);
         if (watermark != null) watermark.setVisibility(View.VISIBLE);
+    }
+
+    private void releaseImportedPlayer() {
+        stopMoviePlayback();
     }
 
     private void selectSource(TvSource source) {
@@ -207,13 +244,13 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
     }
 
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
-        if (importedPlayer == null && receiver.sendControllerEvent(e)) return true;
+        if (movieView == null || movieView.getVisibility() != View.VISIBLE) { if (receiver.sendControllerEvent(e)) return true; }
         return super.dispatchKeyEvent(e);
     }
 
     @Override public void onState(Ps5Receiver.State s,String detail) {
         runOnUiThread(() -> {
-            if (importedPlayer == null) status.setText("PS5: "+s+" • "+detail+" • DAW capture OFF");
+            if (movieView == null || movieView.getVisibility() != View.VISIBLE) status.setText("PS5: "+s+" • "+detail+" • DAW capture OFF");
         });
     }
 
