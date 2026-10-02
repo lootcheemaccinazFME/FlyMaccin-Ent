@@ -1,6 +1,6 @@
-# FME Universal Emulator
+# FME Universal Emulator — One App
 
-One Android APK and one controller/ROM frontend for the FME emulator stack.
+One Android APK, one package ID, one app icon, one ROM library, one controller layer, one save-state system, and one frontend for the complete FME emulator stack. The emulator cores are internal engines, never separate launcher apps.
 
 ## Unified core roster
 
@@ -40,3 +40,4 @@ Application ID: `com.flymaccin.lootcheerom`
 Display name: **FME Universal Emulator**
 
 Version: **1.0.0**
+\n## One-app law\n\nAll supported emulator systems live inside `com.flymaccin.lootcheerom`. Core selection happens internally. FME must not publish each core as a separate Android launcher application. Ambiguous ROM formats are resolved with an in-app system picker.\n
