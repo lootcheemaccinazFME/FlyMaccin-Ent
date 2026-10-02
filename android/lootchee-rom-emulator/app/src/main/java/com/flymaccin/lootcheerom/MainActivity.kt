@@ -69,23 +69,23 @@ class MainActivity:Activity(){
         status.text="NOT MIGRATED • "+r.title
     }
     private fun showDemonicTv(){
-        val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(24,16,24,16)}
-        val now=TextView(this).apply{text=DemonicTvRoom.currentName()?.let{"IMPORTED • "+it}?:"NO LOCAL MEDIA IMPORTED"}
+        val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(16,12,16,12);setBackgroundColor(FmeCockpit.BG);addView(FmeCockpit.title(this@MainActivity,"DEMONIC TV"));addView(FmeCockpit.subtitle(this@MainActivity,"LIVE TV • BROWSER / TV • IMPORT FILE • PLAYLISTS"))}
+        val now=TextView(this).apply{text=DemonicTvRoom.currentName()?.let{"IMPORTED • "+it}?:"NO LOCAL MEDIA IMPORTED";setTextColor(FmeCockpit.TEXT);setPadding(8,8,8,8)}
         box.addView(now)
-        val import=Button(this).apply{text="IMPORT FILE";setOnClickListener{DemonicTvRoom.importFile(this@MainActivity)}}
+        val import=FmeCockpit.button(this,"IMPORT FILE"){DemonicTvRoom.importFile(this@MainActivity)}
         box.addView(import)
-        val live=Button(this).apply{text="FREE LIVE TV";setOnClickListener{showFreeLiveTv()}}
+        val live=FmeCockpit.button(this,"FREE LIVE TV"){showFreeLiveTv()}
         box.addView(live)
-        box.addView(TextView(this).apply{text="Local media plus authorized/public free live streams. Everything plays inside Demonic TV."})
+        box.addView(FmeCockpit.subtitle(this,"Local media plus authorized/public free live streams. Everything plays inside Demonic TV."))
         android.app.AlertDialog.Builder(this).setTitle("DEMONIC TV").setView(box).setNegativeButton("CLOSE",null).show()
         status.text="FME ROOM • DEMONIC TV • MEDIA ROOM"
     }
     private fun showFreeLiveTv(){
-        val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(20,12,20,12)}
+        val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(14,10,14,10);setBackgroundColor(FmeCockpit.BG);addView(FmeCockpit.title(this@MainActivity,"DEMONIC TV • FREE LIVE TV"));addView(FmeCockpit.subtitle(this@MainActivity,"CHANNELS • STREAM • IMPORT • WATCH"))}
         val player=LiveTvPlayer(this);liveTv?.stop();liveTv=player;box.addView(player,LinearLayout.LayoutParams(-1,420))
-        val name=EditText(this).apply{hint="Channel name"};val url=EditText(this).apply{hint="Authorized/public stream URL (http/https)"}
+        val name=FmeCockpit.field(this,"Channel name");val url=FmeCockpit.field(this,"Authorized/public stream URL (http/https)")
         box.addView(name);box.addView(url)
-        val add=Button(this).apply{text="ADD CHANNEL";setOnClickListener{FreeLiveTv.add(this@MainActivity,name.text.toString(),url.text.toString()).onSuccess{status.text="LIVE TV • ADDED • "+it.name;showFreeLiveTv()}.onFailure{status.text="LIVE TV • "+it.message}}};box.addView(add)
+        val add=FmeCockpit.button(this,"ADD CHANNEL"){};add.setOnClickListener{FreeLiveTv.add(this@MainActivity,name.text.toString(),url.text.toString()).onSuccess{status.text="LIVE TV • ADDED • "+it.name;showFreeLiveTv()}.onFailure{status.text="LIVE TV • "+it.message}};box.addView(add)
         FreeLiveTv.channels(this).forEach{ch->
             val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
             row.addView(Button(this).apply{text="WATCH • "+ch.name;setOnClickListener{player.tune(ch.name,ch.stream)}},LinearLayout.LayoutParams(0,-2,1f))
