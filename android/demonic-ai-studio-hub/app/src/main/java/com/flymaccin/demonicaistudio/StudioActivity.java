@@ -88,10 +88,10 @@ public final class StudioActivity extends Activity {
     private Uri incomingAssetUri;
     private ProductionProject production = new ProductionProject();
     private MaestroProject maestro = new MaestroProject();
+    private GenericDawEngine generic = new GenericDawEngine();
     private int productionChannel = 0;
     private String productionImportKind = "";
     private String incomingAssetMime="";
-    private String incomingMeshPayload="";
 
     private final String[] chordNames = {"C", "G", "D", "Am", "Em", "F", "E", "A"};
     private final int[][] chordMidi = {
@@ -134,40 +134,12 @@ public final class StudioActivity extends Activity {
         project = StudioProject.fromJson(prefs.getString(PROJECT_KEY, ""));
         production = ProductionProject.fromJson(prefs.getString("production_project_v2", ""));
         maestro = MaestroProject.fromJson(prefs.getString("maestro_project_v1", ""));
-        incomingMeshPayload = StudioMesh.receive(this);
-        applyStudioMeshPayload(incomingMeshPayload);
+        generic = GenericDawEngine.fromJson(prefs.getString("generic_daw_engine_v1", ""));
+        generic.normalizeFor(production);
         setContentView(buildShell());
         getWindow().getDecorView().post(this::hideSystemBars);
         showHome();
-        if(incomingMeshPayload!=null&&!incomingMeshPayload.isEmpty())status.setText("STUDIO MESH READY · "+StudioMesh.field(incomingMeshPayload,"source"));
         if(getIntent()!=null&&getIntent().getData()!=null&&!Intent.ACTION_VIEW.equals(getIntent().getAction())){incomingAssetUri=getIntent().getData();incomingAssetMime=getIntent().getStringExtra("fme_asset_mime");if(incomingAssetMime==null)incomingAssetMime="";status.setText("LIBRARY ASSET READY · "+incomingAssetMime);}
-    }
-
-    @Override protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        incomingMeshPayload = StudioMesh.receive(this);
-        applyStudioMeshPayload(incomingMeshPayload);
-        if(incomingMeshPayload!=null&&!incomingMeshPayload.isEmpty()){
-            status.setText("STUDIO MESH RECEIVED · "+StudioMesh.field(incomingMeshPayload,"source"));
-            showStudioMesh();
-        }
-    }
-
-    private void applyStudioMeshPayload(String payload){
-        if(payload==null||payload.isEmpty())return;
-        String productionJson=StudioMesh.field(payload,"production_project");
-        String maestroJson=StudioMesh.field(payload,"maestro_project");
-        String legacyJson=StudioMesh.field(payload,"legacy_project");
-        SharedPreferences.Editor e=getSharedPreferences(PREFS,MODE_PRIVATE).edit();
-        if(!productionJson.isEmpty()){production=ProductionProject.fromJson(productionJson);e.putString("production_project_v2",productionJson);}
-        if(!maestroJson.isEmpty()){maestro=MaestroProject.fromJson(maestroJson);e.putString("maestro_project_v1",maestroJson);}
-        if(!legacyJson.isEmpty()){project=StudioProject.fromJson(legacyJson);e.putString(PROJECT_KEY,legacyJson);}
-        e.apply();
-    }
-
-    private String studioMeshBundle(String workspace){
-        return StudioMesh.demonicBundle(workspace,project.toJson(),production.toJson(),maestro.toJson());
     }
 
     private void hideSystemBars() {
@@ -210,7 +182,7 @@ public final class StudioActivity extends Activity {
         nav.setPadding(dp(5), dp(5), dp(5), dp(7));
         nav.addView(navButton("HOME", v -> showHome()));
         nav.addView(navButton("MAESTRO", v -> showMaestroRoom()));
-        nav.addView(navButton("MESH", v -> showStudioMesh()));
+        nav.addView(navButton("GENERIC", v -> showGenericDawRoom()));
         nav.addView(navButton("+ TRACK", v -> showAddTrack()));
         nav.addView(navButton("TRACKS", v -> showProductionTracks()));
         nav.addView(navButton("PIANO", v -> showPiano()));
@@ -250,25 +222,38 @@ public final class StudioActivity extends Activity {
         setPage(scroll);
     }
 
-    private void showStudioMesh(){
+    private void autosaveGeneric(){generic.normalizeFor(production);getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("generic_daw_engine_v1",generic.toJson()).apply();}
+
+    private void showGenericDawRoom(){
         ScrollView scroll=new ScrollView(this);
         LinearLayout page=column();
         page.setPadding(dp(18),dp(10),dp(18),dp(16));
-        page.addView(text("FME STUDIO MESH",25,GOLD,true));
-        page.addView(text("ONE PROJECT GRAPH · EVERY STUDIO",12,MUTED,true));
-        page.addView(text("Demonic can hand the current DAW + Maestro state to any installed studio APK and receive compatible bundles back.",14,WHITE,false));
-        String src=StudioMesh.field(StudioMesh.last(this),"source");
-        String workspace=StudioMesh.field(StudioMesh.last(this),"workspace");
-        page.addView(text(src.isEmpty()?"NO INCOMING PROJECT":"LAST IN · "+src+" · "+workspace,12,src.isEmpty()?MUTED:GREEN,true));
-        page.addView(actionButton("SEND → theDAW",CYAN,v->StudioMesh.send(this,"com.flymaccin.thedaw",studioMeshBundle("DEMONIC"))));
-        page.addView(actionButton("SEND → GENERIC DAW",GOLD,v->StudioMesh.send(this,"com.flymaccin.genericdaw",studioMeshBundle("DEMONIC"))));
-        page.addView(actionButton("SEND → MEADOWLARK DEMONIC",PURPLE,v->StudioMesh.send(this,"com.flymaccin.meadowlarkdemonic",studioMeshBundle("DEMONIC"))));
-        page.addView(actionButton("SEND → TUNEFLOW",GREEN,v->StudioMesh.send(this,"com.flymaccin.tuneflow",studioMeshBundle("DEMONIC"))));
-        page.addView(actionButton("SEND → MAC-MAESTRO",RED,v->StudioMesh.send(this,"com.flymaccin.macmaestro",studioMeshBundle("CREATIVE_AI"))));
-        page.addView(actionButton("SHARE TO ANY STUDIO",WHITE,v->StudioMesh.share(this,studioMeshBundle("DEMONIC"))));
-        page.addView(text("Bundle carries legacy session JSON, dynamic ProductionProject JSON and Maestro project/job JSON. Standalone shells currently cache the full bundle for their own adapters.",12,MUTED,false));
-        scroll.addView(page);
-        setPage(scroll);
+        page.addView(text("GENERIC DAW ENGINE",25,GOLD,true));
+        page.addView(text("NATIVE INSIDE DEMONIC · SHARED PROJECT / TRANSPORT / TRACKS",12,MUTED,true));
+        page.addView(text("This is the Generic DAW architecture folded into the current Demonic production session. No launcher, no app switching.",14,WHITE,false));
+
+        LinearLayout transport=row();
+        transport.addView(actionButton(generic.metronome?"METRONOME ON":"METRONOME OFF",generic.metronome?GREEN:PANEL_2,v->{generic.metronome=!generic.metronome;autosaveGeneric();showGenericDawRoom();}));
+        transport.addView(actionButton(generic.loopEnabled?"LOOP ON":"LOOP OFF",generic.loopEnabled?CYAN:PANEL_2,v->{generic.loopEnabled=!generic.loopEnabled;autosaveGeneric();showGenericDawRoom();}));
+        transport.addView(actionButton("BPM −",PANEL_2,v->{production.bpm=Math.max(40,production.bpm-1);project.bpm=production.bpm;autosaveProduction();autosaveGeneric();showGenericDawRoom();}));
+        transport.addView(text(production.bpm+" BPM · "+generic.numerator+"/4",14,CYAN,true));
+        transport.addView(actionButton("BPM +",PANEL_2,v->{production.bpm=Math.min(240,production.bpm+1);project.bpm=production.bpm;autosaveProduction();autosaveGeneric();showGenericDawRoom();}));
+        page.addView(transport);
+
+        LinearLayout row1=row();
+        row1.addView(featureCard("ARRANGE","Audio + MIDI clips on Demonic ProductionProject",GREEN,v->showTimeline()));
+        row1.addView(featureCard("MIXER","Channel volume · pan · solo · FX",PURPLE,v->showMixer()));
+        row1.addView(featureCard("PIANO ROLL","MIDI notes · velocity-ready architecture",CYAN,v->showPianoRoll()));
+        page.addView(row1);
+
+        LinearLayout row2=row();
+        row2.addView(featureCard("AUDIO CLIPS","Trim · slice · reverse · gain · imported audio",GOLD,v->showSampler()));
+        row2.addView(featureCard("TRACK GRAPH",production.channels.size()+" dynamic channels · route state",RED,v->showProductionTracks()));
+        row2.addView(featureCard("RECORD","Audio recording into Demonic session",WHITE,v->showRecorder()));
+        page.addView(row2);
+
+        page.addView(text("Generic source concepts adopted here: unified transport state, loop range, audio/MIDI clips, clip trim/move/stretch/reverse/slip model, channel graph/routing model, recording paths and plugin-slot architecture. Rust CLAP/audio-thread runtime itself is not embedded in Android yet.",12,MUTED,false));
+        scroll.addView(page);setPage(scroll);
     }
 
     private void showMaestroRoom(){ScrollView scroll=new ScrollView(this);LinearLayout page=column();page.setPadding(dp(18),dp(10),dp(18),dp(16));page.addView(text("CREATIVE AI · MAC-MAESTRO",25,GOLD,true));page.addView(text("DIRECTOR + IMAGE + VIDEO + MUSIC + AUDIO",12,MUTED,true));LinearLayout modes=row();modes.addView(featureCard("DIRECTOR","Music video · short film · long-form shot plans",PURPLE,v->showMaestroDirector()));modes.addView(featureCard("IMAGE AI","Qwen / Z-Image generation jobs",CYAN,v->showMaestroGenerator(MaestroProject.Kind.IMAGE)));modes.addView(featureCard("VIDEO AI","T2V · I2V · A2V · extend / continuation",RED,v->showMaestroGenerator(MaestroProject.Kind.VIDEO)));page.addView(modes);LinearLayout modes2=row();modes2.addView(featureCard("MUSIC AI","Generated music returns to Demonic assets",GREEN,v->showMaestroGenerator(MaestroProject.Kind.MUSIC)));modes2.addView(featureCard("AUDIO AI","Voice / audio generation lane",GOLD,v->showMaestroGenerator(MaestroProject.Kind.AUDIO)));modes2.addView(featureCard("JOBS","Generation queue · progress · outputs",WHITE,v->showMaestroJobs()));page.addView(modes2);page.addView(text("DAW SESSION · "+production.channels.size()+" channels · "+project.bpm+" BPM · "+project.name,14,WHITE,true));page.addView(actionButton("OPEN DEMONIC TRACK RACK",GREEN,v->showProductionTracks()));scroll.addView(page);setPage(scroll);}
