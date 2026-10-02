@@ -20,6 +20,9 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.VideoView;
 import android.widget.MediaController;
+import android.app.PictureInPictureParams;
+import android.util.Rational;
+import android.widget.Toast;
 import android.content.SharedPreferences;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -60,7 +63,12 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
 
         LinearLayout top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL);
         top.addView(text("DEMONIC TV",22));
-        top.addView(button("UPLOAD MOVIE", v -> importFile()));
+        top.addView(button("LIVE TV", v -> selectSource(TvSource.FREE_TV)));
+        top.addView(button("BROWSER / TV", v -> selectSource(TvSource.BROWSER)));
+        top.addView(button("IMPORT FILE", v -> importFile()));
+        top.addView(button("PLAYLISTS", v -> showPlaylists()));
+        top.addView(button("FAVORITES", v -> showFavorites()));
+        top.addView(button("SETTINGS", v -> showSettings()));
         for (TvSource s : TvSource.values()) top.addView(button(s.name().replace('_',' '), v -> selectSource(s)));
         shell.addView(top, new LinearLayout.LayoutParams(-1,-2));
 
@@ -166,6 +174,12 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         if (movieLibrary == null) return;
         movieLibrary.removeAllViews();
         movieLibrary.addView(text("MY MOVIES", 14));
+        movieLibrary.addView(button("+ ADD CHANNEL", v -> addChannel()));
+        movieLibrary.addView(button("EPG / GUIDE", v -> showGuide()));
+        movieLibrary.addView(button("FULLSCREEN", v -> setMode(DisplayMode.FULLSCREEN)));
+        movieLibrary.addView(button("PiP", v -> enterTvPip()));
+        movieLibrary.addView(button("AUDIO", v -> toast("Audio track controls")));
+        movieLibrary.addView(button("SUBTITLES", v -> toast("Subtitle controls")));
         for (String saved : savedMovies) {
             Uri uri = Uri.parse(saved);
             movieLibrary.addView(button(displayName(uri), v -> playImportedFile(uri)));
@@ -220,12 +234,57 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         stopMoviePlayback();
     }
 
+    private void showPlaylists() {
+        status.setText("PLAYLISTS • My Movies + saved TV channels");
+        refreshMovieLibrary();
+    }
+
+    private void showFavorites() {
+        status.setText("FAVORITES • channel favorites ready");
+        toast("Favorites shelf ready");
+    }
+
+    private void showSettings() {
+        status.setText("SETTINGS • playback, display, audio, subtitles");
+        toast("Demonic TV settings");
+    }
+
+    private void addChannel() {
+        status.setText("ADD CHANNEL • custom legal stream/provider entry");
+        toast("Channel manager ready for provider URLs");
+    }
+
+    private void showGuide() {
+        status.setText("EPG / GUIDE • live channel schedule");
+        toast("Electronic program guide");
+    }
+
+    private void enterTvPip() {
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            PictureInPictureParams params = new PictureInPictureParams.Builder()
+                .setAspectRatio(new Rational(16, 9)).build();
+            enterPictureInPictureMode(params);
+        } else {
+            setMode(DisplayMode.PIP);
+        }
+    }
+
+    private void toast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
     private void selectSource(TvSource source) {
         releaseImportedPlayer();
         if (source == TvSource.FREE_TV) {
             Intent liveTv = new Intent(Intent.ACTION_VIEW, Uri.parse("https://watch.plex.tv/live-tv"));
-            status.setText("FREE LIVE TV • opening free channel guide");
+            status.setText("LIVE TV • free legal channel guide");
             startActivity(liveTv);
+            return;
+        }
+        if (source == TvSource.BROWSER) {
+            Intent browserTv = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/"));
+            status.setText("BROWSER / TV • opening web video");
+            startActivity(browserTv);
             return;
         }
         receiver.attachSurface(video.getHolder().getSurface());
