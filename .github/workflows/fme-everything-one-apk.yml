@@ -26,6 +26,11 @@ jobs:
           MOD="$ROOT/app/src/main/java/com/flymaccin/lootcheerom/DemonicDawModules.kt"
           grep -q 'Piano Studio' "$MOD"
           grep -q 'DAW 2 Generation' "$MOD"
+          TV="$ROOT/app/src/main/java/com/flymaccin/lootcheerom/DemonicTvRoom.kt"
+          grep -q 'ACTION_OPEN_DOCUMENT' "$TV"
+          grep -q 'video/\*' "$TV"
+          grep -q 'audio/\*' "$TV"
+          grep -q 'IMPORT FILE' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
       - name: Build canonical single APK
         working-directory: android/lootchee-rom-emulator
         run: gradle --no-daemon :app:assembleDebug
