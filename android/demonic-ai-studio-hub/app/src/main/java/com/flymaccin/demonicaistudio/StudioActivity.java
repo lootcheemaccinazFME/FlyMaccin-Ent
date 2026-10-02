@@ -29,6 +29,8 @@ import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Space;
 import android.widget.TextView;
+import android.widget.VideoView;
+import android.widget.MediaController;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebSettings;
@@ -90,6 +92,8 @@ public final class StudioActivity extends Activity {
     private String lastExportName = "No export yet";
     private boolean pendingRecord;
     private Uri incomingAssetUri;
+    private VideoView tvVideo;
+    private final ArrayList<String> tvLibrary = new ArrayList<>();
     private ProductionProject production = new ProductionProject();
     private MaestroProject maestro = new MaestroProject();
     private GenericDawEngine generic = new GenericDawEngine();
@@ -140,6 +144,7 @@ public final class StudioActivity extends Activity {
         maestro = MaestroProject.fromJson(prefs.getString("maestro_project_v1", ""));
         generic = GenericDawEngine.fromJson(prefs.getString("generic_daw_engine_v1", ""));
         generic.normalizeFor(production);
+        loadTvLibrary();
         setContentView(buildShell());
         getWindow().getDecorView().post(this::hideSystemBars);
         showHome();
@@ -261,26 +266,71 @@ public final class StudioActivity extends Activity {
         scroll.addView(page);setPage(scroll);
     }
 
+    private void loadTvLibrary(){
+        tvLibrary.clear();
+        String raw=getSharedPreferences(PREFS,MODE_PRIVATE).getString("demonic_tv_library_v1","");
+        if(!raw.isEmpty())for(String s:raw.split("\\n"))if(!s.trim().isEmpty())tvLibrary.add(s.trim());
+    }
+
+    private void saveTvLibrary(){
+        StringBuilder b=new StringBuilder();
+        for(String s:tvLibrary){if(b.length()>0)b.append("\n");b.append(s);}
+        getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("demonic_tv_library_v1",b.toString()).apply();
+    }
+
+    private String mediaName(Uri uri){
+        String name=uri.getLastPathSegment();
+        android.database.Cursor q=null;
+        try{q=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null);if(q!=null&&q.moveToFirst())name=q.getString(0);}catch(Exception ignored){}finally{if(q!=null)q.close();}
+        return name==null?"Movie":name;
+    }
+
     private void showDemonicTv() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout page = column();
         page.setPadding(dp(18), dp(10), dp(18), dp(16));
-        page.addView(text("DEMONIC TV · FREE LIVE", 25, RED, true));
-        page.addView(text("LIVE TV + VIDEO · IMAGE · AUDIO · PROJECT MEDIA", 12, MUTED, true));
-        page.addView(text("Free ad-supported TV providers run inside the Demonic workspace. Availability, channels and regional rights are controlled by each provider.", 14, WHITE, false));
-        LinearLayout live=row();
-        live.addView(featureCard("PLUTO TV","Free live channels",CYAN,v->openLiveTv("Pluto TV","https://pluto.tv/live-tv")));
-        live.addView(featureCard("PLEX LIVE TV","Free live TV channels",GOLD,v->openLiveTv("Plex Live TV","https://watch.plex.tv/live-tv")));
-        live.addView(featureCard("TUBI LIVE","Free live TV",GREEN,v->openLiveTv("Tubi Live","https://tubitv.com/live")));
-        page.addView(live);
-        page.addView(actionButton("IMPORT PROJECT MEDIA", CYAN, v -> importDemonicTvFile()));
-        if (incomingAssetUri != null) page.addView(featureCard("IMPORTED FILE", incomingAssetUri.toString(), GREEN, v -> showIncomingAsset()));
+        page.addView(text("DEMONIC TV", 25, RED, true));
+        page.addView(text("YOUR MOVIES · VIDEOS · PROJECT MEDIA", 12, MUTED, true));
+        page.addView(text("Import videos from your device and watch them directly inside Demonic. Imported document permissions are retained so your TV library survives app restarts.", 14, WHITE, false));
+        page.addView(actionButton("+ ADD MOVIE / VIDEO", CYAN, v -> importDemonicTvFile()));
+        page.addView(text("TV LIBRARY · "+tvLibrary.size(),16,GOLD,true));
+        if(tvLibrary.isEmpty()) page.addView(text("No movies imported yet.",13,MUTED,false));
+        for(int n=0;n<tvLibrary.size();n++){
+            final int ix=n; final Uri uri=Uri.parse(tvLibrary.get(n));
+            LinearLayout r=row();r.setBackgroundColor(PANEL);r.setPadding(dp(8),dp(5),dp(8),dp(5));
+            r.addView(actionButton("▶ "+mediaName(uri),GREEN,v->playDemonicTv(uri)));
+            r.addView(smallButton("REMOVE",v->{tvLibrary.remove(ix);saveTvLibrary();showDemonicTv();}));
+            page.addView(r);
+        }
         LinearLayout studio=row();
-        studio.addView(featureCard("MAESTRO VIDEO", "Generate / continue video in Creative AI", PURPLE, v -> showMaestroGenerator(MaestroProject.Kind.VIDEO)));
-        studio.addView(featureCard("AUDIO + MUSIC", "Use imported/generated sound in this project", GOLD, v -> showProductionTracks()));
+        studio.addView(featureCard("MAESTRO VIDEO","Generate / continue video in Creative AI",PURPLE,v->showMaestroGenerator(MaestroProject.Kind.VIDEO)));
+        studio.addView(featureCard("PROJECT AUDIO","Open Demonic production tracks",GOLD,v->showProductionTracks()));
         page.addView(studio);
         scroll.addView(page);
         setPage(scroll);
+    }
+
+    private void playDemonicTv(Uri uri){
+        LinearLayout page=column();
+        LinearLayout bar=row();bar.setPadding(dp(8),dp(4),dp(8),dp(4));
+        bar.addView(actionButton("← LIBRARY",PANEL_2,v->{stopTvVideo();showDemonicTv();}));
+        bar.addView(text(mediaName(uri),17,CYAN,true));
+        page.addView(bar,new LinearLayout.LayoutParams(-1,dp(64)));
+        tvVideo=new VideoView(this);
+        MediaController controls=new MediaController(this);
+        controls.setAnchorView(tvVideo);
+        tvVideo.setMediaController(controls);
+        tvVideo.setVideoURI(uri);
+        tvVideo.setOnPreparedListener(mp->{status.setText("DEMONIC TV · PLAYING");tvVideo.start();});
+        tvVideo.setOnCompletionListener(mp->status.setText("DEMONIC TV · COMPLETE"));
+        tvVideo.setOnErrorListener((mp,what,extra)->{status.setText("DEMONIC TV · VIDEO FORMAT ERROR");return false;});
+        page.addView(tvVideo,new LinearLayout.LayoutParams(-1,0,1));
+        setPage(page);
+        tvVideo.requestFocus();
+    }
+
+    private void stopTvVideo(){
+        if(tvVideo!=null){try{tvVideo.stopPlayback();}catch(Exception ignored){}tvVideo=null;}
     }
 
     private void openLiveTv(String provider,String url){
@@ -307,11 +357,7 @@ public final class StudioActivity extends Activity {
     private void importDemonicTvFile() {
         Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         pick.addCategory(Intent.CATEGORY_OPENABLE);
-        pick.setType("*/*");
-        pick.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
-                "video/*", "image/*", "audio/*", "application/json",
-                "text/plain", "application/zip", "application/octet-stream"
-        });
+        pick.setType("video/*");
         startActivityForResult(pick, TV_IMPORT);
     }
 
@@ -1006,8 +1052,11 @@ public final class StudioActivity extends Activity {
         if(requestCode==TV_IMPORT){
             incomingAssetUri=uri;
             incomingAssetMime=getContentResolver().getType(uri);
-            if(incomingAssetMime==null)incomingAssetMime="application/octet-stream";
-            status.setText("DEMONIC TV IMPORTED · "+incomingAssetMime);
+            if(incomingAssetMime==null)incomingAssetMime="video/*";
+            String stored=uri.toString();
+            if(!tvLibrary.contains(stored))tvLibrary.add(stored);
+            saveTvLibrary();
+            status.setText("DEMONIC TV ADDED · "+mediaName(uri));
             showDemonicTv();
             return;
         }
@@ -1025,6 +1074,7 @@ public final class StudioActivity extends Activity {
         super.onPause();
         pauseTransport();
         stopImportedClip();
+        if(tvVideo!=null&&tvVideo.isPlaying())tvVideo.pause();
         if (wavRecorder.isRunning()) {
             File take = wavRecorder.stop();
             if (take != null) {
@@ -1039,6 +1089,7 @@ public final class StudioActivity extends Activity {
         super.onDestroy();
         transportHandler.removeCallbacksAndMessages(null);
         stopImportedClip();
+        stopTvVideo();
         stopVoicePlayer();
     }
 }
