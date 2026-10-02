@@ -10,6 +10,12 @@ final class AudioEngine {
     static final int SAMPLE_RATE = 44100;
     private final Random random = new Random();
 
+    void playMidi(int pitch, int velocity, float volume, float pan) {
+        double frequency = 440.0 * Math.pow(2.0, (Math.max(0, Math.min(127, pitch)) - 69.0) / 12.0);
+        float v = Math.max(0f, Math.min(1f, velocity / 127f)) * volume;
+        start("fme-midi", () -> playBuffer(piano(frequency, 700), v, pan, false, false));
+    }
+
     void playPiano(double frequency, int durationMs) {
         playPiano(frequency, durationMs, 0.8f, 0f, false, false);
     }
