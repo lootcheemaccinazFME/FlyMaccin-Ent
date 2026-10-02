@@ -15,17 +15,34 @@ class MainActivity:Activity(){
     private var liveTv:LiveTvPlayer?=null
     override fun onCreate(state:Bundle?){
         super.onCreate(state)
-        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.BLACK)}
-        val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-        fun button(label:String,run:()->Unit)=Button(this).apply{text=label;setOnClickListener{run()}}
-        status=TextView(this).apply{setTextColor(Color.WHITE);text="FME • EVERYTHING INSIDE • ONE APK";setPadding(12,8,12,8)}
-        bar.addView(button("FME ROOMS"){showFmeRooms()}); bar.addView(button("SYSTEMS"){showSystems()}); bar.addView(button("TEST ROM"){loadTest()}); bar.addView(button("IMPORT ROM"){pickRom()})
-        bar.addView(button("SAVE STATE"){if(core?.saveState(0)==true) status.text="STATE SAVED"})
-        bar.addView(button("LOAD STATE"){if(core?.loadState(0)==true) status.text="STATE LOADED"})
-        bar.addView(button("RESET"){core?.reset()})
-        root.addView(status); root.addView(bar)
-        display=FrameLayout(this); screen=EmulatorView(this); screen.touchSink={x,y,down->NativeBridge.setPointer(x,y,down)}; hardware=HardwareRenderView(this); display.addView(screen,FrameLayout.LayoutParams(-1,-1)); root.addView(display,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
+        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(FmeCockpit.BG)}
+        root.addView(FmeCockpit.header(this))
+        root.addView(FmeCockpit.nav(this){openCockpitRoom(it)})
+        status=TextView(this).apply{setTextColor(FmeCockpit.TEXT);setBackgroundColor(0xff070b10.toInt());text="FME • CONTROL CENTER • READY";setPadding(14,8,14,8)}
+        root.addView(status)
+        display=FrameLayout(this).apply{setBackgroundColor(FmeCockpit.BG)}
+        screen=EmulatorView(this);screen.touchSink={x,y,down->NativeBridge.setPointer(x,y,down)}
+        hardware=HardwareRenderView(this)
+        root.addView(display,LinearLayout.LayoutParams(-1,0,1f))
+        setContentView(root)
+        showCockpitHome()
         if(intent.getBooleanExtra("autoTest",false)) loadTest()
+    }
+    private fun showCockpitHome(){core?.pause();liveTv?.stop();display.removeAllViews();display.addView(FmeCockpit.home(this){openCockpitRoom(it)},FrameLayout.LayoutParams(-1,-1));status.text="FME • HOME • EVERYTHING INSIDE"}
+    private fun openCockpitRoom(id:String){
+        if(id=="home"){showCockpitHome();return}
+        val r=FmeRoomRegistry.rooms.firstOrNull{it.id==id}?:run{status.text="FME • $id • ROOM NOT REGISTERED";return}
+        when(r.id){
+            "tv"->showDemonicTv()
+            "emulator"->{prepareDisplay(CoreRegistry.specs.first());status.text="UNIVERSAL EMULATOR • IMPORT A ROM";pickRom()}
+            "games","8bit","hyphyxels","carnival"->openRoom(r,FmeGameRooms.build(this,r.id))
+            "agent"->openRoom(r,FmeUtilityRooms.agent(this))
+            "potna"->openRoom(r,FmeUtilityRooms.potna(this))
+            "bayauto"->openRoom(r,FmeUtilityRooms.bayAuto(this))
+            "octop"->openRoom(r,FmeControlRooms.octop(this))
+            "remote"->openRoom(r,FmeControlRooms.remote(this))
+            else->showRoomNotMigrated(r)
+        }
     }
     private fun showFmeRooms(){
         val labels=FmeRoomRegistry.rooms.map{it.title+"  •  "+it.kind}.toTypedArray()
