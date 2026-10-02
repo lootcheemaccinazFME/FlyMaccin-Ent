@@ -24,7 +24,16 @@ class MainActivity:Activity(){
         screen=EmulatorView(this);screen.touchSink={x,y,down->NativeBridge.setPointer(x,y,down)};root.addView(screen,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
         if(intent.getBooleanExtra("autoTest",false)) loadTest()
     }
-    private fun showSystems(){\n        val names=CoreRegistry.specs.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()\n        android.app.AlertDialog.Builder(this).setTitle("FME UNIVERSAL EMULATOR • SYSTEMS").setItems(names){_,i->status.text="READY • "+CoreRegistry.specs[i].systems.joinToString("/")+" • IMPORT A ROM"}.setNegativeButton("CLOSE",null).show()\n    }\n    private fun chooseCore(uri:android.net.Uri,matches:List<CoreSpec>){\n        val labels=matches.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()\n        android.app.AlertDialog.Builder(this).setTitle("CHOOSE SYSTEM").setItems(labels){_,i->loadUriWithCore(uri,matches[i])}.setNegativeButton("CANCEL",null).show()\n    }\n    private fun loadUriWithCore(uri:android.net.Uri,spec:CoreSpec){switchCore(spec);val c=core?:return;c.load(uri).onSuccess{c.start();status.text="PLAYING "+spec.systems.joinToString("/")+" • "+spec.id}.onFailure{status.text="ROM ERROR: "+it.message}}\n    private fun loadTest(){ switchCore(CoreRegistry.specs.first{it.id=="sameboy"}); val c=core?:return;c.loadBuiltIn(TestRom.build(),"lootchee-test-rom").onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • SAMEBOY"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }
+    private fun showSystems(){
+        val names=CoreRegistry.specs.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()
+        android.app.AlertDialog.Builder(this).setTitle("FME UNIVERSAL EMULATOR • SYSTEMS").setItems(names){_,i->status.text="READY • "+CoreRegistry.specs[i].systems.joinToString("/")+" • IMPORT A ROM"}.setNegativeButton("CLOSE",null).show()
+    }
+    private fun chooseCore(uri:android.net.Uri,matches:List<CoreSpec>){
+        val labels=matches.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()
+        android.app.AlertDialog.Builder(this).setTitle("CHOOSE SYSTEM").setItems(labels){_,i->loadUriWithCore(uri,matches[i])}.setNegativeButton("CANCEL",null).show()
+    }
+    private fun loadUriWithCore(uri:android.net.Uri,spec:CoreSpec){switchCore(spec);val c=core?:return;c.load(uri).onSuccess{c.start();status.text="PLAYING "+spec.systems.joinToString("/")+" • "+spec.id}.onFailure{status.text="ROM ERROR: "+it.message}}
+    private fun loadTest(){ switchCore(CoreRegistry.specs.first{it.id=="sameboy"}); val c=core?:return;c.loadBuiltIn(TestRom.build(),"lootchee-test-rom").onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • SAMEBOY"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }
     private fun switchCore(spec:CoreSpec){core?.stop();core=runCatching{LibretroCore(this,spec){p,w,h->runOnUiThread{screen.submit(p,w,h)}}}.getOrElse{status.text="CORE ERROR "+spec.id+": "+it.message;null}}
     private fun pickRom(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/octet-stream";addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)},100)}
     @Deprecated("compat")
