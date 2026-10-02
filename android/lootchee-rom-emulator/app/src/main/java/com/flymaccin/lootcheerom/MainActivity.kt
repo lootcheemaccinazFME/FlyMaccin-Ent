@@ -12,6 +12,7 @@ class MainActivity:Activity(){
     private lateinit var hardware:HardwareRenderView
     private lateinit var display:FrameLayout
     private var core:LibretroCore?=null
+    private var liveTv:LiveTvPlayer?=null
     override fun onCreate(state:Bundle?){
         super.onCreate(state)
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.BLACK)}
@@ -36,9 +37,26 @@ class MainActivity:Activity(){
         box.addView(now)
         val import=Button(this).apply{text="IMPORT FILE";setOnClickListener{DemonicTvRoom.importFile(this@MainActivity)}}
         box.addView(import)
-        box.addView(TextView(this).apply{text="Accepts local video/audio through Android Storage Access Framework. The file stays in Demonic TV inside the FME APK."})
+        val live=Button(this).apply{text="FREE LIVE TV";setOnClickListener{showFreeLiveTv()}}
+        box.addView(live)
+        box.addView(TextView(this).apply{text="Local media plus authorized/public free live streams. Everything plays inside Demonic TV."})
         android.app.AlertDialog.Builder(this).setTitle("DEMONIC TV").setView(box).setNegativeButton("CLOSE",null).show()
         status.text="FME ROOM • DEMONIC TV • MEDIA ROOM"
+    }
+    private fun showFreeLiveTv(){
+        val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(20,12,20,12)}
+        val player=LiveTvPlayer(this);liveTv?.stop();liveTv=player;box.addView(player,LinearLayout.LayoutParams(-1,420))
+        val name=EditText(this).apply{hint="Channel name"};val url=EditText(this).apply{hint="Authorized/public stream URL (http/https)"}
+        box.addView(name);box.addView(url)
+        val add=Button(this).apply{text="ADD CHANNEL";setOnClickListener{FreeLiveTv.add(this@MainActivity,name.text.toString(),url.text.toString()).onSuccess{status.text="LIVE TV • ADDED • "+it.name;showFreeLiveTv()}.onFailure{status.text="LIVE TV • "+it.message}}};box.addView(add)
+        FreeLiveTv.channels(this).forEach{ch->
+            val row=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
+            row.addView(Button(this).apply{text="WATCH • "+ch.name;setOnClickListener{player.tune(ch.name,ch.stream)}},LinearLayout.LayoutParams(0,-2,1f))
+            row.addView(Button(this).apply{text="REMOVE";setOnClickListener{FreeLiveTv.remove(this@MainActivity,ch.name);showFreeLiveTv()}})
+            box.addView(row)
+        }
+        android.app.AlertDialog.Builder(this).setTitle("DEMONIC TV • FREE LIVE TV").setView(box).setNegativeButton("CLOSE"){_,_->player.stop()}.show()
+        status.text="DEMONIC TV • FREE LIVE TV"
     }
     private fun showSystems(){
         val names=CoreRegistry.specs.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()
@@ -64,7 +82,7 @@ class MainActivity:Activity(){
     }}
     override fun onPause(){super.onPause();core?.pause();hardware.onPause()}
     override fun onResume(){super.onResume();hardware.onResume();core?.resume()}
-    override fun onDestroy(){core?.stop();super.onDestroy()}
+    override fun onDestroy(){liveTv?.stop();core?.stop();super.onDestroy()}
     override fun dispatchKeyEvent(e:KeyEvent):Boolean{
         if((e.source and InputDevice.SOURCE_GAMEPAD)!=0||(e.source and InputDevice.SOURCE_JOYSTICK)!=0){
             val a=when(e.keyCode){KeyEvent.KEYCODE_DPAD_UP->GameAction.UP;KeyEvent.KEYCODE_DPAD_DOWN->GameAction.DOWN;KeyEvent.KEYCODE_DPAD_LEFT->GameAction.LEFT;KeyEvent.KEYCODE_DPAD_RIGHT->GameAction.RIGHT;KeyEvent.KEYCODE_BUTTON_A->GameAction.A;KeyEvent.KEYCODE_BUTTON_B->GameAction.B;KeyEvent.KEYCODE_BUTTON_X->GameAction.X;KeyEvent.KEYCODE_BUTTON_Y->GameAction.Y;KeyEvent.KEYCODE_BUTTON_START->GameAction.START;KeyEvent.KEYCODE_BUTTON_SELECT->GameAction.SELECT;KeyEvent.KEYCODE_BUTTON_L1->GameAction.L1;KeyEvent.KEYCODE_BUTTON_R1->GameAction.R1;else->null}
