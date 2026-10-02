@@ -4,7 +4,7 @@ data class RuntimeCapability(val core:String,val backend:RenderBackend,val note:
 object RuntimeCapabilities {
     fun forCore(id:String)=when(id){
         "sameboy","fceumm","mgba","bsnes","gearsystem","clownmdemu","pcsx_rearmed","mednafen_pce_fast","stella","handy","geolith" -> RuntimeCapability(id,RenderBackend.SOFTWARE,"Software framebuffer supported by LOOTCHEE frontend")
-        "mupen64plus_next","melondsds","ppsspp","flycast","play" -> RuntimeCapability(id,RenderBackend.OPENGL_ES,"Requires hardware-render context; EGL host in progress")
+        "mupen64plus_next","melondsds","ppsspp","flycast","play" -> RuntimeCapability(id,RenderBackend.OPENGL_ES,"GLSurfaceView/EGL host available; per-core runtime certification required")
         else -> RuntimeCapability(id,RenderBackend.UNSUPPORTED,"No certified renderer")
     }
 }
