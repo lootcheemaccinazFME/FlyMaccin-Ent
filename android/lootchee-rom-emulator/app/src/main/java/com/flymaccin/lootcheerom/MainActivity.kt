@@ -34,7 +34,8 @@ class MainActivity:Activity(){
         val r=FmeRoomRegistry.rooms.firstOrNull{it.id==id}?:run{status.text="FME • $id • ROOM NOT REGISTERED";return}
         when(r.id){
             "tv"->showDemonicTv()
-            "emulator"->{prepareDisplay(CoreRegistry.specs.first());status.text="UNIVERSAL EMULATOR • IMPORT A ROM";pickRom()}
+            "daw"->openRoom(r,DemonicDawRoom.build(this))
+            "emulator"->openRoom(r,EmulatorCockpit.build(this){handleEmulatorCommand(it)})
             "games","8bit","hyphyxels","carnival"->openRoom(r,FmeGameRooms.build(this,r.id))
             "agent"->openRoom(r,FmeUtilityRooms.agent(this))
             "potna"->openRoom(r,FmeUtilityRooms.potna(this))
@@ -44,6 +45,7 @@ class MainActivity:Activity(){
             else->showRoomNotMigrated(r)
         }
     }
+    private fun handleEmulatorCommand(cmd:String){when(cmd){"import"->pickRom();"test"->loadTest();"save"->{if(core?.saveState(0)==true)status.text="STATE SAVED"};"load"->{if(core?.loadState(0)==true)status.text="STATE LOADED"};"reset"->core?.reset()}}
     private fun showFmeRooms(){
         val labels=FmeRoomRegistry.rooms.map{it.title+"  •  "+it.kind}.toTypedArray()
         android.app.AlertDialog.Builder(this).setTitle("FME • EVERYTHING INSIDE").setItems(labels){_,i->
