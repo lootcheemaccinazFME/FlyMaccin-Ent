@@ -40,6 +40,7 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
     private Uri importedUri;
     private LinearLayout movieLibrary;
     private final Set<String> savedMovies = new LinkedHashSet<>();
+    private final Set<String> recentMovies = new LinkedHashSet<>();
     private final Set<String> savedChannels = new LinkedHashSet<>();
     private final Set<String> favoriteChannels = new LinkedHashSet<>();
     private DisplayMode mode = DisplayMode.DOCKED;
@@ -171,7 +172,9 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
     private void loadMovieLibrary() {
         SharedPreferences prefs = getSharedPreferences("demonic_tv_movies", MODE_PRIVATE);
         savedMovies.clear();
+        recentMovies.clear();
         savedMovies.addAll(prefs.getStringSet("movies", new LinkedHashSet<>()));
+        recentMovies.addAll(prefs.getStringSet("recent", new LinkedHashSet<>()));
         refreshMovieLibrary();
     }
 
@@ -185,9 +188,16 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         movieLibrary.addView(button("PiP", v -> enterTvPip()));
         movieLibrary.addView(button("AUDIO", v -> toast("Audio track controls")));
         movieLibrary.addView(button("SUBTITLES", v -> toast("Subtitle controls")));
+        if (!recentMovies.isEmpty()) movieLibrary.addView(text("RECENT", 12));
+        for (String recent : recentMovies) {
+            Uri uri = Uri.parse(recent);
+            movieLibrary.addView(button("▶ " + displayName(uri), v -> playImportedFile(uri)));
+        }
+        if (!savedMovies.isEmpty()) movieLibrary.addView(text("LIBRARY", 12));
         for (String saved : savedMovies) {
             Uri uri = Uri.parse(saved);
             movieLibrary.addView(button(displayName(uri), v -> playImportedFile(uri)));
+            movieLibrary.addView(button("REMOVE", v -> removeMovie(uri)));
         }
     }
 
@@ -195,12 +205,24 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         stopMoviePlayback();
         receiver.detachSurface();
         importedUri = uri;
+        recentMovies.remove(uri.toString());
+        recentMovies.add(uri.toString());
+        while (recentMovies.size() > 8) recentMovies.remove(recentMovies.iterator().next());
+        getSharedPreferences("demonic_tv_movies", MODE_PRIVATE).edit()
+            .putStringSet("recent", new LinkedHashSet<>(recentMovies)).apply();
         video.setVisibility(View.GONE);
         watermark.setVisibility(View.GONE);
         movieView.setVisibility(View.VISIBLE);
         movieView.setVideoURI(uri);
         movieView.setOnPreparedListener(player -> {
-            status.setText("Now playing: " + displayName(uri));
+            int resumeMs = getSharedPreferences("demonic_tv_resume", MODE_PRIVATE)
+                .getInt(uri.toString(), 0);
+            if (resumeMs > 5000 && resumeMs < player.getDuration() - 5000) {
+                movieView.seekTo(resumeMs);
+                status.setText("Resuming: " + displayName(uri));
+            } else {
+                status.setText("Now playing: " + displayName(uri));
+            }
             movieView.start();
         });
         movieView.setOnCompletionListener(player ->
@@ -226,7 +248,29 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         return name != null ? name : "local media";
     }
 
+    private void removeMovie(Uri uri) {
+        savedMovies.remove(uri.toString());
+        recentMovies.remove(uri.toString());
+        getSharedPreferences("demonic_tv_movies", MODE_PRIVATE).edit()
+            .putStringSet("movies", new LinkedHashSet<>(savedMovies))
+            .putStringSet("recent", new LinkedHashSet<>(recentMovies)).apply();
+        getSharedPreferences("demonic_tv_resume", MODE_PRIVATE).edit()
+            .remove(uri.toString()).apply();
+        if (uri.equals(importedUri)) stopMoviePlayback();
+        refreshMovieLibrary();
+        status.setText("Removed from My Movies • original file untouched");
+    }
+
+    private void saveResumePosition() {
+        if (movieView != null && movieView.getVisibility() == View.VISIBLE && importedUri != null) {
+            int position = movieView.getCurrentPosition();
+            if (position > 0) getSharedPreferences("demonic_tv_resume", MODE_PRIVATE)
+                .edit().putInt(importedUri.toString(), position).apply();
+        }
+    }
+
     private void stopMoviePlayback() {
+        saveResumePosition();
         if (movieView != null) {
             try { movieView.stopPlayback(); } catch (Exception ignored) {}
             movieView.setVisibility(View.GONE);
@@ -416,6 +460,11 @@ public final class TvActivity extends Activity implements Ps5Receiver.Listener {
         runOnUiThread(() -> {
             if (movieView == null || movieView.getVisibility() != View.VISIBLE) status.setText("PS5: "+s+" • "+detail+" • DAW capture OFF");
         });
+    }
+
+    @Override protected void onPause() {
+        saveResumePosition();
+        super.onPause();
     }
 
     @Override protected void onDestroy() {
