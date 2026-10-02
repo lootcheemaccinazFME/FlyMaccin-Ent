@@ -48,6 +48,10 @@ jobs:
           grep -q 'FLYMACCIN ENT' "$COCKPIT"
           grep -q 'ONE APP • EVERYTHING FME' "$COCKPIT"
           grep -q 'FmeCockpit.nav' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
+          grep -q 'DemonicDawRoom.build' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
+          grep -q 'EmulatorCockpit.build' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
+          grep -q 'ARRANGEMENT / TIMELINE' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/DemonicDawRoom.kt"
+          grep -q '16 CORES' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/EmulatorCockpit.kt"
       - name: Build canonical single APK
         working-directory: android/lootchee-rom-emulator
         run: gradle --no-daemon :app:assembleDebug
