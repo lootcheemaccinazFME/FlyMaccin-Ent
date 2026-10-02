@@ -27,6 +27,11 @@ jobs:
           test "$(find android/lootchee-rom-emulator -type f -name '*.apk' | wc -l)" -eq 1
           grep -q 'CoreSpec("sameboy"' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/CoreRegistry.kt
           grep -q 'CoreSpec("play"' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/CoreRegistry.kt
+          test "$(grep -c 'CoreSpec("' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/CoreRegistry.kt)" -eq 16
+          grep -q 'HardwareRenderView' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt
+          grep -q 'GLSurfaceView' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/HardwareRenderView.kt
+          grep -q 'saveState' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/LibretroCore.kt
+          grep -q 'restoreSram' android/lootchee-rom-emulator/app/src/main/java/com/flymaccin/lootcheerom/LibretroCore.kt
           sha256sum "$APK" > /tmp/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
