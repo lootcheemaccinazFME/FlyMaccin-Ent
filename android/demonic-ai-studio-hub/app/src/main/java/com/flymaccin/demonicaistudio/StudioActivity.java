@@ -29,6 +29,11 @@ import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Space;
 import android.widget.TextView;
+import android.widget.VideoView;
+import android.widget.MediaController;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.webkit.WebSettings;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -46,6 +51,8 @@ public final class StudioActivity extends Activity {
     private static final int WHITE = Color.rgb(239, 241, 248);
     private static final int MUTED = Color.rgb(157, 163, 180);
     private static final int MIC_PERMISSION = 2201;
+    private static final int PRODUCTION_IMPORT = 3301;
+    private static final int TV_IMPORT = 4401;
     private static final String PREFS = "demonic_studio_v110";
     private static final String PROJECT_KEY = "autosave_project";
     private static final String[] TRACK_NAMES = {"PIANO", "GUITAR", "DRUMS", "VOICE"};
@@ -64,6 +71,9 @@ public final class StudioActivity extends Activity {
     private TextView status;
     private TextView position;
     private boolean playing;
+    private boolean productionPlaying;
+    private long productionStartedAtMs;
+    private int productionStartTick;
     private int transportStep;
     private int lastPlayedStep;
     private int selectedStep;
@@ -77,15 +87,44 @@ public final class StudioActivity extends Activity {
     private String clipboard = "";
     private int clipboardTrack = -1;
     private MediaPlayer voicePlayer;
+    private MediaPlayer importedPlayer;
+    private final ArrayList<String> productionUndo = new ArrayList<>();
+    private final ArrayList<String> productionRedo = new ArrayList<>();
+    private boolean restoringProductionHistory=false;
     private Uri lastExportUri;
     private String lastExportName = "No export yet";
     private boolean pendingRecord;
+    private Uri incomingAssetUri;
+    private VideoView tvVideo;
+    private final ArrayList<String> tvLibrary = new ArrayList<>();
+    private ProductionProject production = new ProductionProject();
+    private MaestroProject maestro = new MaestroProject();
+    private GenericDawEngine generic = new GenericDawEngine();
+    private int productionChannel = 0;
+    private String productionImportKind = "";
+    private String incomingAssetMime="";
 
     private final String[] chordNames = {"C", "G", "D", "Am", "Em", "F", "E", "A"};
     private final int[][] chordMidi = {
             {48, 52, 55, 60, 64}, {43, 47, 50, 55, 59, 67}, {50, 54, 57, 62, 66},
             {45, 52, 57, 60, 64}, {40, 47, 52, 55, 59, 64}, {41, 48, 53, 57, 60, 65},
             {40, 47, 52, 56, 59, 64}, {45, 52, 57, 61, 64, 69}
+    };
+
+    private final Runnable productionTransportRunner = new Runnable() {
+        @Override public void run() {
+            if (!productionPlaying) return;
+            long now=android.os.SystemClock.elapsedRealtime();
+            double ticksPerMs=production.bpm*ProductionProject.PPQ/60000.0;
+            int tick=productionStartTick+(int)Math.round((now-productionStartedAtMs)*ticksPerMs);
+            int end=Math.max(ProductionProject.PPQ,production.bars*4*ProductionProject.PPQ);
+            int loopStart=Math.max(0,production.loopStartTick),loopEnd=Math.min(end,Math.max(loopStart+1,production.loopEndTick));
+            if(production.loop&&tick>=loopEnd){productionStartTick=loopStart;productionStartedAtMs=now;tick=loopStart;}
+            else if(tick>=end){production.playheadTick=end;productionPlaying=false;status.setText("PRODUCTION COMPLETE");autosaveProduction();return;}
+            production.playheadTick=Math.max(0,Math.min(end,tick));
+            position.setText(String.format(Locale.US,"BAR %d · %d BPM",1+production.playheadTick/(ProductionProject.PPQ*4),production.bpm));
+            transportHandler.postDelayed(this,25);
+        }
     };
 
     private final Runnable transportRunner = new Runnable() {
@@ -118,16 +157,24 @@ public final class StudioActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        hideSystemBars();
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         project = StudioProject.fromJson(prefs.getString(PROJECT_KEY, ""));
+        production = ProductionProject.fromJson(prefs.getString("production_project_v2", ""));
+        maestro = MaestroProject.fromJson(prefs.getString("maestro_project_v1", ""));
+        generic = GenericDawEngine.fromJson(prefs.getString("generic_daw_engine_v1", ""));
+        generic.normalizeFor(production);
+        loadTvLibrary();
         setContentView(buildShell());
+        getWindow().getDecorView().post(this::hideSystemBars);
         showHome();
+        if(getIntent()!=null&&getIntent().getData()!=null&&!Intent.ACTION_VIEW.equals(getIntent().getAction())){incomingAssetUri=getIntent().getData();incomingAssetMime=getIntent().getStringExtra("fme_asset_mime");if(incomingAssetMime==null)incomingAssetMime="";status.setText("LIBRARY ASSET READY · "+incomingAssetMime);}
     }
 
     private void hideSystemBars() {
         if (android.os.Build.VERSION.SDK_INT >= 30) {
-            WindowInsetsController controller = getWindow().getInsetsController();
+            View decor = getWindow().getDecorView();
+            if (decor == null || !decor.isAttachedToWindow()) return;
+            WindowInsetsController controller = decor.getWindowInsetsController();
             if (controller != null) {
                 controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
                 controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
@@ -148,6 +195,8 @@ public final class StudioActivity extends Activity {
         header.addView(smallButton("▶ PLAY", v -> startTransport()));
         header.addView(smallButton("Ⅱ PAUSE", v -> pauseTransport()));
         header.addView(smallButton("■ STOP", v -> stopTransport()));
+        header.addView(smallButton("↶ UNDO", v -> undoProduction()));
+        header.addView(smallButton("↷ REDO", v -> redoProduction()));
         status = text("AUTOSAVE RESTORED", 11, GREEN, true);
         header.addView(status);
         root.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
@@ -160,7 +209,15 @@ public final class StudioActivity extends Activity {
         LinearLayout nav = row();
         nav.setPadding(dp(5), dp(5), dp(5), dp(7));
         nav.addView(navButton("HOME", v -> showHome()));
+        nav.addView(navButton("MAESTRO", v -> showMaestroRoom()));
+        nav.addView(navButton("DEMONIC TV", v -> showDemonicTv()));
+        nav.addView(navButton("GENERIC", v -> showGenericDawRoom()));
+        nav.addView(navButton("+ TRACK", v -> showAddTrack()));
+        nav.addView(navButton("TRACKS", v -> showProductionTracks()));
         nav.addView(navButton("PIANO", v -> showPiano()));
+        nav.addView(navButton("SAMPLER", v -> showSampler()));
+        nav.addView(navButton("PIANO ROLL", v -> showPianoRoll()));
+        nav.addView(navButton("INSTRUMENTS", v -> showInstruments()));
         nav.addView(navButton("GUITAR", v -> showGuitar()));
         nav.addView(navButton("DRUMS", v -> showDrums()));
         nav.addView(navButton("TIMELINE", v -> showTimeline()));
@@ -188,10 +245,189 @@ public final class StudioActivity extends Activity {
         rowTwo.addView(featureCard("TIMELINE", "Edit and arrange all four tracks", GREEN, v -> showTimeline()));
         rowTwo.addView(featureCard("MIXER + FX", "Volume · pan · solo · effects", PURPLE, v -> showMixer()));
         rowTwo.addView(featureCard("WAV EXPORT", "Master mix and four stems", WHITE, v -> showExport()));
+        if(incomingAssetUri!=null)rowTwo.addView(featureCard("LIBRARY ASSET","Preview / attach shared asset",CYAN,v->showIncomingAsset()));
         page.addView(rowTwo);
         scroll.addView(page);
         setPage(scroll);
     }
+
+    private void autosaveGeneric(){generic.normalizeFor(production);getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("generic_daw_engine_v1",generic.toJson()).apply();}
+
+    private void showGenericDawRoom(){
+        ScrollView scroll=new ScrollView(this);
+        LinearLayout page=column();
+        page.setPadding(dp(18),dp(10),dp(18),dp(16));
+        page.addView(text("GENERIC DAW ENGINE",25,GOLD,true));
+        page.addView(text("NATIVE INSIDE DEMONIC · SHARED PROJECT / TRANSPORT / TRACKS",12,MUTED,true));
+        page.addView(text("This is the Generic DAW architecture folded into the current Demonic production session. No launcher, no app switching.",14,WHITE,false));
+
+        LinearLayout transport=row();
+        transport.addView(actionButton(generic.metronome?"METRONOME ON":"METRONOME OFF",generic.metronome?GREEN:PANEL_2,v->{generic.metronome=!generic.metronome;autosaveGeneric();showGenericDawRoom();}));
+        transport.addView(actionButton(generic.loopEnabled?"LOOP ON":"LOOP OFF",generic.loopEnabled?CYAN:PANEL_2,v->{generic.loopEnabled=!generic.loopEnabled;autosaveGeneric();showGenericDawRoom();}));
+        transport.addView(actionButton("BPM −",PANEL_2,v->{production.bpm=Math.max(40,production.bpm-1);project.bpm=production.bpm;autosaveProduction();autosaveGeneric();showGenericDawRoom();}));
+        transport.addView(text(production.bpm+" BPM · "+generic.numerator+"/4",14,CYAN,true));
+        transport.addView(actionButton("BPM +",PANEL_2,v->{production.bpm=Math.min(240,production.bpm+1);project.bpm=production.bpm;autosaveProduction();autosaveGeneric();showGenericDawRoom();}));
+        page.addView(transport);
+
+        LinearLayout row1=row();
+        row1.addView(featureCard("ARRANGE","Audio + MIDI clips on Demonic ProductionProject",GREEN,v->showTimeline()));
+        row1.addView(featureCard("MIXER","Channel volume · pan · solo · FX",PURPLE,v->showMixer()));
+        row1.addView(featureCard("PIANO ROLL","MIDI notes · velocity-ready architecture",CYAN,v->showPianoRoll()));
+        page.addView(row1);
+
+        LinearLayout row2=row();
+        row2.addView(featureCard("AUDIO CLIPS","Trim · slice · reverse · gain · imported audio",GOLD,v->showSampler()));
+        row2.addView(featureCard("TRACK GRAPH",production.channels.size()+" dynamic channels · route state",RED,v->showProductionTracks()));
+        row2.addView(featureCard("RECORD","Audio recording into Demonic session",WHITE,v->showRecorder()));
+        page.addView(row2);
+
+        page.addView(text("Generic source concepts adopted here: unified transport state, loop range, audio/MIDI clips, clip trim/move/stretch/reverse/slip model, channel graph/routing model, recording paths and plugin-slot architecture. Rust CLAP/audio-thread runtime itself is not embedded in Android yet.",12,MUTED,false));
+        scroll.addView(page);setPage(scroll);
+    }
+
+    private void loadTvLibrary(){
+        tvLibrary.clear();
+        String raw=getSharedPreferences(PREFS,MODE_PRIVATE).getString("demonic_tv_library_v1","");
+        if(!raw.isEmpty())for(String s:raw.split("\\n"))if(!s.trim().isEmpty())tvLibrary.add(s.trim());
+    }
+
+    private void saveTvLibrary(){
+        StringBuilder b=new StringBuilder();
+        for(String s:tvLibrary){if(b.length()>0)b.append("\n");b.append(s);}
+        getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("demonic_tv_library_v1",b.toString()).apply();
+    }
+
+    private String mediaName(Uri uri){
+        String name=uri.getLastPathSegment();
+        android.database.Cursor q=null;
+        try{q=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null);if(q!=null&&q.moveToFirst())name=q.getString(0);}catch(Exception ignored){}finally{if(q!=null)q.close();}
+        return name==null?"Movie":name;
+    }
+
+    private void showDemonicTv() {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout page = column();
+        page.setPadding(dp(18), dp(10), dp(18), dp(16));
+        page.addView(text("DEMONIC TV", 25, RED, true));
+        page.addView(text("YOUR MOVIES · VIDEOS · PROJECT MEDIA", 12, MUTED, true));
+        page.addView(text("Import videos from your device and watch them directly inside Demonic. Imported document permissions are retained so your TV library survives app restarts.", 14, WHITE, false));
+        page.addView(actionButton("+ ADD MOVIE / VIDEO", CYAN, v -> importDemonicTvFile()));
+        page.addView(text("TV LIBRARY · "+tvLibrary.size(),16,GOLD,true));
+        if(tvLibrary.isEmpty()) page.addView(text("No movies imported yet.",13,MUTED,false));
+        for(int n=0;n<tvLibrary.size();n++){
+            final int ix=n; final Uri uri=Uri.parse(tvLibrary.get(n));
+            LinearLayout r=row();r.setBackgroundColor(PANEL);r.setPadding(dp(8),dp(5),dp(8),dp(5));
+            r.addView(actionButton("▶ "+mediaName(uri),GREEN,v->playDemonicTv(uri)));
+            r.addView(smallButton("REMOVE",v->{tvLibrary.remove(ix);saveTvLibrary();showDemonicTv();}));
+            page.addView(r);
+        }
+        LinearLayout studio=row();
+        studio.addView(featureCard("MAESTRO VIDEO","Generate / continue video in Creative AI",PURPLE,v->showMaestroGenerator(MaestroProject.Kind.VIDEO)));
+        studio.addView(featureCard("PROJECT AUDIO","Open Demonic production tracks",GOLD,v->showProductionTracks()));
+        page.addView(studio);
+        scroll.addView(page);
+        setPage(scroll);
+    }
+
+    private void playDemonicTv(Uri uri){
+        LinearLayout page=column();
+        LinearLayout bar=row();bar.setPadding(dp(8),dp(4),dp(8),dp(4));
+        bar.addView(actionButton("← LIBRARY",PANEL_2,v->{stopTvVideo();showDemonicTv();}));
+        bar.addView(text(mediaName(uri),17,CYAN,true));
+        page.addView(bar,new LinearLayout.LayoutParams(-1,dp(64)));
+        tvVideo=new VideoView(this);
+        MediaController controls=new MediaController(this);
+        controls.setAnchorView(tvVideo);
+        tvVideo.setMediaController(controls);
+        tvVideo.setVideoURI(uri);
+        tvVideo.setOnPreparedListener(mp->{status.setText("DEMONIC TV · PLAYING");tvVideo.start();});
+        tvVideo.setOnCompletionListener(mp->status.setText("DEMONIC TV · COMPLETE"));
+        tvVideo.setOnErrorListener((mp,what,extra)->{status.setText("DEMONIC TV · VIDEO FORMAT ERROR");return false;});
+        page.addView(tvVideo,new LinearLayout.LayoutParams(-1,0,1));
+        setPage(page);
+        tvVideo.requestFocus();
+    }
+
+    private void stopTvVideo(){
+        if(tvVideo!=null){try{tvVideo.stopPlayback();}catch(Exception ignored){}tvVideo=null;}
+    }
+
+    private void openLiveTv(String provider,String url){
+        LinearLayout page=column();
+        LinearLayout bar=row();
+        bar.setPadding(dp(8),dp(4),dp(8),dp(4));
+        bar.addView(actionButton("← TV GUIDE",PANEL_2,v->showDemonicTv()));
+        bar.addView(text(provider+" · FREE LIVE",17,CYAN,true));
+        page.addView(bar,new LinearLayout.LayoutParams(-1,dp(64)));
+        WebView web=new WebView(this);
+        WebSettings s=web.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setLoadWithOverviewMode(true);
+        s.setUseWideViewPort(true);
+        web.setWebViewClient(new WebViewClient());
+        web.loadUrl(url);
+        page.addView(web,new LinearLayout.LayoutParams(-1,0,1));
+        setPage(page);
+        status.setText("DEMONIC TV · "+provider);
+    }
+
+    private void importDemonicTvFile() {
+        Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        pick.addCategory(Intent.CATEGORY_OPENABLE);
+        pick.setType("video/*");
+        startActivityForResult(pick, TV_IMPORT);
+    }
+
+    private void showMaestroRoom(){ScrollView scroll=new ScrollView(this);LinearLayout page=column();page.setPadding(dp(18),dp(10),dp(18),dp(16));page.addView(text("CREATIVE AI · MAC-MAESTRO",25,GOLD,true));page.addView(text("DIRECTOR + IMAGE + VIDEO + MUSIC + AUDIO",12,MUTED,true));LinearLayout modes=row();modes.addView(featureCard("DIRECTOR","Music video · short film · long-form shot plans",PURPLE,v->showMaestroDirector()));modes.addView(featureCard("IMAGE AI","Qwen / Z-Image generation jobs",CYAN,v->showMaestroGenerator(MaestroProject.Kind.IMAGE)));modes.addView(featureCard("VIDEO AI","T2V · I2V · A2V · extend / continuation",RED,v->showMaestroGenerator(MaestroProject.Kind.VIDEO)));page.addView(modes);LinearLayout modes2=row();modes2.addView(featureCard("MUSIC AI","Generated music returns to Demonic assets",GREEN,v->showMaestroGenerator(MaestroProject.Kind.MUSIC)));modes2.addView(featureCard("AUDIO AI","Voice / audio generation lane",GOLD,v->showMaestroGenerator(MaestroProject.Kind.AUDIO)));modes2.addView(featureCard("JOBS","Generation queue · progress · outputs",WHITE,v->showMaestroJobs()));page.addView(modes2);page.addView(text("DAW SESSION · "+production.channels.size()+" channels · "+project.bpm+" BPM · "+project.name,14,WHITE,true));page.addView(actionButton("OPEN DEMONIC TRACK RACK",GREEN,v->showProductionTracks()));scroll.addView(page);setPage(scroll);}
+
+    private void showMaestroGenerator(MaestroProject.Kind kind){LinearLayout page=column();page.setPadding(dp(20),dp(14),dp(20),dp(14));page.addView(text("MAESTRO · "+kind.name(),23,GOLD,true));EditText prompt=new EditText(this);prompt.setHint("Describe what to generate…");prompt.setTextColor(WHITE);prompt.setHintTextColor(MUTED);prompt.setMinLines(5);prompt.setGravity(Gravity.TOP);prompt.setBackgroundColor(PANEL_2);page.addView(prompt,new LinearLayout.LayoutParams(-1,dp(180)));EditText model=new EditText(this);model.setHint(kind==MaestroProject.Kind.IMAGE?"qwen_image / z_image":kind==MaestroProject.Kind.VIDEO?"ltx2 / hunyuan / longcat":kind==MaestroProject.Kind.MUSIC?"minimax_music3 / ace_step":"audio model");model.setTextColor(WHITE);model.setHintTextColor(MUTED);page.addView(model,new LinearLayout.LayoutParams(-1,dp(58)));page.addView(actionButton("QUEUE "+kind.name()+" JOB",CYAN,v->{MaestroProject.Job j=new MaestroProject.Job();j.kind=kind;j.prompt=prompt.getText().toString().trim();j.model=model.getText().toString().trim();maestro.jobs.add(j);autosaveMaestro();status.setText("MAESTRO JOB QUEUED · "+kind.name());showMaestroJobs();}));page.addView(actionButton("BACK TO CREATIVE AI",PANEL_2,v->showMaestroRoom()));setPage(page);}
+
+    private void showMaestroDirector(){LinearLayout page=column();page.setPadding(dp(20),dp(14),dp(20),dp(14));page.addView(text("MAESTRO · DIRECTOR",23,GOLD,true));page.addView(text("Music video · short film · podcast · viral video · long-form orchestration",13,MUTED,false));EditText brief=new EditText(this);brief.setHint("Describe the production, story, song treatment, characters and continuity…");brief.setTextColor(WHITE);brief.setHintTextColor(MUTED);brief.setMinLines(6);brief.setGravity(Gravity.TOP);brief.setBackgroundColor(PANEL_2);page.addView(brief,new LinearLayout.LayoutParams(-1,dp(210)));String[] skills={"music_video","short_film","podcast","viral_video"};for(String skill:skills)page.addView(actionButton("QUEUE "+skill.toUpperCase(),PURPLE,v->{MaestroProject.Job j=new MaestroProject.Job();j.kind=MaestroProject.Kind.DIRECTOR;j.model=skill;j.prompt=brief.getText().toString().trim();maestro.jobs.add(j);autosaveMaestro();showMaestroJobs();}));page.addView(text("Director jobs use Maestro's shot/continuity contract: T2V, I2V, A2V, retake, extend, independent/continuous/extend-previous and sliding-window prompts.",12,MUTED,false));setPage(page);}
+
+    private void showMaestroJobs(){ScrollView sc=new ScrollView(this);LinearLayout page=column();page.setPadding(dp(14),dp(10),dp(14),dp(14));page.addView(text("MAESTRO GENERATION JOBS · "+maestro.jobs.size(),22,GOLD,true));for(int i=maestro.jobs.size()-1;i>=0;i--){MaestroProject.Job j=maestro.jobs.get(i);LinearLayout card=column();card.setBackgroundColor(PANEL);card.setPadding(dp(10),dp(8),dp(10),dp(8));card.addView(text(j.kind+" · "+(j.model.isEmpty()?"AUTO":j.model),15,CYAN,true));card.addView(text(j.status+" · "+j.progress+"%",12,j.status.equals("COMPLETED")?GREEN:MUTED,true));card.addView(text(j.prompt,12,WHITE,false));card.addView(text("OUTPUTS · "+j.outputs.size(),11,MUTED,true));page.addView(card);}page.addView(actionButton("+ NEW CREATIVE JOB",GREEN,v->showMaestroRoom()));sc.addView(page);setPage(sc);}
+
+    private void showAddTrack(){String[] types={"DRUMS","BASS","GUITAR","PIANO","SYNTH","SAMPLER","VOCALS","AUDIO","MIDI","SFZ","SF2"};new AlertDialog.Builder(this).setTitle("ADD TRACK").setItems(types,(d,w)->{ProductionProject.Channel ch=production.addChannel(types[w]+" "+(production.channels.size()+1));ch.instrument.type=ProductionProject.InstrumentType.valueOf(types[w]);productionChannel=production.channels.size()-1;autosaveProduction();showProductionTracks();}).show();}
+
+    private void showProductionTracks(){ScrollView sc=new ScrollView(this);LinearLayout page=column();page.setPadding(dp(10),dp(8),dp(10),dp(8));LinearLayout top=row();top.addView(text("PRODUCTION TRACKS · "+production.channels.size(),20,CYAN,true));top.addView(actionButton("+ TRACK",GREEN,v->showAddTrack()));page.addView(top);for(int i=0;i<production.channels.size();i++){final int ix=i;ProductionProject.Channel ch=production.channels.get(i);LinearLayout r=row();r.setPadding(dp(6),dp(4),dp(6),dp(4));r.setBackgroundColor(ix==productionChannel?PANEL_2:PANEL);r.addView(actionButton(ch.name+" · "+ch.instrument.type,ix==productionChannel?CYAN:WHITE,v->{productionChannel=ix;showProductionTracks();}));r.addView(smallButton("ROLL",v->{productionChannel=ix;showPianoRoll();}));r.addView(smallButton("CLIPS",v->{productionChannel=ix;showSampler();}));r.addView(smallButton("INST",v->{productionChannel=ix;showInstruments();}));r.addView(toggleButton(ch.mute?"MUTED":"MUTE",ch.mute,v->{ch.mute=!ch.mute;autosaveProduction();showProductionTracks();}));r.addView(toggleButton(ch.solo?"SOLO ON":"SOLO",ch.solo,v->{ch.solo=!ch.solo;autosaveProduction();showProductionTracks();}));page.addView(r);}sc.addView(page);setPage(sc);}
+
+    private void showIncomingAsset(){LinearLayout page=column();page.setGravity(Gravity.CENTER);page.addView(text("SHARED LIBRARY ASSET",24,CYAN,true));page.addView(text(incomingAssetMime+"\n"+incomingAssetUri,13,MUTED,false));page.addView(actionButton("PREVIEW AS MEDIA",CYAN,v->{try{Intent i=new Intent(Intent.ACTION_VIEW,incomingAssetUri);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);if(!incomingAssetMime.isEmpty())i.setDataAndType(incomingAssetUri,incomingAssetMime);startActivity(i);}catch(Exception e){status.setText("NO COMPATIBLE PREVIEW");}}));page.addView(text("Direct sampler ingestion is not enabled yet. This screen prevents a received asset from being mistaken for an imported instrument.",12,GOLD,false));setPage(page);}
+
+    private ProductionProject.Channel prodChannel(){while(production.channels.size()<=productionChannel)production.addChannel("Track "+(production.channels.size()+1));return production.channels.get(productionChannel);}
+
+    private void pickProduction(String kind,String mime){productionImportKind=kind;Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType(mime);if(kind.equals("instrument"))i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"audio/wav","application/octet-stream","text/plain"});startActivityForResult(i,PRODUCTION_IMPORT);}
+
+    private void showSampler(){
+        LinearLayout page=column();page.setPadding(dp(12),dp(8),dp(12),dp(8));page.addView(text("SAMPLE LAB · CHOP / TRIM / ARRANGE",20,CYAN,true));
+        page.addView(text("Audio clips are independent production objects with timeline position, trim boundaries, gain, fades and reverse state.",12,MUTED,false));
+        page.addView(actionButton("IMPORT BEAT / SONG / STEM / SAMPLE",CYAN,v->pickProduction("audio","audio/*")));
+        ProductionProject.Channel ch=prodChannel();
+        for(int i=0;i<ch.audio.size();i++){ProductionProject.AudioClip clip=ch.audio.get(i);final int ix=i;LinearLayout r=row();r.addView(text(new File(clip.path).getName()+" · "+clip.trimStartMs+"ms → "+(clip.trimEndMs<0?"END":clip.trimEndMs+"ms")+" · tick "+clip.startTick,12,WHITE,true));r.addView(smallButton("▶ PLAY",v->playImportedClip(ch,clip)));r.addView(smallButton("■ STOP",v->stopImportedClip()));r.addView(smallButton("TRIM +100",v->{clip.trimStartMs+=100;autosaveProduction();showSampler();}));r.addView(smallButton("END −100",v->{clip.trimEndMs=clip.trimEndMs<0?1000:Math.max(clip.trimStartMs+20,clip.trimEndMs-100);autosaveProduction();showSampler();}));r.addView(smallButton("SLICE",v->{ProductionProject.AudioClip b=ProductionProject.AudioClip.from(jsonClip(clip));long mid=clip.trimEndMs<0?clip.trimStartMs+500:(clip.trimStartMs+clip.trimEndMs)/2;b.trimStartMs=mid;clip.trimEndMs=mid;b.startTick=clip.startTick+ProductionProject.PPQ;ch.audio.add(b);autosaveProduction();showSampler();}));r.addView(smallButton(clip.reverse?"REVERSE ON":"REVERSE",v->{clip.reverse=!clip.reverse;autosaveProduction();showSampler();}));page.addView(r);}
+        setPage(page);
+    }
+
+    private void playImportedClip(ProductionProject.Channel ch, ProductionProject.AudioClip clip){stopImportedClip();try{importedPlayer=new MediaPlayer();importedPlayer.setDataSource(clip.path);float left=ch.volume*(ch.pan<=0?1f:1f-ch.pan),right=ch.volume*(ch.pan>=0?1f:1f+ch.pan);importedPlayer.setVolume(left,right);importedPlayer.setOnPreparedListener(p->{try{if(clip.trimStartMs>0)p.seekTo((int)Math.min(Integer.MAX_VALUE,clip.trimStartMs));p.start();status.setText("PLAYING · "+new File(clip.path).getName());if(clip.trimEndMs>clip.trimStartMs){long stopAfter=clip.trimEndMs-clip.trimStartMs;transportHandler.postDelayed(()->{if(importedPlayer==p)stopImportedClip();},stopAfter);}}catch(Exception e){stopImportedClip();status.setText("PLAYBACK FAILED · "+e.getClass().getSimpleName());}});importedPlayer.setOnCompletionListener(p->{if(importedPlayer==p)stopImportedClip();});importedPlayer.prepareAsync();}catch(Exception e){stopImportedClip();status.setText("PLAYBACK FAILED · "+e.getMessage());}}
+    private void stopImportedClip(){if(importedPlayer!=null){try{importedPlayer.stop();}catch(Exception ignored){}try{importedPlayer.release();}catch(Exception ignored){}importedPlayer=null;}}
+
+    private org.json.JSONObject jsonClip(ProductionProject.AudioClip c){try{return c.json();}catch(Exception e){return new org.json.JSONObject();}}
+
+    private void showPianoRoll(){
+        LinearLayout page=column();page.setPadding(dp(10),dp(6),dp(10),dp(6));LinearLayout bar=row();bar.addView(text("PIANO ROLL · MIDI",20,PURPLE,true));bar.addView(actionButton("IMPORT .MID",PURPLE,v->pickProduction("midi","audio/midi")));bar.addView(smallButton("CLEAR",v->{prodChannel().notes.clear();autosaveProduction();showPianoRoll();}));page.addView(bar);
+        PianoRollView roll=new PianoRollView(this);roll.bind(prodChannel().notes,production.bars);roll.setListener(new PianoRollView.Listener(){public void onChanged(){autosaveProduction();status.setText("PIANO ROLL EDIT AUTOSAVED");}public void onPreview(int midi){audio.playPiano(440.0*Math.pow(2,(midi-69)/12.0),260);}});page.addView(roll,new LinearLayout.LayoutParams(-1,0,1));page.addView(text("Tap empty grid to add. Drag notes to move/pitch. Drag the right edge to resize. Velocity is preserved on imported MIDI notes.",11,MUTED,false));setPage(page);
+    }
+
+    private void showInstruments(){
+        LinearLayout page=column();page.setPadding(dp(14),dp(10),dp(14),dp(10));ProductionProject.Channel ch=prodChannel();page.addView(text("INSTRUMENT RACK · WAV / SFZ / SF2",20,GOLD,true));page.addView(text("Current: "+ch.instrument.type+(ch.instrument.path.isEmpty()?" · built-in synth":" · "+new File(ch.instrument.path).getName()),13,WHITE,true));page.addView(actionButton("LOAD WAV / SFZ / SF2",GOLD,v->pickProduction("instrument","application/octet-stream")));page.addView(text("WAV: PCM16 sample instrument with root-key mapping. SFZ: region/sample/key mapping parser. SF2: SoundFont container validation and bank/preset state. Full SF2 voice rendering is the next engine layer.",12,MUTED,false));setPage(page);
+    }
+
+    private void autosaveMaestro(){getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("maestro_project_v1",maestro.toJson()).apply();}
+
+    private void autosaveProduction(){SharedPreferences p=getSharedPreferences(PREFS,MODE_PRIVATE);String next=production.toJson(),prev=p.getString("production_project_v2","");if(!restoringProductionHistory&&!prev.isEmpty()&&!prev.equals(next)){productionUndo.add(prev);if(productionUndo.size()>80)productionUndo.remove(0);productionRedo.clear();}p.edit().putString("production_project_v2",next).apply();}
+
+    private void undoProduction(){if(productionUndo.isEmpty()){status.setText("NOTHING TO UNDO");return;}String current=production.toJson();String prior=productionUndo.remove(productionUndo.size()-1);productionRedo.add(current);restoreProduction(prior,"UNDO");}
+    private void redoProduction(){if(productionRedo.isEmpty()){status.setText("NOTHING TO REDO");return;}String current=production.toJson();String next=productionRedo.remove(productionRedo.size()-1);productionUndo.add(current);restoreProduction(next,"REDO");}
+    private void restoreProduction(String json,String label){restoringProductionHistory=true;production=ProductionProject.fromJson(json);productionChannel=Math.max(0,Math.min(productionChannel,production.channels.size()-1));getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("production_project_v2",production.toJson()).apply();restoringProductionHistory=false;stopImportedClip();status.setText(label+" · PRODUCTION STATE RESTORED");showProductionTracks();}
 
     private void showPiano() {
         LinearLayout page = column();
@@ -373,15 +609,12 @@ public final class StudioActivity extends Activity {
         setPage(page);
     }
 
-    private void showMixer() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout page = column();
-        page.setPadding(dp(12), dp(7), dp(12), dp(10));
-        page.addView(text("MIXER + EFFECTS", 20, PURPLE, true));
-        for (int track = 0; track < StudioProject.TRACK_COUNT; track++) page.addView(mixerStrip(track));
-        scroll.addView(page);
-        setPage(scroll);
-    }
+    private void showMixer() {ScrollView scroll=new ScrollView(this);LinearLayout page=column();page.setPadding(dp(12),dp(7),dp(12),dp(10));page.addView(text("DYNAMIC MIXER + FX · "+production.channels.size()+" CHANNELS",20,PURPLE,true));for(int i=0;i<production.channels.size();i++)page.addView(productionMixerStrip(i));scroll.addView(page);setPage(scroll);}
+
+    private View productionMixerStrip(int ix){ProductionProject.Channel ch=production.channels.get(ix);LinearLayout strip=column();strip.setPadding(dp(8),dp(5),dp(8),dp(5));strip.setBackgroundColor(PANEL);LinearLayout head=row();head.addView(text(ch.name+" · "+ch.instrument.type,15,CYAN,true));head.addView(toggleButton(ch.mute?"MUTED":"MUTE",ch.mute,v->{ch.mute=!ch.mute;autosaveProduction();showMixer();}));head.addView(toggleButton(ch.solo?"SOLO ON":"SOLO",ch.solo,v->{ch.solo=!ch.solo;autosaveProduction();showMixer();}));strip.addView(head);LinearLayout controls=row();controls.addView(text("VOL",10,MUTED,true));SeekBar vol=new SeekBar(this);vol.setMax(100);vol.setProgress(Math.round(ch.volume*100));vol.setOnSeekBarChangeListener(seekListener(v->{ch.volume=v/100f;autosaveProduction();}));controls.addView(vol,new LinearLayout.LayoutParams(dp(130),dp(42)));controls.addView(text("PAN",10,MUTED,true));SeekBar pan=new SeekBar(this);pan.setMax(200);pan.setProgress(Math.round(ch.pan*100+100));pan.setOnSeekBarChangeListener(seekListener(v->{ch.pan=(v-100)/100f;autosaveProduction();}));controls.addView(pan,new LinearLayout.LayoutParams(dp(120),dp(42)));controls.addView(fxSeek("LOW",ch.eqLow,v->ch.eqLow=v));controls.addView(fxSeek("MID",ch.eqMid,v->ch.eqMid=v));controls.addView(fxSeek("HIGH",ch.eqHigh,v->ch.eqHigh=v));controls.addView(fxSeek("COMP",ch.compressor,v->ch.compressor=v));controls.addView(fxSeek("DRIVE",ch.drive,v->ch.drive=v));controls.addView(fxSeek("REV",ch.reverb,v->ch.reverb=v));controls.addView(fxSeek("DELAY",ch.delay,v->ch.delay=v));strip.addView(controls);return strip;}
+
+    private View fxSeek(String label,float current,FloatSetter setter){LinearLayout box=column();box.addView(text(label,9,MUTED,true));SeekBar s=new SeekBar(this);s.setMax(100);s.setProgress(Math.round(Math.max(0,Math.min(1,current))*100));s.setOnSeekBarChangeListener(seekListener(v->{setter.set(v/100f);autosaveProduction();}));box.addView(s,new LinearLayout.LayoutParams(dp(90),dp(38)));return box;}
+    private interface FloatSetter{void set(float value);}
 
     private View mixerStrip(int track) {
         LinearLayout strip = row();
@@ -434,8 +667,8 @@ public final class StudioActivity extends Activity {
         page.setGravity(Gravity.CENTER);
         page.addView(text("MASTER + STEM DELIVERY", 24, WHITE, true));
         page.addView(text("Offline 44.1 kHz / 16-bit stereo WAV. Exports appear in Music/DemonicAIStudio.", 14, MUTED, false));
-        page.addView(actionButton("EXPORT MASTER WAV", CYAN, v -> exportProject(false)));
-        page.addView(actionButton("EXPORT MASTER + 4 STEMS", PURPLE, v -> exportProject(true)));
+        page.addView(actionButton("EXPORT PRODUCTION MASTER WAV", CYAN, v -> exportProduction(false)));
+        page.addView(actionButton("EXPORT MASTER + ALL CHANNEL STEMS", PURPLE, v -> exportProduction(true)));
         page.addView(text(lastExportName, 13, GREEN, true));
         Button share = actionButton("SHARE LAST MASTER", GOLD, v -> shareLastExport());
         share.setEnabled(lastExportUri != null);
@@ -467,33 +700,57 @@ public final class StudioActivity extends Activity {
     }
 
     private void startTransport() {
-        if (playing) return;
-        playing = true;
-        transportStep = selectedStep;
-        transportHandler.removeCallbacks(transportRunner);
-        transportHandler.post(transportRunner);
-        status.setText("TRANSPORT PLAYING");
+        if (productionPlaying) return;
+        production.bpm=project.bpm=Math.max(40,Math.min(240,production.bpm));
+        productionPlaying=true;
+        productionStartTick=Math.max(0,production.playheadTick);
+        productionStartedAtMs=android.os.SystemClock.elapsedRealtime();
+        transportHandler.removeCallbacks(productionTransportRunner);
+        transportHandler.post(productionTransportRunner);
+        startProductionAudioPreview();
+        status.setText("PRODUCTION TRANSPORT PLAYING · "+production.channels.size()+" CHANNELS");
     }
 
     private void pauseTransport() {
-        playing = false;
-        transportHandler.removeCallbacks(transportRunner);
-        selectedStep = lastPlayedStep;
-        stopVoicePlayer();
-        status.setText("TRANSPORT PAUSED");
-        refreshTimeline();
+        productionPlaying=false;
+        transportHandler.removeCallbacks(productionTransportRunner);
+        stopImportedClip(); stopVoicePlayer();
+        autosaveProduction();
+        status.setText("PRODUCTION TRANSPORT PAUSED");
     }
 
     private void stopTransport() {
-        playing = false;
+        productionPlaying=false;
+        playing=false;
+        transportHandler.removeCallbacks(productionTransportRunner);
         transportHandler.removeCallbacks(transportRunner);
-        transportStep = 0;
-        lastPlayedStep = 0;
-        selectedStep = 0;
-        stopVoicePlayer();
-        position.setText("01/16 · " + project.bpm + " BPM");
-        status.setText("TRANSPORT STOPPED");
+        production.playheadTick=0; transportStep=0; lastPlayedStep=0; selectedStep=0;
+        stopImportedClip(); stopVoicePlayer();
+        position.setText("BAR 1 · " + production.bpm + " BPM");
+        autosaveProduction();
+        status.setText("PRODUCTION TRANSPORT STOPPED");
         refreshTimeline();
+    }
+
+    private void startProductionAudioPreview(){
+        boolean anySolo=false;for(ProductionProject.Channel c:production.channels)if(c.solo)anySolo=true;
+        for(ProductionProject.Channel c:production.channels){
+            if(c.mute||(anySolo&&!c.solo))continue;
+            for(ProductionProject.AudioClip clip:c.audio){
+                if(clip.path==null||clip.path.isEmpty())continue;
+                if(clip.startTick<=production.playheadTick){playImportedClip(c,clip);return;}
+            }
+        }
+        for(ProductionProject.Channel c:production.channels){
+            if(c.mute||(anySolo&&!c.solo))continue;
+            for(ProductionProject.MidiNote n:c.notes){
+                if(n.startTick<production.playheadTick)continue;
+                double hz=440.0*Math.pow(2,(n.note-69)/12.0);float v=c.volume*Math.max(0f,Math.min(1f,n.velocity/127f));
+                if(c.instrument.type==ProductionProject.InstrumentType.GUITAR||c.instrument.type==ProductionProject.InstrumentType.BASS)audio.playGuitarNote(hz,v,c.pan,c.reverb>0,c.delay>0);
+                else audio.playPiano(hz,Math.max(80,(int)(n.durationTick*60000.0/production.bpm/ProductionProject.PPQ)),v,c.pan,c.reverb>0,c.delay>0);
+                return;
+            }
+        }
     }
 
     private void triggerStep(int step) {
@@ -596,6 +853,8 @@ public final class StudioActivity extends Activity {
             voicePlayer = null;
         }
     }
+
+    private void exportProduction(boolean stems){status.setText("RENDERING "+production.channels.size()+" CHANNELS…");new Thread(()->{try{StudioRenderer.Result result=new StudioRenderer().renderProduction(this,production,project.name,stems);Uri published=StudioRenderer.publish(this,result.master);runOnUiThread(()->{lastExportUri=published;lastExportName=result.master.getName()+" · "+result.stems.size()+" stems";status.setText("PRODUCTION EXPORT COMPLETE");showExport();});}catch(Exception e){runOnUiThread(()->status.setText("EXPORT FAILED · "+e.getClass().getSimpleName()));}},"demonic-production-render").start();}
 
     private void exportProject(boolean stems) {
         stopTransport();
@@ -828,9 +1087,37 @@ public final class StudioActivity extends Activity {
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
+    @Deprecated
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        super.onActivityResult(requestCode,resultCode,data);
+        if(resultCode!=RESULT_OK||data==null||data.getData()==null)return;
+        Uri uri=data.getData();try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+        if(requestCode==TV_IMPORT){
+            incomingAssetUri=uri;
+            incomingAssetMime=getContentResolver().getType(uri);
+            if(incomingAssetMime==null)incomingAssetMime="video/*";
+            String stored=uri.toString();
+            if(!tvLibrary.contains(stored))tvLibrary.add(stored);
+            saveTvLibrary();
+            status.setText("DEMONIC TV ADDED · "+mediaName(uri));
+            showDemonicTv();
+            return;
+        }
+        if(requestCode!=PRODUCTION_IMPORT)return;
+        try{String name="import_"+System.currentTimeMillis();android.database.Cursor q=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null);if(q!=null){try{if(q.moveToFirst())name=q.getString(0);}finally{q.close();}}
+            File dir=new File(getFilesDir(),"studio_assets");dir.mkdirs();File out=new File(dir,name.replaceAll("[^A-Za-z0-9._-]","_"));try(java.io.InputStream in=getContentResolver().openInputStream(uri);java.io.FileOutputStream os=new java.io.FileOutputStream(out)){byte[] b=new byte[32768];int n;while((n=in.read(b))>0)os.write(b,0,n);}
+            String lower=out.getName().toLowerCase(Locale.US);ProductionProject.Channel ch=prodChannel();
+            if(productionImportKind.equals("midi")){ch.notes.addAll(MidiFileIO.read(out));status.setText("MIDI IMPORTED · "+ch.notes.size()+" NOTES");showPianoRoll();}
+            else if(productionImportKind.equals("sample")||productionImportKind.equals("audio")){ProductionProject.AudioClip clip=new ProductionProject.AudioClip();clip.path=out.getAbsolutePath();if(lower.endsWith(".wav")){WavFile.Data wav=WavFile.read(out);clip.trimEndMs=wav.frames()*1000L/wav.rate;status.setText("WAV AUDIO IMPORTED · "+wav.frames()+" FRAMES");}else{android.media.MediaMetadataRetriever mmr=new android.media.MediaMetadataRetriever();try{mmr.setDataSource(out.getAbsolutePath());String duration=mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);clip.trimEndMs=duration==null?-1:Long.parseLong(duration);status.setText("AUDIO IMPORTED · "+out.getName());}finally{try{mmr.release();}catch(Exception ignored){}}}ch.audio.add(clip);showSampler();}
+            else {if(lower.endsWith(".wav")){WavFile.read(out);ch.instrument.type=ProductionProject.InstrumentType.WAV;}else if(lower.endsWith(".sfz")){InstrumentDefinition.sfz(out);ch.instrument.type=ProductionProject.InstrumentType.SFZ;}else if(lower.endsWith(".sf2")&&InstrumentDefinition.sf2Header(out)){ch.instrument.type=ProductionProject.InstrumentType.SF2;}else throw new IllegalArgumentException("Unsupported instrument");ch.instrument.path=out.getAbsolutePath();status.setText(ch.instrument.type+" INSTRUMENT LOADED");showInstruments();}autosaveProduction();
+        }catch(Exception e){status.setText("IMPORT ERROR · "+e.getMessage());}
+    }
+
     @Override protected void onPause() {
         super.onPause();
         pauseTransport();
+        stopImportedClip();
+        if(tvVideo!=null&&tvVideo.isPlaying())tvVideo.pause();
         if (wavRecorder.isRunning()) {
             File take = wavRecorder.stop();
             if (take != null) {
@@ -844,6 +1131,8 @@ public final class StudioActivity extends Activity {
     @Override protected void onDestroy() {
         super.onDestroy();
         transportHandler.removeCallbacksAndMessages(null);
+        stopImportedClip();
+        stopTvVideo();
         stopVoicePlayer();
     }
 }
