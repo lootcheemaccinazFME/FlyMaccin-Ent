@@ -37,6 +37,10 @@ jobs:
           grep -q 'http' "$LIVE"
           grep -q 'MediaPlayer' "$PLAYER"
           grep -q 'SurfaceView' "$PLAYER"
+          MAN="$ROOT/app/src/main/AndroidManifest.xml"
+          grep -q 'android.permission.INTERNET' "$MAN"
+          grep -q 'android:label="FME"' "$MAN"
+          grep -q 'NOT MIGRATED' "$ROOT/app/src/main/java/com/flymaccin/lootcheerom/MainActivity.kt"
       - name: Build canonical single APK
         working-directory: android/lootchee-rom-emulator
         run: gradle --no-daemon :app:assembleDebug
