@@ -32,6 +32,44 @@ Historical behavior target:
 | Mac-Maestro | Creative timeline reference | non-destructive multitrack/editor workflow; not realtime audio authority |
 | MOBDAW | Quarantined pending repository verification | no code promotion until source/build evidence is retrievable |
 
+## P0ck3tb4nd operating repository federation
+
+P0ck3tb4nd treats the repositories below as one governed operating-repository ecosystem. Membership does **not** mean blind source merging. Each repository keeps a declared role, license boundary, provenance, and capability-truth status. The canonical runtime remains `FlyMaccin-Ent/demonic-daw`.
+
+| Repository | P0ck3tb4nd role | Operating contribution / boundary |
+|---|---|---|
+| FlyMaccin-Ent | CANONICAL RUNTIME | P0ck3tb4nd/DD1+DD2 application core, native state, assets, audio, routing, control, QA and releases |
+| D3m0n1c | ACTIVE ANDROID DONOR | Beat Lab, step sequencing, touch pads, USB MIDI and Android performance workflow |
+| FME-FUN-HUB-Studio | ACTIVE ANDROID DAW DONOR | multitrack editing, recording, mixer, DSP/FX, EQ, import/export and project UX |
+| BeatMaker | ACTIVE MIDI/SEQUENCER DONOR, LICENSE-GATED | raw USB-MIDI and sequencer timing patterns; direct reuse only when license permits |
+| 1-generic-daw | ACTIVE ARCHITECTURE REFERENCE, GPL BOUNDARY | workstation/audio-graph/editor concepts; no incompatible source copying |
+| music-orchestra-studio | ACTIVE COMPOSITION REFERENCE | piano roll, arrangement, track controls, undo/redo, MIDI import and WAV-export concepts |
+| theDAW | ACTIVE LOCAL-STUDIO REFERENCE | local-first studio/editing workflow; AI portions remain outside the non-AI release critical path |
+| MiniMax-Music-Studio | ACTIVE CONTENT/JOB REFERENCE | library, jobs and local content workflow; not Android realtime audio authority |
+| Mac-Maestro | ACTIVE CREATIVE-TIMELINE REFERENCE | non-destructive timeline/editor concepts; not realtime audio authority |
+| MeadowlarkDemonic | ACTIVE REPOSITORY, REVIEW-GATED | available to P0ck3tb4nd research/intake; capability promotion requires source/build evidence |
+| tuneflow-py | ACTIVE MUSIC-LOGIC REFERENCE | music/project manipulation concepts; Python code is not an Android realtime dependency |
+| FuMiVoice | ACTIVE VOICE/AUDIO REFERENCE | voice/audio workflow research; promotion requires compatibility and provenance review |
+| project-2026-06-14-algo-music-composer | ACTIVE COMPOSITION REFERENCE | algorithmic composition ideas; no AI/realtime authority implied |
+| MOBDAW | QUARANTINED | repository exists and is active, but no source/code promotion until expected source/build evidence is retrievable |
+
+### Federation laws
+1. P0ck3tb4nd owns the integration contract. Donor repositories do not become competing runtime authorities.
+2. Code is promoted only after license/provenance review, compatibility review, tests, and capability-truth evidence.
+3. Reference-only repositories may inform behavior and architecture without copying protected or incompatible source.
+4. No repository may introduce category-reserved audio/MIDI channels.
+5. Native ProjectStore/AssetStore remain durable state authorities; donor-local state does not become canonical by accident.
+6. Realtime code must obey RT-SAFE rules regardless of donor implementation.
+7. Repository membership never upgrades a capability to TESTED/RUNTIME_VERIFIED/PHYSICAL_VERIFIED by itself.
+8. AI-capable repositories remain subordinate to the P10 AI-last rule.
+9. Quarantined repositories may be inventoried but cannot feed production code until their gate is cleared.
+10. Every promoted subsystem records its source repository, license/provenance decision, target files, tests, and resulting capability status.
+
+### Operating intake pipeline
+`DISCOVER -> CLASSIFY -> LICENSE/PROVENANCE -> MAP CAPABILITY -> CLEAN-ROOM/COMPATIBLE ADAPT -> TEST -> PROMOTE -> RECORD`
+
+This federation is the P0ck3tb4nd source-and-reference operating layer. It expands the system's available parts without creating duplicate project, time, audio, command, integrity, or content authorities.
+
 ## PocketBand-compatible original data model
 
 Song

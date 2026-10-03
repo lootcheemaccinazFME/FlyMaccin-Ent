@@ -99,3 +99,15 @@ Started in source on 2026-09-21. AI remains deferred.
 - P5: MidiDevicePolicy foundation added with explicit generic-channel law and timestamp/data normalization; Android MIDI device integration remains.
 - P8: DiagnosticsRegistry and CompatibilityManifest foundations added for runtime evidence, recovery/underrun counters and schema/protocol compatibility. Advanced UX/live/collaboration remain future non-AI work.
 - P9: certification track is active through QA workflow and capability-truth gates. Physical-device verification is not claimed until hardware evidence exists.
+
+
+## P0ck3tb4nd operating-repository authority — 2026-10-03
+Status: ACTIVE / REGISTERED
+
+P0ck3tb4nd now governs the active music/DAW repository federation recorded in `POCKETBAND_REBUILD_INTEGRATION_MATRIX.md`. The federation is part of the operating system's engineering/source layer, while `FlyMaccin-Ent/demonic-daw` remains the canonical runtime and release destination.
+
+Registered operating repositories: FlyMaccin-Ent, D3m0n1c, FME-FUN-HUB-Studio, BeatMaker, 1-generic-daw, music-orchestra-studio, theDAW, MiniMax-Music-Studio, Mac-Maestro, MeadowlarkDemonic, tuneflow-py, FuMiVoice, project-2026-06-14-algo-music-composer, and MOBDAW.
+
+MOBDAW remains QUARANTINED pending retrievable source/build evidence. Repositories with incompatible or unverified licenses remain reference-only until a compatible reuse decision is documented. Repository registration does not imply runtime verification.
+
+Operating law: DISCOVER -> CLASSIFY -> LICENSE/PROVENANCE -> MAP CAPABILITY -> CLEAN-ROOM/COMPATIBLE ADAPT -> TEST -> PROMOTE -> RECORD.

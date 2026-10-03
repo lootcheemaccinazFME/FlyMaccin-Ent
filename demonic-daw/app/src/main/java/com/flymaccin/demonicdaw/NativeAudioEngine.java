@@ -19,6 +19,11 @@ public final class NativeAudioEngine {
     public static native void nativePitchBend(int channel, int value);
     public static native void nativeSetGain(float gain);
     public static native void nativeSetChannelMix(int channel, float gain, float pan, boolean mute, boolean solo);
+    public static native void nativeSetChannelFx(int channel, int type, float amount);
+    public static native boolean nativeLoadDrumVoiceWav(int drumVoiceId, String path);
+    public static native void nativeTriggerDrumVoice(int drumVoiceId, int velocity);
+    public static native void nativeSetDrumVoiceMix(int drumVoiceId, float gain, float pan, boolean mute, boolean solo);
+    public static native void nativeSetDrumVoiceFx(int drumVoiceId, int type, float amount);
     public static native void nativeSetReverb(float room, float damp, float width, float level);
     public static native void nativeSetChorus(int voices, float level, float speed, float depth);
 }
