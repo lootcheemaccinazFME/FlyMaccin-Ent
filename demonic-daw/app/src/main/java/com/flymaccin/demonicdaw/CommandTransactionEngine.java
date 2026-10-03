@@ -34,6 +34,25 @@ public final class CommandTransactionEngine {
       case "project.rename":
         p.put("name",a.optString("name","Untitled Project"));
         return ok(command);
+      case "loop.create":{
+        JSONArray loops=p.getJSONArray("loops");if(loops.length()>=32)throw new IllegalStateException("POCKETBAND_LOOP_LIMIT");
+        JSONObject loop=new JSONObject().put("id",id("loop")).put("name",a.optString("name","Loop "+(loops.length()+1)))
+          .put("bars",Math.max(1,a.optInt("bars",4)));loops.put(loop);p.getJSONArray("loopOrder").put(loop.getString("id"));
+        return ok(command).put("loop",loop);
+      }
+      case "loop.duplicate":{
+        JSONObject src=find(p.getJSONArray("loops"),a.optString("id"));JSONArray loops=p.getJSONArray("loops");
+        if(loops.length()>=32)throw new IllegalStateException("POCKETBAND_LOOP_LIMIT");
+        JSONObject copy=new JSONObject(src.toString()).put("id",id("loop")).put("name",a.optString("name",src.optString("name","Loop")+" Copy"));
+        loops.put(copy);p.getJSONArray("loopOrder").put(copy.getString("id"));return ok(command).put("loop",copy);
+      }
+      case "loop.reorder":{
+        JSONArray requested=a.getJSONArray("order"),loops=p.getJSONArray("loops");Set<String> valid=new HashSet<>(),seen=new HashSet<>();
+        for(int i=0;i<loops.length();i++)valid.add(loops.getJSONObject(i).getString("id"));
+        if(requested.length()!=valid.size())throw new IllegalArgumentException("LOOP_ORDER_INCOMPLETE");
+        for(int i=0;i<requested.length();i++){String lid=requested.getString(i);if(!valid.contains(lid)||!seen.add(lid))throw new IllegalArgumentException("LOOP_ORDER_INVALID");}
+        p.put("loopOrder",new JSONArray(requested.toString()));return ok(command);
+      }
       case "track.create":{
         JSONArray tracks=p.getJSONArray("tracks");
         JSONObject t=new JSONObject().put("id",id("track")).put("name",a.optString("name","Track "+(tracks.length()+1)))
