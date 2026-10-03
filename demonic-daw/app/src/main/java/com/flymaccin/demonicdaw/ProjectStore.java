@@ -34,6 +34,7 @@ public final class ProjectStore {
     if(!p.has("schemaVersion"))p.put("schemaVersion",2);if(!p.has("tracks"))p.put("tracks",new JSONArray());if(!p.has("clips"))p.put("clips",new JSONArray());
     if(!p.has("buses"))p.put("buses",new JSONArray());if(!p.has("effects"))p.put("effects",new JSONArray());if(!p.has("automation"))p.put("automation",new JSONArray());
     if(!p.has("tempo"))p.put("tempo",120);if(!p.has("timeSignature"))p.put("timeSignature",new JSONObject().put("numerator",4).put("denominator",4));
+    if(!p.has("assets"))p.put("assets",new JSONArray());if(!p.has("loops"))p.put("loops",new JSONArray());if(!p.has("loopOrder"))p.put("loopOrder",new JSONArray());if(!p.has("selection"))p.put("selection",new JSONObject());
     return p;
   }
   private void commit(File d,JSONObject next,JSONObject previous)throws Exception{
