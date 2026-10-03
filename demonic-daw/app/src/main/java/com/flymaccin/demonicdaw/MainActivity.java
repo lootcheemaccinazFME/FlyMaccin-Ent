@@ -1,0 +1,360 @@
+package com.flymaccin.demonicdaw;
+
+import android.Manifest;
+import android.app.Activity;
+import android.app.PictureInPictureParams;
+import android.util.Rational;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.Uri;
+import android.os.Bundle;
+import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.webkit.DownloadListener;
+import android.app.DownloadManager;
+import android.os.Environment;
+import android.graphics.Color;
+import androidx.documentfile.provider.DocumentFile;
+import org.json.JSONObject;
+import java.io.*;
+import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+public class MainActivity extends Activity {
+  private WebView webView;
+  private static final int MIC_REQUEST = 901;
+  private static final int SF2_REQUEST = 902;
+  private static final int SFZ_TREE_REQUEST = 903;
+  private static final int FME_EXPANSION_REQUEST = 904;
+  private static final String ONLINE_URL = "https://demonicaistudiohut.floot.app";
+  private static final String OFFLINE_URL = "file:///android_asset/offline.html";
+  private static final String SUNO_HOME = "https://suno.com/";
+  private static final String SUNO_CREATE = "https://suno.com/create";
+  private volatile boolean nativeReady = false;
+  private File factoryDir;
+  private File importDir;
+  private ProjectStore projectStore;
+  private SessionManager sessionManager;
+  private AssetStore assetStore;
+  private CommandTransactionEngine commandTransactions;
+
+  @Override public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    factoryDir = new File(getFilesDir(), "factory");
+    importDir = new File(getFilesDir(), "instrument-imports");
+    importDir.mkdirs();
+    projectStore = new ProjectStore(this);
+    sessionManager = new SessionManager(this);
+    assetStore = new AssetStore(this,projectStore);
+    commandTransactions = new CommandTransactionEngine(projectStore);
+
+    // Render the DAW first. Native audio and pack preparation must never block first paint.
+    webView = new WebView(this);
+    webView.setBackgroundColor(Color.rgb(5,5,7));
+    setContentView(webView);
+    WebSettings s = webView.getSettings();
+    s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setMediaPlaybackRequiresUserGesture(false); s.setDatabaseEnabled(true); s.setAllowFileAccess(true); s.setCacheMode(WebSettings.LOAD_DEFAULT);
+    webView.addJavascriptInterface(new NativeBridge(), "DemonicNative");
+    webView.setDownloadListener((url,userAgent,contentDisposition,mimetype,contentLength)->{
+      try{
+        if(url==null||!url.startsWith("https://"))return;
+        DownloadManager.Request r=new DownloadManager.Request(Uri.parse(url));
+        r.setMimeType(mimetype);r.addRequestHeader("User-Agent",userAgent==null?"":userAgent);
+        r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"DemonicTV_"+System.currentTimeMillis());
+        ((DownloadManager)getSystemService(DOWNLOAD_SERVICE)).enqueue(r);
+      }catch(Exception ignored){}
+    });
+    webView.setWebChromeClient(new WebChromeClient() {
+      @Override public void onPermissionRequest(final PermissionRequest request) {
+        runOnUiThread(() -> { if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) request.grant(request.getResources()); else requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_REQUEST); });
+      }
+    });
+    webView.setWebViewClient(new WebViewClient() {
+      @Override public void onPageFinished(WebView view,String url) {
+        super.onPageFinished(view,url);
+        if(url!=null&&url.startsWith("file:///android_asset/")) view.evaluateJavascript(
+          "(function(){return !!(window.DemonicControl&&window.DemonicControl.version)})()",
+          value -> { if("true".equals(value)) view.setContentDescription("DEMONIC_DAW_FME_UI_READY"); }
+        );
+      }
+      @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
+        super.onReceivedError(view, request, error); if (request.isForMainFrame() && (view.getUrl()==null || !view.getUrl().startsWith("file:///android_asset/"))) view.loadUrl(OFFLINE_URL);
+      }
+    });
+    // Demonic DAW 1.2 is local-first so the bundled FME UI is authoritative online or offline.
+    webView.loadUrl(OFFLINE_URL);
+
+    new Thread(() -> {
+      try { nativeReady = NativeAudioEngine.nativeStart(); } catch (Throwable t) { nativeReady = false; }
+      try { copyAssetTree("factory", factoryDir); } catch (Exception ignored) {}
+      try { installBundledFmeCore(); } catch (Exception ignored) {}
+      if (nativeReady) restoreLastBank();
+      runOnUiThread(() -> {
+        if (webView != null) webView.evaluateJavascript("window.dispatchEvent(new Event('demonic-native-ready'));", null);
+      });
+    }).start();
+  }
+
+  private boolean isOnline() {
+    ConnectivityManager cm=(ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE); if(cm==null)return false; Network n=cm.getActiveNetwork(); if(n==null)return false; NetworkCapabilities c=cm.getNetworkCapabilities(n); return c!=null&&c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+  }
+  private void copyAssetTree(String assetPath, File out) throws IOException {
+    String[] items=getAssets().list(assetPath); if(items==null)return; if(items.length==0){ out.getParentFile().mkdirs(); try(InputStream in=getAssets().open(assetPath); OutputStream os=new FileOutputStream(out)){ copy(in,os); } return; }
+    out.mkdirs(); for(String item:items) copyAssetTree(assetPath+"/"+item,new File(out,item));
+  }
+  private static void copy(InputStream in, OutputStream out) throws IOException { byte[]b=new byte[32768];int n;while((n=in.read(b))>0)out.write(b,0,n); }
+  private void installBundledFmeCore() throws IOException {
+    File root=new File(getFilesDir(),"fme-packs/core-v1");
+    File done=new File(root,".installed");
+    if(done.exists())return;
+    deleteTree(root); root.mkdirs();
+    try(InputStream raw=getAssets().open("FME_Core_Pack_v1.zip"); ZipInputStream zin=new ZipInputStream(new BufferedInputStream(raw))){
+      ZipEntry e; byte[]buf=new byte[32768];
+      String rootPath=root.getCanonicalPath()+File.separator;
+      while((e=zin.getNextEntry())!=null){
+        File dst=new File(root,e.getName());
+        String cp=dst.getCanonicalPath();
+        if(!cp.startsWith(rootPath))throw new IOException("Unsafe core-pack path");
+        if(e.isDirectory()){dst.mkdirs();continue;}
+        File parent=dst.getParentFile(); if(parent!=null)parent.mkdirs();
+        try(OutputStream out=new BufferedOutputStream(new FileOutputStream(dst))){int n;while((n=zin.read(buf))>0)out.write(buf,0,n);}
+      }
+    }
+    try(FileOutputStream o=new FileOutputStream(done)){o.write("FME Core Pack v1".getBytes("UTF-8"));}
+    getSharedPreferences("demonic_packs",MODE_PRIVATE).edit().putBoolean("fme_core_v1",true).putString("fme_core_path",root.getAbsolutePath()).apply();
+  }
+  private int selectFactoryToChannel(String id,int channel){ if(!nativeReady)return 0; try{return SfzBank.load(new File(factoryDir,id+".sfz"),Math.max(0,Math.min(15,channel)),true);}catch(Exception e){return 0;} }
+
+  private boolean restoreLastBank(){
+    String kind=getPreferences(MODE_PRIVATE).getString("bank_kind",""); String path=getPreferences(MODE_PRIVATE).getString("bank_path","");
+    if(path.isEmpty())return false; File f=new File(path); if(!f.exists())return false;
+    try { if("sf2".equals(kind)) return NativeAudioEngine.nativeLoadSoundFont(path)>=0; /* SFZ restore requires an explicit routed channel. */ } catch(Exception ignored){} return false;
+  }
+  private void rememberBank(String kind, File path){ getPreferences(MODE_PRIVATE).edit().putString("bank_kind",kind).putString("bank_path",path.getAbsolutePath()).apply(); }
+
+  private void launchSf2Picker(){
+    Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*");
+    i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/octet-stream","audio/*","application/x-soundfont"}); startActivityForResult(i,SF2_REQUEST);
+  }
+  private void launchSfzFolderPicker(){ Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION); startActivityForResult(i,SFZ_TREE_REQUEST); }
+  private void launchFmeExpansionPicker(){ Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/zip");i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);startActivityForResult(i,FME_EXPANSION_REQUEST); }
+
+  @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+    super.onActivityResult(requestCode,resultCode,data); if(resultCode!=RESULT_OK||data==null||data.getData()==null)return; Uri uri=data.getData();
+    if(requestCode==SF2_REQUEST){ importSf2(uri); }
+    else if(requestCode==SFZ_TREE_REQUEST){ importSfzTree(uri,data.getFlags()); }
+    else if(requestCode==FME_EXPANSION_REQUEST){ importFmeExpansion(uri,data.getFlags()); }
+  }
+  private void importSf2(Uri uri){
+    try { File dst=new File(importDir,"custom.sf2"); try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(dst)){if(in==null)throw new IOException("No input stream");copy(in,out);} int id=NativeAudioEngine.nativeLoadSoundFont(dst.getAbsolutePath()); boolean ok=id>=0; if(ok)rememberBank("sf2",dst); notifyImport("sf2",ok,dst.getName(),ok?"SoundFont loaded":"FluidSynth rejected the SoundFont"); }
+    catch(Exception e){notifyImport("sf2",false,"",e.getMessage());}
+  }
+  private void importSfzTree(Uri uri,int flags){
+    try {
+      getContentResolver().takePersistableUriPermission(uri,flags&(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION));
+      DocumentFile root=DocumentFile.fromTreeUri(this,uri); if(root==null||!root.isDirectory())throw new IOException("Folder unavailable");
+      File dstRoot=new File(importDir,"sfz-bank"); deleteTree(dstRoot); dstRoot.mkdirs(); List<File> sfzFiles=new ArrayList<>(); copyDocumentTree(root,dstRoot,sfzFiles);
+      if(sfzFiles.isEmpty())throw new IOException("No .sfz file found in selected folder"); File sfz=sfzFiles.get(0); rememberBank("sfz",sfz); notifyImport("sfz",true,sfz.getName(),"SFZ imported; assign a track channel before loading");
+    } catch(Exception e){notifyImport("sfz",false,"",e.getMessage());}
+  }
+  private void importFmeExpansion(Uri uri,int flags){
+    try{
+      try{getContentResolver().takePersistableUriPermission(uri,flags&Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+      String name="FME_Expansion";DocumentFile d=DocumentFile.fromSingleUri(this,uri);if(d!=null&&d.getName()!=null)name=d.getName().replaceFirst("(?i)\\.zip$","");
+      String result=new NativeBridge().installFmeExpansionPack("",uri.toString(),name,-1);JSONObject parsed=new JSONObject(result);boolean ok=parsed.optBoolean("ok");
+      notifyImport("pack",ok,name,ok?"Expansion installed":"Expansion install failed: "+parsed.optString("error"));
+      if(webView!=null)runOnUiThread(()->webView.evaluateJavascript("if(window.renderPacks)renderPacks();",null));
+    }catch(Exception e){notifyImport("pack",false,"",e.getMessage());}
+  }
+  private void copyDocumentTree(DocumentFile src,File dst,List<File> sfzFiles)throws IOException{
+    if(src.isDirectory()){dst.mkdirs();for(DocumentFile child:src.listFiles()){String n=safeName(child.getName());copyDocumentTree(child,new File(dst,n),sfzFiles);}return;}
+    dst.getParentFile().mkdirs();try(InputStream in=getContentResolver().openInputStream(src.getUri());OutputStream out=new FileOutputStream(dst)){if(in==null)throw new IOException("Cannot read "+src.getName());copy(in,out);}if(dst.getName().toLowerCase(Locale.US).endsWith(".sfz"))sfzFiles.add(dst);
+  }
+  private void collectWavs(File root,File f,org.json.JSONArray out){
+    if(f==null||!f.exists())return;
+    if(f.isDirectory()){File[]xs=f.listFiles();if(xs!=null)for(File x:xs)collectWavs(root,x,out);return;}
+    if(!f.getName().toLowerCase(Locale.US).endsWith(".wav"))return;
+    try{String rp=root.getCanonicalPath()+File.separator,fp=f.getCanonicalPath();if(fp.startsWith(rp))out.put(fp.substring(rp.length()).replace(File.separatorChar,'/'));}catch(Exception ignored){}
+  }
+  private static String safeName(String n){ if(n==null||n.trim().isEmpty())return "unnamed";return n.replaceAll("[^A-Za-z0-9._ -]","_"); }
+  private static void deleteTree(File f){if(f==null||!f.exists())return;if(f.isDirectory()){File[]xs=f.listFiles();if(xs!=null)for(File x:xs)deleteTree(x);}f.delete();}
+  private void notifyImport(String kind,boolean ok,String name,String message){ if(webView==null)return; final String js="window.dispatchEvent(new CustomEvent('demonic-native-import',{detail:{kind:"+JSONObject.quote(kind)+",ok:"+ok+",name:"+JSONObject.quote(name==null?"":name)+",message:"+JSONObject.quote(message==null?"":message)+"}}));"; runOnUiThread(()->webView.evaluateJavascript(js,null)); }
+
+  public final class NativeBridge {
+    @JavascriptInterface public boolean ready(){ return nativeReady; }
+    @JavascriptInterface public int selectFactoryInstrument(String id){ return 0; /* unrouted factory load disabled */ }
+    @JavascriptInterface public int selectFactoryInstrumentToChannel(String id,int channel){ return selectFactoryToChannel(normalizeInstrument(id),channel); }
+    @JavascriptInterface public void noteOn(int key,int velocity){ /* Legacy unrouted entry point intentionally disabled. */ }
+    @JavascriptInterface public void noteOff(int key){ /* Legacy unrouted entry point intentionally disabled. */ }
+    @JavascriptInterface public void noteOnChannel(int channel,int key,int velocity){ if(nativeReady)NativeAudioEngine.nativeNoteOn(Math.max(0,Math.min(15,channel)),key,velocity); }
+    @JavascriptInterface public void noteOffChannel(int channel,int key){ if(nativeReady)NativeAudioEngine.nativeNoteOff(Math.max(0,Math.min(15,channel)),key); }
+    @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
+    @JavascriptInterface public void allNotesOff(){ if(nativeReady)for(int ch=0;ch<16;ch++)NativeAudioEngine.nativeCc(ch,123,0); }
+    @JavascriptInterface public void setChannelMix(int channel,float gain,float pan,boolean mute,boolean solo){ if(nativeReady)NativeAudioEngine.nativeSetChannelMix(Math.max(0,Math.min(15,channel)),gain,pan,mute,solo); }
+    @JavascriptInterface public String nativeCapabilities(){ try{return CapabilityRegistry.snapshot(nativeReady,hasFmeCore());}catch(Exception e){return "{}";} }
+    @JavascriptInterface public String createNativeProject(String name){ try{return projectStore.create(name);}catch(Exception e){return "";} }
+    @JavascriptInterface public boolean saveNativeProject(String id,String json){ try{return projectStore.save(id,json);}catch(Exception e){return false;} }
+    @JavascriptInterface public String saveNativeProjectRevision(String id,String json,long expectedRevision){ try{return projectStore.saveRevision(id,json,expectedRevision);}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"SAVE_FAILED":e.getMessage())+"}";} }
+    @JavascriptInterface public String recoverNativeProject(String id){ try{return projectStore.recoverProject(id);}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"RECOVERY_FAILED":e.getMessage())+"}";} }
+    @JavascriptInterface public String executeNativeTransaction(String id,String commandsJson,long expectedRevision){ try{return commandTransactions.execute(id,commandsJson,expectedRevision);}catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"TRANSACTION_FAILED":e.getMessage())+"}";} }
+    @JavascriptInterface public String importProjectAsset(String projectId,String kind,String uriString,String originalName,String provenance,long expectedRevision){
+      try{
+        Uri uri=Uri.parse(uriString);InputStream in=getContentResolver().openInputStream(uri);if(in==null)throw new IOException("ASSET_INPUT_UNAVAILABLE");
+        try(InputStream source=in){return assetStore.importAndRegister(projectId,kind,source,originalName,provenance,expectedRevision);}
+      }catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"ASSET_IMPORT_FAILED":e.getMessage())+"}";}
+    }
+    @JavascriptInterface public String installFmeExpansionPack(String projectId,String uriString,String packName,long expectedRevision){
+      try{
+        Uri uri=Uri.parse(uriString);InputStream raw=getContentResolver().openInputStream(uri);if(raw==null)throw new IOException("PACK_INPUT_UNAVAILABLE");
+        File root=new File(getFilesDir(),"fme-packs/expansions/"+safeName(packName));deleteTree(root);root.mkdirs();
+        String rootPath=root.getCanonicalPath()+File.separator;int wavCount=0;byte[]buf=new byte[32768];
+        try(ZipInputStream zin=new ZipInputStream(new BufferedInputStream(raw))){
+          ZipEntry e;while((e=zin.getNextEntry())!=null){
+            File dst=new File(root,e.getName());if(!dst.getCanonicalPath().startsWith(rootPath))throw new IOException("UNSAFE_PACK_PATH");
+            if(e.isDirectory()){dst.mkdirs();continue;}File parent=dst.getParentFile();if(parent!=null)parent.mkdirs();
+            try(FileOutputStream out=new FileOutputStream(dst)){int n;while((n=zin.read(buf))>0)out.write(buf,0,n);out.getFD().sync();}
+            if(dst.getName().toLowerCase(Locale.US).endsWith(".wav"))wavCount++;
+          }
+        }
+        if(wavCount<1){deleteTree(root);throw new IOException("PACK_HAS_NO_WAVS");}
+        File marker=new File(root,".installed");try(FileOutputStream o=new FileOutputStream(marker)){o.write((packName+"\n"+wavCount).getBytes("UTF-8"));o.getFD().sync();}
+        JSONObject result=new JSONObject().put("ok",true).put("pack",packName).put("wavCount",wavCount).put("path",root.getAbsolutePath());
+        getSharedPreferences("demonic_packs",MODE_PRIVATE).edit().putBoolean("expansion_"+safeName(packName),true).putString("expansion_path_"+safeName(packName),root.getAbsolutePath()).apply();
+        return result.toString();
+      }catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"PACK_INSTALL_FAILED":e.getMessage())+"}";}
+    }
+    @JavascriptInterface public String listFmeExpansionSamples(String packId){
+      try{
+        File root=new File(getFilesDir(),"fme-packs/expansions/"+safeName(packId));if(!root.isDirectory()||!new File(root,".installed").isFile())return "[]";
+        org.json.JSONArray out=new org.json.JSONArray();String base=root.getCanonicalPath()+File.separator;List<File> stack=new ArrayList<>();stack.add(root);
+        while(!stack.isEmpty()){File x=stack.remove(stack.size()-1);File[] kids=x.listFiles();if(kids==null)continue;for(File k:kids){if(k.isDirectory())stack.add(k);else if(k.getName().toLowerCase(Locale.US).endsWith(".wav")){String cp=k.getCanonicalPath();if(cp.startsWith(base))out.put(cp.substring(base.length()).replace(File.separatorChar,'/'));}}}
+        return out.toString();
+      }catch(Exception e){return "[]";}
+    }
+    @JavascriptInterface public boolean loadFmeExpansionSampleToChannel(String packId,String relativePath,int channel,boolean clearChannel){
+      if(!nativeReady||channel<0||channel>15)return false;
+      try{
+        File root=new File(getFilesDir(),"fme-packs/expansions/"+safeName(packId));File sample=new File(root,relativePath);String base=root.getCanonicalPath()+File.separator,cp=sample.getCanonicalPath();
+        if(!cp.startsWith(base)||!sample.isFile()||!sample.getName().toLowerCase(Locale.US).endsWith(".wav"))return false;
+        return SfzBank.loadSingleWav(sample,channel,clearChannel)>0;
+      }catch(Exception e){return false;}
+    }
+    @JavascriptInterface public String listInstalledFmeExpansions(){
+      org.json.JSONArray a=new org.json.JSONArray();File root=new File(getFilesDir(),"fme-packs/expansions");File[] packs=root.listFiles();
+      if(packs!=null)for(File d:packs)if(d.isDirectory()&&new File(d,".installed").isFile()){int count=0;List<File> stack=new ArrayList<>();stack.add(d);while(!stack.isEmpty()){File x=stack.remove(stack.size()-1);File[] kids=x.listFiles();if(kids!=null)for(File k:kids)if(k.isDirectory())stack.add(k);else if(k.getName().toLowerCase(Locale.US).endsWith(".wav"))count++;}try{a.put(new JSONObject().put("id",d.getName()).put("path",d.getAbsolutePath()).put("wavCount",count));}catch(Exception ignored){}}
+      return a.toString();
+    }
+    @JavascriptInterface public String verifyProjectAsset(String projectId,String kind,String assetId){
+      try{return assetStore.verify(projectId,kind,assetId);}catch(Exception e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage()==null?"ASSET_VERIFY_FAILED":e.getMessage())+"}";}
+    }
+    @JavascriptInterface public String loadNativeProject(String id){ try{return projectStore.load(id);}catch(Exception e){return "{}";} }
+    @JavascriptInterface public String listNativeProjects(){ return projectStore.list(); }
+    @JavascriptInterface public String pairController(String client,String scopesJson){ try{return sessionManager.requestPairing(client,new org.json.JSONArray(scopesJson));}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"pairing failed":e.getMessage())+"}";} }
+    @JavascriptInterface public String approveController(String pendingId,String scopesJson){ try{return sessionManager.approvePairing(pendingId,new org.json.JSONArray(scopesJson));}catch(Exception e){return "{\"error\":"+JSONObject.quote(e.getMessage()==null?"approval failed":e.getMessage())+"}";} }
+    @JavascriptInterface public boolean revokeController(String sessionId){ try{return sessionManager.revoke(sessionId);}catch(Exception e){return false;} }
+    @JavascriptInterface public int revokeAllControllers(){ try{return sessionManager.revokeAll();}catch(Exception e){return 0;} }
+    @JavascriptInterface public boolean loadFmeDrumKit(){ return false; /* legacy unrouted entry point intentionally disabled */ }
+    @JavascriptInterface public boolean loadFmeDrumKitToChannel(int channel,boolean clearChannel){
+      try{
+        int ch=Math.max(0,Math.min(15,channel));
+        File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
+        org.json.JSONArray a=new org.json.JSONArray(); collectWavs(root,root,a);
+        String[] tags={"kick","rim","snare","clap","hat","tom","perc","crash"}; int[] keys={36,37,38,39,42,45,46,49};
+        StringBuilder z=new StringBuilder(); int mapped=0;
+        for(int i=0;i<tags.length;i++){for(int j=0;j<a.length();j++){String rel=a.optString(j,"");if(rel.toLowerCase(Locale.US).contains(tags[i])){File w=new File(root,rel);z.append("<region> sample=").append(w.getAbsolutePath().replace("\\","/")).append(" key=").append(keys[i]).append(" ampeg_release=0.05\n");mapped++;break;}}}
+        if(mapped==0)return false; File sfz=new File(getCacheDir(),"fme-core-kit-"+ch+".sfz");try(FileOutputStream o=new FileOutputStream(sfz)){o.write(z.toString().getBytes("UTF-8"));}
+        return SfzBank.load(sfz,ch,clearChannel)>0;
+      }catch(Exception e){return false;}
+    }
+    @JavascriptInterface public String mode(){ return nativeReady?"NATIVE_SAMPLE":"STARTING"; }
+    @JavascriptInterface public String uiProbe(){ return "DEMONIC_DAW_LOCAL_FME_UI_V121"; }
+    @JavascriptInterface public String controlCapabilities(){
+      if(webView==null)return "[]";
+      return "[\"project.getState\",\"project.save\",\"project.rename\",\"track.create\",\"track.delete\",\"mixer.set\",\"clip.create\",\"midi.insertNotes\",\"transport.play\",\"transport.stop\",\"history.undo\",\"history.redo\",\"render.exportProject\"]";
+    }
+    @JavascriptInterface public String executeControl(String requestJson){
+      if(webView==null)return "{\"ok\":false,\"error\":\"UI_UNAVAILABLE\"}";
+      try{
+        JSONObject r=new JSONObject(requestJson==null?"{}":requestJson);
+        String command=r.optString("command",""),scope=scopeForCommand(command);
+        sessionManager.authorize(r.optString("sessionId"),r.optString("token"),scope);
+        // Credentials terminate at the native authorization boundary and are never forwarded into WebView state.
+        r.remove("token");
+        final String req=JSONObject.quote(r.toString());
+        runOnUiThread(()->webView.evaluateJavascript(
+          "(function(){try{return JSON.stringify(window.DemonicControl.execute(JSON.parse("+req+")));}catch(e){return JSON.stringify({ok:false,error:String(e)})}})()",null));
+        return "{\"ok\":true,\"accepted\":true}";
+      }catch(SecurityException e){return "{\"ok\":false,\"error\":"+JSONObject.quote(e.getMessage())+"}";}
+       catch(Exception e){return "{\"ok\":false,\"error\":\"CONTROL_REQUEST_INVALID\"}";}
+    }
+    @JavascriptInterface public boolean hasFmeCore(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getBoolean("fme_core_v1",false); }
+    @JavascriptInterface public String fmeCorePath(){ return getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""); }
+    @JavascriptInterface public String listFmeCoreSamples(){
+      File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
+      org.json.JSONArray a=new org.json.JSONArray(); collectWavs(root,root,a); return a.toString();
+    }
+    @JavascriptInterface public boolean loadFmeCoreSample(String relative){ return false; /* legacy category-routing entry point intentionally disabled */ }
+    @JavascriptInterface public boolean loadFmeCoreSampleToChannel(String relative,int channel,boolean clearChannel){
+      try{
+        File root=new File(getSharedPreferences("demonic_packs",MODE_PRIVATE).getString("fme_core_path",""));
+        File wav=new File(root,relative); String rp=root.getCanonicalPath()+File.separator, wp=wav.getCanonicalPath();
+        if(!wp.startsWith(rp)||!wav.isFile()||!wav.getName().toLowerCase(Locale.US).endsWith(".wav"))return false;
+        File sfz=new File(getCacheDir(),"fme-core-preview.sfz");
+        // Selected FME samples are playable chromatically across the sequencer range.
+        String txt="<region> sample="+wav.getAbsolutePath().replace("\\","/")+" lokey=24 hikey=96 pitch_keycenter=60 ampeg_release=0.08\n";
+        try(FileOutputStream o=new FileOutputStream(sfz)){o.write(txt.getBytes("UTF-8"));}
+        return SfzBank.load(sfz,Math.max(0,Math.min(15,channel)),clearChannel)>0;
+      }catch(Exception e){return false;}
+    }
+    @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
+    @JavascriptInterface public void importSfzFolder(){ runOnUiThread(()->launchSfzFolderPicker()); }
+    @JavascriptInterface public void importFmeExpansionPack(){ runOnUiThread(()->launchFmeExpansionPicker()); }
+    @JavascriptInterface public void openBrowser(String url){ runOnUiThread(()->{String u=(url==null||url.trim().isEmpty())?SUNO_HOME:url.trim();if(u.startsWith("https://"))webView.loadUrl(u);}); }
+    @JavascriptInterface public void openSunoCreate(){ runOnUiThread(()->webView.loadUrl(SUNO_CREATE)); }
+    @JavascriptInterface public void openSunoStudio(){ runOnUiThread(()->webView.loadUrl(SUNO_HOME)); }
+    @JavascriptInterface public void openFreeTv(){ runOnUiThread(()->webView.loadUrl("https://pluto.tv/us/live-tv")); }
+    @JavascriptInterface public void downloadUrl(String url){ if(url==null||!url.startsWith("https://"))return;runOnUiThread(()->{try{DownloadManager.Request r=new DownloadManager.Request(Uri.parse(url));r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,"DemonicTV_"+System.currentTimeMillis());((DownloadManager)getSystemService(DOWNLOAD_SERVICE)).enqueue(r);}catch(Exception ignored){}}); }
+    @JavascriptInterface public String browserUrl(){ return webView==null?"":webView.getUrl(); }
+    @JavascriptInterface public void browserBack(){ runOnUiThread(()->{if(webView.canGoBack())webView.goBack();}); }
+    @JavascriptInterface public void browserForward(){ runOnUiThread(()->{if(webView.canGoForward())webView.goForward();}); }
+    @JavascriptInterface public void browserReload(){ runOnUiThread(()->webView.reload()); }
+    @JavascriptInterface public void browserHome(){ runOnUiThread(()->webView.loadUrl(OFFLINE_URL)); }
+    @JavascriptInterface public void enterPip(){ if(android.os.Build.VERSION.SDK_INT>=26)runOnUiThread(()->{try{enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new Rational(16,9)).build());}catch(Exception ignored){}}); }
+    @JavascriptInterface public boolean launchPsRemotePlay(){
+      String pkg="com.playstation.remoteplay";
+      try{Intent launch=getPackageManager().getLaunchIntentForPackage(pkg);if(launch!=null){startActivity(launch);return true;}}catch(Exception ignored){}
+      try{Intent market=new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+pkg));startActivity(market);return false;}catch(Exception ignored){}
+      try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id="+pkg)));}catch(Exception ignored){}
+      return false;
+    }
+    @JavascriptInterface public void browserTvPip(){ if(android.os.Build.VERSION.SDK_INT>=26)runOnUiThread(()->{try{enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new Rational(16,9)).build());}catch(Exception ignored){}}); }
+  }
+  private static String scopeForCommand(String command){
+    if(command==null)return "READ";
+    if(command.startsWith("recording."))return "RECORD";
+    if(command.startsWith("render."))return "RENDER";
+    if(command.startsWith("file.")||command.startsWith("asset."))return "FILE";
+    if(command.startsWith("publish."))return "PUBLISH";
+    if(command.equals("project.getState")||command.equals("capabilities.get"))return "READ";
+    return "EDIT";
+  }
+  private String normalizeInstrument(String s){
+    String x=s==null?"gfunk-bass":s.toLowerCase(Locale.US).replace(" / ","-").replace(' ','-');
+    Map<String,String> m=new HashMap<>(); m.put("grand-piano","grand");m.put("warm-organ","organ");m.put("rock--blues-lead","lead-guitar");m.put("rock-blues-lead","lead-guitar");m.put("g-funk-bass","gfunk-bass");m.put("808-sub","808-sub");m.put("brass-stack","brass-stack");m.put("demonic-synth","synth");m.put("percussion-fx","perc-fx"); return m.getOrDefault(x,x);
+  }
+
+  @Override protected void onUserLeaveHint(){ super.onUserLeaveHint(); if(android.os.Build.VERSION.SDK_INT>=26&&webView!=null&&webView.getUrl()!=null&&!webView.getUrl().startsWith("file:///android_asset/")){try{enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new Rational(16,9)).build());}catch(Exception ignored){}} }
+  @Override public void onBackPressed(){ if(webView!=null&&webView.canGoBack())webView.goBack();else super.onBackPressed(); }
+  @Override protected void onDestroy(){ try{if(nativeReady)NativeAudioEngine.nativeStop();}catch(Throwable ignored){} super.onDestroy(); }
+}

@@ -1,0 +1,7 @@
+package com.flymaccin.demonicdaw;
+import org.json.*;
+public final class MixerAutomationEngine {
+ public static double valueAt(JSONArray points,double beat,double fallback)throws Exception{if(points==null||points.length()==0)return fallback;JSONObject prev=null,next=null;for(int i=0;i<points.length();i++){JSONObject p=points.getJSONObject(i);if(p.optDouble("beat")<=beat)prev=p;else{next=p;break;}}if(prev==null)return points.getJSONObject(0).optDouble("value",fallback);if(next==null)return prev.optDouble("value",fallback);double a=prev.optDouble("beat"),b=next.optDouble("beat"),x=b==a?1:(beat-a)/(b-a);return prev.optDouble("value",fallback)+(next.optDouble("value",fallback)-prev.optDouble("value",fallback))*Math.max(0,Math.min(1,x));}
+ public static void validateLane(JSONObject lane)throws Exception{if(lane.optString("id").isEmpty()||lane.optString("targetId").isEmpty()||lane.optString("parameter").isEmpty())throw new IllegalStateException("AUTOMATION_INVALID");JSONArray p=lane.optJSONArray("points");double last=-1;if(p!=null)for(int i=0;i<p.length();i++){double b=p.getJSONObject(i).optDouble("beat",-1);if(b<last)throw new IllegalStateException("AUTOMATION_UNSORTED");last=b;}}
+ private MixerAutomationEngine(){}
+}

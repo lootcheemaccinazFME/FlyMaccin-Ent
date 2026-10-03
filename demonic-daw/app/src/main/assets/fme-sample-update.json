@@ -1,0 +1,114 @@
+{
+  "update": "Demonic DAW 1.2 FME Sample Update",
+  "versionCode": 3,
+  "soundPolicy": "FME_SAMPLE_PACK_ONLY",
+  "factoryCollections": [
+    {
+      "name": "FME Original Drum Library v1",
+      "samples": 31
+    },
+    {
+      "name": "FME Original Drum Library v2 Expansion",
+      "samples": 78
+    },
+    {
+      "name": "FME Original Instrument Samples v1",
+      "samples": 429
+    },
+    {
+      "name": "FME Original Instrument Samples v2 Expansion",
+      "samples": 620
+    },
+    {
+      "name": "FME Every Category Blend & Mutation Sample Pack v1",
+      "samples": 624
+    }
+  ],
+  "totalFmeSamples": 1782,
+  "categories": [
+    "drums",
+    "808s",
+    "bass",
+    "keys",
+    "organ",
+    "guitar-models",
+    "strings-models",
+    "brass-models",
+    "g-funk",
+    "pads",
+    "fx",
+    "104-category-blend-mutation-lanes"
+  ],
+  "disclosure": "Factory audio is original FME synthetic/sample-designed material. Do not label modeled sounds as real acoustic recordings.",
+  "plannedUI": [
+    "FME sample browser",
+    "upload/import section",
+    "recording studio",
+    "resizable piano-roll notes",
+    "audio tracks in arrangement"
+  ],
+  "existingNative": [
+    "Oboe output",
+    "SF2 FluidSynth",
+    "SFZ/WAV regions",
+    "SF2 import",
+    "SFZ folder import",
+    "offline engine",
+    "4 buses",
+    "automation"
+  ],
+  "assetIntegration": {
+    "status": "STAGED",
+    "sourceOfTruth": "FME generated sample packs",
+    "packs": [
+      "FME_Original_Drum_Library_v1.zip",
+      "FME_Original_Drum_Library_v2_Expansion.zip",
+      "FME_Original_Instrument_Samples_v1.zip",
+      "FME_Original_Instrument_Samples_v2_Expansion.zip",
+      "FME_Every_Category_Blend_Mutation_Sample_Pack_v1.zip"
+    ],
+    "localPackSizeApproxMB": 182,
+    "repoBinaryUpload": "BLOCKED_BY_CURRENT_GITHUB_CONNECTOR_TEXT_ONLY",
+    "buildTarget": "app/src/main/assets/fme/",
+    "rule": "Do not fall back to fake acoustic factory labels; FME packs are canonical factory sound source."
+  },
+  "recordingStudio": {
+    "status": "SHELL_IMPLEMENTED",
+    "features": [
+      "mic recording",
+      "stop/new take",
+      "take playback",
+      "audio upload",
+      "SF2 import",
+      "SFZ folder import"
+    ]
+  },
+  "pianoRoll2": {
+    "status": "FOUNDATION_IMPLEMENTED",
+    "features": [
+      "touch/pointer right-edge resize",
+      "persistent note widths"
+    ]
+  },
+  "corePack": {
+    "name": "FME Core Pack v1",
+    "samples": 240,
+    "zipSizeMB": 18.42,
+    "sha256": "afe68660b55970d49ecc6fa4e5a2588adf02623cb14a311a37d628679081f71a",
+    "mode": "bundle with app / first-launch offline core"
+  },
+  "fullLibrary": {
+    "samples": 1782,
+    "mode": "optional installable/importable local expansion",
+    "rememberInstalledPacks": true
+  },
+  "userLibrary": {
+    "persistent": true,
+    "imports": [
+      "WAV/audio",
+      "SF2",
+      "SFZ",
+      "recordings"
+    ]
+  }
+}
