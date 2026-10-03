@@ -226,6 +226,7 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void setGain(float gain){ if(nativeReady)NativeAudioEngine.nativeSetGain(gain); }
     @JavascriptInterface public void allNotesOff(){ if(nativeReady)for(int ch=0;ch<16;ch++)NativeAudioEngine.nativeCc(ch,123,0); }
     @JavascriptInterface public void setChannelMix(int channel,float gain,float pan,boolean mute,boolean solo){ if(nativeReady)NativeAudioEngine.nativeSetChannelMix(Math.max(0,Math.min(15,channel)),gain,pan,mute,solo); }
+    @JavascriptInterface public void setChannelFx(int channel,String type,float amount){ if(!nativeReady)return;int fx=0;if("drive".equals(type))fx=1;else if("filter".equals(type))fx=2;else if("delay".equals(type))fx=3;else if("reverb".equals(type))fx=4;NativeAudioEngine.nativeSetChannelFx(Math.max(0,Math.min(15,channel)),fx,Math.max(0f,Math.min(1f,amount))); }
     @JavascriptInterface public String nativeCapabilities(){ try{return CapabilityRegistry.snapshot(nativeReady,hasFmeCore());}catch(Exception e){return "{}";} }
     @JavascriptInterface public String createNativeProject(String name){ try{return projectStore.create(name);}catch(Exception e){return "";} }
     @JavascriptInterface public boolean saveNativeProject(String id,String json){ try{return projectStore.save(id,json);}catch(Exception e){return false;} }
