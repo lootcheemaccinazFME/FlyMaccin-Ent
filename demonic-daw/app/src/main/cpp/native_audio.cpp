@@ -84,3 +84,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_demonicdaw_NativeAudioEngin
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_demonicdaw_NativeAudioEngine_nativeSetChannelMix(JNIEnv*,jclass,jint c,jfloat g,jfloat p,jboolean m,jboolean s){E.channelMix(c,g,p,m==JNI_TRUE,s==JNI_TRUE);}
 
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_demonicdaw_NativeAudioEngine_nativeSetChannelFx(JNIEnv*,jclass,jint c,jint t,jfloat a){E.channelFx(c,t,a);}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_demonicdaw_NativeAudioEngine_nativeLoadDrumVoiceWav(JNIEnv*e,jclass,jint id,jstring s){const char*p=e->GetStringUTFChars(s,0);bool ok=E.loadDrumVoice(id,p);e->ReleaseStringUTFChars(s,p);return ok;}
+extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_demonicdaw_NativeAudioEngine_nativeTriggerDrumVoice(JNIEnv*,jclass,jint id,jint v){E.triggerDrumVoice(id,v);}
+extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_demonicdaw_NativeAudioEngine_nativeSetDrumVoiceMix(JNIEnv*,jclass,jint id,jfloat g,jfloat p,jboolean m,jboolean s){E.drumMix(id,g,p,m==JNI_TRUE,s==JNI_TRUE);}
+extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_demonicdaw_NativeAudioEngine_nativeSetDrumVoiceFx(JNIEnv*,jclass,jint id,jint t,jfloat a){E.drumFx(id,t,a);}
