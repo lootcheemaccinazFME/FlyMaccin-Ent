@@ -36,6 +36,10 @@ public class MainActivity extends Activity {
   private static final int SF2_REQUEST = 902;
   private static final int SFZ_TREE_REQUEST = 903;
   private static final int FME_EXPANSION_REQUEST = 904;
+  private static final int DRUM_WAV_REQUEST = 905;
+  private String pendingDrumProjectId="";
+  private long pendingDrumRevision=-1;
+  private int pendingDrumIndex=-1;
   private static final String ONLINE_URL = "https://demonicaistudiohut.floot.app";
   private static final String OFFLINE_URL = "file:///android_asset/offline.html";
   private static final String SUNO_HOME = "https://suno.com/";
@@ -155,6 +159,26 @@ public class MainActivity extends Activity {
     if(requestCode==SF2_REQUEST){ importSf2(uri); }
     else if(requestCode==SFZ_TREE_REQUEST){ importSfzTree(uri,data.getFlags()); }
     else if(requestCode==FME_EXPANSION_REQUEST){ importFmeExpansion(uri,data.getFlags()); }
+    else if(requestCode==DRUM_WAV_REQUEST){ importDrumWav(uri,data.getFlags()); }
+  }
+  private void launchDrumWavPicker(String projectId,long expectedRevision,int drumIndex){
+    pendingDrumProjectId=projectId==null?"":projectId;pendingDrumRevision=expectedRevision;pendingDrumIndex=drumIndex;
+    Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("audio/*");
+    i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"audio/wav","audio/x-wav","audio/*"});i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);startActivityForResult(i,DRUM_WAV_REQUEST);
+  }
+  private void importDrumWav(Uri uri,int flags){
+    String pid=pendingDrumProjectId;long rev=pendingDrumRevision;int drum=pendingDrumIndex;pendingDrumProjectId="";pendingDrumRevision=-1;pendingDrumIndex=-1;
+    try{
+      if(pid.isEmpty())throw new IOException("PROJECT_REQUIRED");
+      try{getContentResolver().takePersistableUriPermission(uri,flags&Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+      DocumentFile d=DocumentFile.fromSingleUri(this,uri);String name=d!=null&&d.getName()!=null?d.getName():"custom-drum.wav";
+      InputStream in=getContentResolver().openInputStream(uri);if(in==null)throw new IOException("ASSET_INPUT_UNAVAILABLE");
+      String result;try(InputStream source=in){result=assetStore.importAndRegister(pid,"audio",source,name,"user-import:drum",rev);}
+      JSONObject parsed=new JSONObject(result);if(!parsed.optBoolean("ok"))throw new IOException(parsed.optString("error","ASSET_IMPORT_FAILED"));
+      JSONObject asset=parsed.getJSONObject("asset");long newRev=parsed.getJSONObject("state").optLong("revision",rev);
+      final String js="window.onNativeDrumAssetImported("+drum+","+JSONObject.quote(asset.toString())+","+newRev+");";
+      runOnUiThread(()->webView.evaluateJavascript(js,null));
+    }catch(Exception e){notifyImport("drum",false,"",e.getMessage());}
   }
   private void importSf2(Uri uri){
     try { File dst=new File(importDir,"custom.sf2"); try(InputStream in=getContentResolver().openInputStream(uri);OutputStream out=new FileOutputStream(dst)){if(in==null)throw new IOException("No input stream");copy(in,out);} int id=NativeAudioEngine.nativeLoadSoundFont(dst.getAbsolutePath()); boolean ok=id>=0; if(ok)rememberBank("sf2",dst); notifyImport("sf2",ok,dst.getName(),ok?"SoundFont loaded":"FluidSynth rejected the SoundFont"); }
@@ -320,6 +344,16 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void importSoundFont(){ runOnUiThread(()->launchSf2Picker()); }
     @JavascriptInterface public void importSfzFolder(){ runOnUiThread(()->launchSfzFolderPicker()); }
     @JavascriptInterface public void importFmeExpansionPack(){ runOnUiThread(()->launchFmeExpansionPicker()); }
+    @JavascriptInterface public void importDrumWav(String projectId,long expectedRevision,int drumIndex){ runOnUiThread(()->launchDrumWavPicker(projectId,expectedRevision,drumIndex)); }
+    @JavascriptInterface public boolean loadProjectAssetWavToChannel(String projectId,String assetId,int channel,boolean clearChannel){
+      if(!nativeReady||channel<0||channel>15)return false;
+      try{
+        JSONObject verified=new JSONObject(assetStore.verify(projectId,"audio",assetId));if(!verified.optBoolean("ok"))return false;
+        JSONObject asset=verified.getJSONObject("asset");File dir=projectStore.assetDir(projectId,"audio"),wav=new File(dir,asset.getString("file"));
+        if(!wav.isFile()||!wav.getName().toLowerCase(Locale.US).endsWith(".wav"))return false;
+        return SfzBank.loadSingleWav(wav,channel,clearChannel)>0;
+      }catch(Exception e){return false;}
+    }
     @JavascriptInterface public void openBrowser(String url){ runOnUiThread(()->{String u=(url==null||url.trim().isEmpty())?SUNO_HOME:url.trim();if(u.startsWith("https://"))webView.loadUrl(u);}); }
     @JavascriptInterface public void openSunoCreate(){ runOnUiThread(()->webView.loadUrl(SUNO_CREATE)); }
     @JavascriptInterface public void openSunoStudio(){ runOnUiThread(()->webView.loadUrl(SUNO_HOME)); }
