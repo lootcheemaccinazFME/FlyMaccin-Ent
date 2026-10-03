@@ -71,6 +71,44 @@ public final class CommandTransactionEngine {
           .put("notes",a.optJSONArray("notes")==null?new JSONArray():a.optJSONArray("notes"));
         p.getJSONArray("clips").put(clip);return ok(command).put("clip",clip);
       }
+      case "clip.duplicate":{
+        JSONObject src=find(p.getJSONArray("clips"),a.optString("id"));
+        JSONObject copy=new JSONObject(src.toString()).put("id",id("clip"));
+        if(a.has("start"))copy.put("start",Math.max(0,a.getDouble("start")));
+        p.getJSONArray("clips").put(copy);return ok(command).put("clip",copy);
+      }
+      case "clip.split":{
+        JSONObject clip=find(p.getJSONArray("clips"),a.optString("id"));
+        double at=a.getDouble("at"),start=clip.optDouble("start",0),bars=clip.optDouble("bars",1),end=start+bars;
+        if(at<=start||at>=end)throw new IllegalArgumentException("SPLIT_OUTSIDE_CLIP");
+        JSONObject right=new JSONObject(clip.toString()).put("id",id("clip")).put("start",at).put("bars",end-at);
+        clip.put("bars",at-start);p.getJSONArray("clips").put(right);
+        return ok(command).put("left",clip).put("right",right);
+      }
+      case "midi.insertNotes":{
+        JSONObject clip=find(p.getJSONArray("clips"),a.optString("clipId",a.optString("id")));
+        JSONArray notes=clip.optJSONArray("notes");if(notes==null){notes=new JSONArray();clip.put("notes",notes);}
+        JSONArray incoming=a.optJSONArray("notes");if(incoming!=null)for(int i=0;i<incoming.length();i++){
+          JSONObject n=new JSONObject(incoming.getJSONObject(i).toString());
+          n.put("id",n.optString("id").isEmpty()?id("note"):n.optString("id"));
+          n.put("tick",Math.max(0,n.optLong("tick",0))).put("durationTicks",Math.max(1,n.optLong("durationTicks",240)))
+           .put("pitch",Math.max(0,Math.min(127,n.optInt("pitch",60)))).put("velocity",Math.max(1,Math.min(127,n.optInt("velocity",100))));
+          notes.put(n);
+        }
+        return ok(command).put("clipId",clip.getString("id")).put("noteCount",notes.length());
+      }
+      case "midi.quantize":{
+        JSONObject clip=find(p.getJSONArray("clips"),a.optString("clipId",a.optString("id")));
+        JSONArray q=TimelineEngine.quantizeNotes(clip.optJSONArray("notes")==null?new JSONArray():clip.optJSONArray("notes"),a.optInt("division",16));
+        clip.put("notes",q);return ok(command).put("clipId",clip.getString("id")).put("noteCount",q.length());
+      }
+      case "automation.set":{
+        JSONObject lane=new JSONObject(a.toString());
+        if(lane.optString("id").isEmpty())lane.put("id",id("automation"));
+        MixerAutomationEngine.validateLane(lane);JSONArray lanes=p.getJSONArray("automation");boolean replaced=false;
+        for(int i=0;i<lanes.length();i++)if(lane.getString("id").equals(lanes.getJSONObject(i).optString("id"))){lanes.put(i,lane);replaced=true;break;}
+        if(!replaced)lanes.put(lane);return ok(command).put("automationId",lane.getString("id"));
+      }
       case "clip.move": case "clip.resize": case "clip.repeat":{
         JSONObject clip=find(p.getJSONArray("clips"),a.optString("id"));
         if(a.has("start"))clip.put("start",Math.max(0,a.getDouble("start")));
