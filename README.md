@@ -1,6 +1,6 @@
 # FlyMaccin Ent
 
-Current build target: **FME Bookwriter OpenAI Studios v1.2.2**.
+Current build target: **FME Open Studios v1.2.2**.
 
 This repository is configured for Codemagic / GitHub Android debug APK builds.
 
