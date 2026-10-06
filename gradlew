@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 GRADLE_VERSION="8.10.2"
-if command -v gradle >/dev/null 2>&1; then
-  exec gradle "$@"
-fi
 CACHE_DIR="${HOME}/.gradle-bootstrap"
 DIST_DIR="$CACHE_DIR/gradle-$GRADLE_VERSION"
 ZIP="$CACHE_DIR/gradle-$GRADLE_VERSION-bin.zip"

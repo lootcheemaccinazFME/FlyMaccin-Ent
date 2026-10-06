@@ -1,11 +1,14 @@
-name: Build Demonic AI Studio APK
+name: Build Unified Demonic AI Studio APK
 
 on:
   pull_request:
     branches: [main]
     paths:
-      - "android/demonic-ai-studio-hub/**"
+      - "demonic-daw/app/src/main/java/com/flymaccin/demonicaistudio/**"
+      - "demonic-daw/**"
+      - ".github/scripts/generate_demonic_factory.py"
       - ".github/workflows/build-demonic-apk.yml"
+      - ".github/workflows/demonic-daw-qa.yml"
 
 permissions:
   contents: read
@@ -13,9 +16,7 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: android/demonic-ai-studio-hub
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -26,36 +27,63 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
+      - name: Configure Android SDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "platform-tools" \
+            "cmake;3.22.1" \
+            "ndk;27.2.12479018"
+
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.13"
 
-      - name: Restore stable debug signer
-        run: base64 --decode ../../.github/demonic-studio-debug.keystore.b64 > app/studio-debug.keystore
+      - name: Build unified debug APK
+        working-directory: demonic-daw
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: gradle --no-daemon assembleDebug --stacktrace
 
-      - name: Build debug APK
-        run: gradle --no-daemon :app:assembleDebug
-
-      - name: Install and launch on Android emulator
+      - name: Install and verify both studio experiences
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
-          profile: pixel_2
+          profile: pixel_6
           disable-animations: true
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -cores 2 -memory 4096
           script: |
-            adb install -r android/demonic-ai-studio-hub/app/build/outputs/apk/debug/app-debug.apk
-            adb shell pm grant com.flymaccin.demonicaistudio android.permission.RECORD_AUDIO
-            adb shell am start -W -n com.flymaccin.demonicaistudio/.StudioActivity
-            sleep 5
-            adb shell pidof com.flymaccin.demonicaistudio
-            if adb logcat -d '*:E' | grep -q 'FATAL EXCEPTION.*com.flymaccin.demonicaistudio'; then exit 1; fi
+            set -euxo pipefail
+            adb kill-server || true
+            adb start-server
+            timeout 300 sh -c '
+              until [ "$(adb get-state 2>/dev/null || true)" = "device" ]; do
+                adb devices || true
+                sleep 2
+              done
+            '
+            timeout 300 sh -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\\r")" = "1" ]; do sleep 2; done'
+            timeout 180 sh -c 'until adb shell service check package 2>/dev/null | grep -q "found"; do sleep 2; done'
+            adb install --no-streaming -r demonic-daw/app/build/outputs/apk/debug/app-debug.apk
+            adb shell pm grant com.flymaccin.demonicdaw android.permission.RECORD_AUDIO || true
+            adb shell am start -W -n com.flymaccin.demonicdaw/.MainActivity
+            sleep 3
+            adb shell am start -W -n com.flymaccin.demonicdaw/com.flymaccin.demonicaistudio.StudioActivity
+            sleep 3
+            adb shell dumpsys activity activities > /tmp/demonic-activities.txt
+            grep -q 'com.flymaccin.demonicaistudio.StudioActivity' /tmp/demonic-activities.txt
+            adb logcat -d > /tmp/demonic-logcat.txt
+            ! grep -E 'FATAL EXCEPTION|UnsatisfiedLinkError|Process: com.flymaccin.demonicdaw' /tmp/demonic-logcat.txt
 
-      - name: Upload APK
+      - name: Upload unified APK
         uses: actions/upload-artifact@v4
         with:
-          name: FME-Demonic-AI-Studio-APK
-          path: android/demonic-ai-studio-hub/app/build/outputs/apk/debug/app-debug.apk
+          name: Demonic-AI-Studio-Unified-APK
+          path: demonic-daw/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
