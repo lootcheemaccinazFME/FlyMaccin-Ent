@@ -55,7 +55,11 @@ public final class GummieAcademyActivity extends Activity {
     base("🐻 Gummie Bear Academy\nWelcome, Kentrey!\nFourth Grade Learning HQ");
     label("⭐ Stars earned: "+stars()+"    📚 Questions solved: "+prefs.getInt("solved",0),18);
     for(String s:subjects)button(s+" Practice",()->practice(s));
-    button("🎯 Goals & Challenges",this::goals);\n    button("🎁 Prize Shop & Trophy Room",this::prizes);\n    button("🎮 Educational Games",this::games);\n    button("🧪 Timed Practice Tests",this::tests);\n    button("📝 Homework Checklist",this::homework);
+    button("🎯 Goals & Challenges",this::goals);
+    button("🎁 Prize Shop & Trophy Room",this::prizes);
+    button("🎮 Educational Games",this::games);
+    button("🧪 Timed Practice Tests",this::tests);
+    button("📝 Homework Checklist",this::homework);
     button("⏱ Focus Timer",this::focus);
     button("💡 Study Helper",this::helper);
     button("👪 Parent View",this::parent);
@@ -232,7 +236,8 @@ public final class GummieAcademyActivity extends Activity {
     if(owned==0)label("No prizes yet. Play a game to earn your first badge!",16);
     back();
   }
-\n  private void homework(){
+
+  private void homework(){
     base("📝 Homework Checklist");
     String[] tasks={"Math homework","Reading for 20 minutes","Science review","Vocabulary practice","Pack school bag"};
     for(int i=0;i<tasks.length;i++){
@@ -268,7 +273,12 @@ public final class GummieAcademyActivity extends Activity {
   private void parent(){
     base("👪 Parent View");
     label("Kentrey's Progress",22);label("⭐ Earned stars: "+stars(),20);
-    label("Questions solved: "+prefs.getInt("solved",0),19);\n    label("Games completed: "+prefs.getInt("games",0),19);\n    label("Goal streak: "+prefs.getInt("goal_streak",0)+" days",19);\n    label("Prizes redeemed: "+prefs.getInt("prizes_redeemed",0),19);\n    label("Tests completed: "+prefs.getInt("tests",0),19);\n    for(int i=0;i<subjects.length;i++)label(subjects[i]+" test best: "+prefs.getInt("best_"+i,0)+"/10",16);
+    label("Questions solved: "+prefs.getInt("solved",0),19);
+    label("Games completed: "+prefs.getInt("games",0),19);
+    label("Goal streak: "+prefs.getInt("goal_streak",0)+" days",19);
+    label("Prizes redeemed: "+prefs.getInt("prizes_redeemed",0),19);
+    label("Tests completed: "+prefs.getInt("tests",0),19);
+    for(int i=0;i<subjects.length;i++)label(subjects[i]+" test best: "+prefs.getInt("best_"+i,0)+"/10",16);
     int completed=0;for(int i=0;i<5;i++)if(prefs.getBoolean("hw"+i,false))completed++;
     label("Homework tasks complete: "+completed+"/5",19);
     label("Progress is saved locally on this device.",16);
