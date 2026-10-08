@@ -49,8 +49,8 @@ jobs:
             adb shell pm grant com.flymaccin.demonicaistudio android.permission.RECORD_AUDIO
             adb shell am start -W -n com.flymaccin.demonicaistudio/.StudioActivity
             sleep 5
-            adb shell pidof com.flymaccin.demonicaistudio
-            if adb logcat -d '*:E' | grep -q 'FATAL EXCEPTION.*com.flymaccin.demonicaistudio'; then exit 1; fi
+            if ! adb shell pidof com.flymaccin.demonicaistudio; then adb logcat -d | grep -E -i 'demonicaistudio|AndroidRuntime|FATAL EXCEPTION|Process: com.flymaccin.demonicaistudio' || true; exit 1; fi
+            if adb logcat -d | grep -A 20 -B 5 -E 'FATAL EXCEPTION|Process: com.flymaccin.demonicaistudio' | grep -q 'com.flymaccin.demonicaistudio'; then adb logcat -d | grep -A 30 -B 5 -E 'FATAL EXCEPTION|Process: com.flymaccin.demonicaistudio' || true; exit 1; fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

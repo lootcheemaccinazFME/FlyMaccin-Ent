@@ -1,0 +1,23 @@
+Demonic DAW QA trigger
+Revision: unified-build-routing-1789845032004
+Target: emulator compile/install/offline-online smoke after generic routing + unified harvest
+
+Revision: 33
+Reason: verify ProjectStore WAL compile-type fix and unified generic routing build.
+
+Revision: 34
+Reason: preserve emulator-runner ADB lifecycle; reconnect offline transport without killing server.
+
+Release-readiness QA trigger: 2026-09-20 pack installer + native transaction baseline
+
+Revision: 35
+Reason: canonical native state validator + compiled audio graph + immutable realtime snapshot foundation.
+
+Revision: 36
+Reason: compile/smoke non-AI parallel P0-P5 P8 P9 foundations; AI remains deferred.
+
+Revision: 37
+Reason: fix first real QA failure: missing SfzBank.loadSingleWav(File,int,boolean); rerun build before feature work.
+
+Revision: 38
+Reason: verify instrument track auto-routing/selection, FME sample audition, studio panic control, and recording UI compile/smoke.
