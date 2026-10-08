@@ -1,0 +1,33 @@
+name: Build DREYVEN Universal APK
+on:
+  push:
+    branches: [build/fme-everything-one-apk-v1]
+  workflow_dispatch:
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android/lootchee-rom-emulator
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Install Android toolchain
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
+      - name: Compile one DREYVEN APK
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DREYVEN-FME-UNIVERSAL-APP-HUB-debug
+          path: android/lootchee-rom-emulator/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
