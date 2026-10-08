@@ -55,7 +55,7 @@ public final class GummieAcademyActivity extends Activity {
     base("🐻 Gummie Bear Academy\nWelcome, Kentrey!\nFourth Grade Learning HQ");
     label("⭐ Stars earned: "+stars()+"    📚 Questions solved: "+prefs.getInt("solved",0),18);
     for(String s:subjects)button(s+" Practice",()->practice(s));
-    button("📝 Homework Checklist",this::homework);
+    button("🎮 Educational Games",this::games);\n    button("🧪 Timed Practice Tests",this::tests);\n    button("📝 Homework Checklist",this::homework);
     button("⏱ Focus Timer",this::focus);
     button("💡 Study Helper",this::helper);
     button("👪 Parent View",this::parent);
@@ -85,7 +85,97 @@ public final class GummieAcademyActivity extends Activity {
     back();
   }
   private int index(){for(int i=0;i<subjects.length;i++)if(subjects[i].equals(subject))return i;return 0;}
-  private void homework(){
+
+  private int gameRound=0,gameScore=0,testRound=0,testScore=0;
+  private long testStart=0;
+  private void games(){
+    base("🎮 Educational Games");
+    label("Choose a game. Correct answers earn stars!",18);
+    button("⚡ Multiplication Sprint",()->startGame(0));
+    button("🔢 Number Detective",()->startGame(1));
+    button("🧠 Word Detective",()->startGame(2));
+    button("🌎 Science Explorer",()->startGame(3));
+    back();
+  }
+  private int gameMode=0,gameAnswer=0;
+  private String gameText="";
+  private String[] gameChoices;
+  private void startGame(int mode){gameMode=mode;gameRound=0;gameScore=0;nextGame();}
+  private void nextGame(){
+    if(gameRound>=10){
+      int reward=gameScore*5;
+      prefs.edit().putInt("stars",stars()+reward).putInt("games",prefs.getInt("games",0)+1).apply();
+      base("🏆 Game Complete");
+      label("Score: "+gameScore+"/10",24);label("Stars earned: +"+reward,20);
+      button("Play Again",()->startGame(gameMode));back();return;
+    }
+    int a=2+random.nextInt(11),b=2+random.nextInt(11);
+    if(gameMode==0){gameText="What is "+a+" × "+b+"?";gameAnswer=a*b;gameChoices=numberOptions(gameAnswer);}
+    else if(gameMode==1){gameAnswer=a*10+b;gameText="Find the number: "+a+" tens and "+b+" ones.";gameChoices=numberOptions(gameAnswer);}
+    else if(gameMode==2){
+      String[] words={"enormous","cautious","ancient","observe","generous"};
+      String[][] opts={{"very large","very tiny","very fast"},{"careful","careless","angry"},{"very old","brand new","colorful"},{"watch closely","run quickly","sleep"},{"giving","selfish","quiet"}};
+      int n=random.nextInt(words.length);gameText="What does '"+words[n]+"' mean?";
+      gameChoices=opts[n];gameAnswer=0;
+    }else{
+      String[] q={"Which planet is called the Red Planet?","What pulls objects toward Earth?","Which organ pumps blood?","What do bees collect from flowers?","What do roots absorb from soil?"};
+      String[][] opts={{"Mars","Venus","Jupiter"},{"Gravity","Sound","Light"},{"Heart","Lungs","Stomach"},{"Nectar","Sand","Salt"},{"Water","Smoke","Plastic"}};
+      int n=random.nextInt(q.length);gameText=q[n];gameChoices=opts[n];gameAnswer=0;
+    }
+    base("🎮 "+new String[]{"Multiplication Sprint","Number Detective","Word Detective","Science Explorer"}[gameMode]);
+    label("Round "+(gameRound+1)+"/10   Correct: "+gameScore,18);label(gameText,23);
+    for(int i=0;i<gameChoices.length;i++){
+      final int index=i;button(gameChoices[i],()->{
+        boolean right=index==gameAnswerIndex();
+        if(right)gameScore++;
+        Toast.makeText(this,right?"Correct! ⭐":"Answer: "+gameChoices[gameAnswerIndex()],Toast.LENGTH_SHORT).show();
+        gameRound++;nextGame();
+      });
+    }
+    back();
+  }
+  private int gameAnswerIndex(){return gameMode<2?gameAnswer==Integer.parseInt(gameChoices[0])?0:gameAnswer==Integer.parseInt(gameChoices[1])?1:2:0;}
+  private String[] numberOptions(int correct){
+    int wrong1=correct+1+random.nextInt(7),wrong2=Math.max(0,correct-1-random.nextInt(7));
+    String[] arr={""+correct,""+wrong1,""+wrong2};
+    for(int i=2;i>0;i--){int j=random.nextInt(i+1);String t=arr[i];arr[i]=arr[j];arr[j]=t;}
+    return arr;
+  }
+  private int testMode=0;
+  private void tests(){
+    base("🧪 Timed Practice Tests");
+    label("10 questions per test. Earn a score and track your best result.",18);
+    for(int i=0;i<subjects.length;i++){final int m=i;button(subjects[i]+" Test",()->startTest(m));}
+    back();
+  }
+  private void startTest(int mode){testMode=mode;testRound=0;testScore=0;testStart=System.currentTimeMillis();nextTest();}
+  private void nextTest(){
+    if(testRound>=10){
+      int elapsed=(int)((System.currentTimeMillis()-testStart)/1000);
+      String key="best_"+testMode;int best=Math.max(testScore,prefs.getInt(key,0));
+      prefs.edit().putInt(key,best).putInt("tests",prefs.getInt("tests",0)+1).putInt("stars",stars()+testScore*5).apply();
+      base("📊 Test Results");label(subjects[testMode]+": "+testScore+"/10",25);
+      label("Time: "+elapsed+" seconds",19);label("Personal best: "+best+"/10",19);
+      label("Earned "+(testScore*5)+" stars",19);
+      button("Retake Test",()->startTest(testMode));back();return;
+    }
+    int n=random.nextInt(5);int a=2+random.nextInt(12),b=2+random.nextInt(12);
+    String q,expected;
+    if(testMode==0){q="Calculate "+a+" × "+b;expected=""+(a*b);}
+    else{q=prompts[testMode][n];expected=keys[testMode][n];}
+    base("🧪 "+subjects[testMode]+" Test");
+    label("Question "+(testRound+1)+" of 10",17);label(q,22);
+    EditText field=new EditText(this);field.setHint("Type answer");field.setTextColor(Color.WHITE);
+    field.setHintTextColor(0xffbbbbbb);root.addView(field);
+    button("Submit & Next",()->{
+      String given=field.getText().toString().trim().toLowerCase();
+      if(given.isEmpty()){field.setError("Answer required");return;}
+      if(given.equals(expected)||given.contains(expected)||expected.contains(given)&&given.length()>=4)testScore++;
+      testRound++;nextTest();
+    });
+    button("End Test",this::tests);
+  }
+\n  private void homework(){
     base("📝 Homework Checklist");
     String[] tasks={"Math homework","Reading for 20 minutes","Science review","Vocabulary practice","Pack school bag"};
     for(int i=0;i<tasks.length;i++){
@@ -121,7 +211,7 @@ public final class GummieAcademyActivity extends Activity {
   private void parent(){
     base("👪 Parent View");
     label("Kentrey's Progress",22);label("⭐ Earned stars: "+stars(),20);
-    label("Questions solved: "+prefs.getInt("solved",0),19);
+    label("Questions solved: "+prefs.getInt("solved",0),19);\n    label("Games completed: "+prefs.getInt("games",0),19);\n    label("Tests completed: "+prefs.getInt("tests",0),19);\n    for(int i=0;i<subjects.length;i++)label(subjects[i]+" test best: "+prefs.getInt("best_"+i,0)+"/10",16);
     int completed=0;for(int i=0;i<5;i++)if(prefs.getBoolean("hw"+i,false))completed++;
     label("Homework tasks complete: "+completed+"/5",19);
     label("Progress is saved locally on this device.",16);
