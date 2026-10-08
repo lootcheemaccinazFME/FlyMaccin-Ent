@@ -1,8 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.INTERNET"/>
-  <application android:theme="@style/AppTheme" android:label="FME" android:extractNativeLibs="true">
-    <activity android:name=".MainActivity" android:screenOrientation="sensorLandscape" android:exported="true">
+  <application android:theme="@style/AppTheme" android:label="DREYVEN: FME Universal App Hub" android:extractNativeLibs="true">
+    <activity android:name=".DreyvenActivity" android:exported="true">
       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
     </activity>
+    <activity android:name=".MainActivity" android:screenOrientation="sensorLandscape" android:exported="false"/>
   </application>
 </manifest>
