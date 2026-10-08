@@ -29,7 +29,7 @@ public final class DreyvenActivity extends Activity {
         room("Demonic AI Studio", false, "AI engine integration is in progress.");
         room("LOOTCHEE OS", false, "Workflow engine integration is in progress.");
         room("FME Games", false, "Game engines are not yet certified.");
-        room("Gummie Bear Academy", false, "Education module is awaiting integration.");
+        room("Gummie Bear Academy", true, "Offline fourth-grade math lab.");
         setContentView(scroll);
     }
     private void title(String s, int sp, int color) {
