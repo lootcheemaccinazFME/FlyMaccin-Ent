@@ -55,7 +55,7 @@ public final class GummieAcademyActivity extends Activity {
     base("🐻 Gummie Bear Academy\nWelcome, Kentrey!\nFourth Grade Learning HQ");
     label("⭐ Stars earned: "+stars()+"    📚 Questions solved: "+prefs.getInt("solved",0),18);
     for(String s:subjects)button(s+" Practice",()->practice(s));
-    button("🎮 Educational Games",this::games);\n    button("🧪 Timed Practice Tests",this::tests);\n    button("📝 Homework Checklist",this::homework);
+    button("🎯 Goals & Challenges",this::goals);\n    button("🎁 Prize Shop & Trophy Room",this::prizes);\n    button("🎮 Educational Games",this::games);\n    button("🧪 Timed Practice Tests",this::tests);\n    button("📝 Homework Checklist",this::homework);
     button("⏱ Focus Timer",this::focus);
     button("💡 Study Helper",this::helper);
     button("👪 Parent View",this::parent);
@@ -75,7 +75,7 @@ public final class GummieAcademyActivity extends Activity {
       if(given.isEmpty()){response.setError("Enter your answer");return;}
       boolean right=given.equals(expected)||given.contains(expected)||expected.contains(given)&&given.length()>=4;
       if(right){
-        prefs.edit().putInt("stars",stars()+10).putInt("solved",prefs.getInt("solved",0)+1).apply();
+        prefs.edit().putInt("stars",stars()+10).putInt("solved",prefs.getInt("solved",0)+1).apply();updateGoals();
         Toast.makeText(this,"Correct! +10 stars ⭐",Toast.LENGTH_LONG).show();current=random.nextInt(5);showQuestion();
       }else{
         Toast.makeText(this,"Try again. Hint: "+expected.substring(0,Math.min(2,expected.length()))+"…",Toast.LENGTH_LONG).show();
@@ -104,7 +104,7 @@ public final class GummieAcademyActivity extends Activity {
   private void nextGame(){
     if(gameRound>=10){
       int reward=gameScore*5;
-      prefs.edit().putInt("stars",stars()+reward).putInt("games",prefs.getInt("games",0)+1).apply();
+      prefs.edit().putInt("stars",stars()+reward).putInt("games",prefs.getInt("games",0)+1).apply();updateGoals();
       base("🏆 Game Complete");
       label("Score: "+gameScore+"/10",24);label("Stars earned: +"+reward,20);
       button("Play Again",()->startGame(gameMode));back();return;
@@ -153,7 +153,7 @@ public final class GummieAcademyActivity extends Activity {
     if(testRound>=10){
       int elapsed=(int)((System.currentTimeMillis()-testStart)/1000);
       String key="best_"+testMode;int best=Math.max(testScore,prefs.getInt(key,0));
-      prefs.edit().putInt(key,best).putInt("tests",prefs.getInt("tests",0)+1).putInt("stars",stars()+testScore*5).apply();
+      prefs.edit().putInt(key,best).putInt("tests",prefs.getInt("tests",0)+1).putInt("stars",stars()+testScore*5).apply();updateGoals();
       base("📊 Test Results");label(subjects[testMode]+": "+testScore+"/10",25);
       label("Time: "+elapsed+" seconds",19);label("Personal best: "+best+"/10",19);
       label("Earned "+(testScore*5)+" stars",19);
@@ -174,6 +174,63 @@ public final class GummieAcademyActivity extends Activity {
       testRound++;nextTest();
     });
     button("End Test",this::tests);
+  }
+\n
+  private String today(){
+    return new java.text.SimpleDateFormat("yyyy-MM-dd",java.util.Locale.US).format(new java.util.Date());
+  }
+  private void updateGoals(){
+    String today=today(),last=prefs.getString("goal_date","");
+    if(!today.equals(last)){
+      java.util.Calendar cal=java.util.Calendar.getInstance();cal.add(java.util.Calendar.DAY_OF_YEAR,-1);
+      String yesterday=new java.text.SimpleDateFormat("yyyy-MM-dd",java.util.Locale.US).format(cal.getTime());
+      int streak=last.equals(yesterday)?prefs.getInt("goal_streak",0)+1:1;
+      prefs.edit().putString("goal_date",today).putInt("goal_streak",streak).putInt("daily_baseline",prefs.getInt("solved",0)).apply();
+    }
+  }
+  private int dailySolved(){return Math.max(0,prefs.getInt("solved",0)-prefs.getInt("daily_baseline",0));}
+  private void goals(){
+    updateGoals();base("🎯 Goals & Challenges");
+    int target=prefs.getInt("daily_target",5);
+    label("🔥 Learning streak: "+prefs.getInt("goal_streak",0)+" day(s)",21);
+    label("Daily question goal: "+dailySolved()+" / "+target,20);
+    ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
+    bar.setMax(target);bar.setProgress(Math.min(target,dailySolved()));root.addView(bar);
+    label(dailySolved()>=target?"🏅 Daily goal completed!":"Keep practicing to reach today's goal.",17);
+    button("Set Goal: 5 Questions",()->{prefs.edit().putInt("daily_target",5).apply();goals();});
+    button("Set Goal: 10 Questions",()->{prefs.edit().putInt("daily_target",10).apply();goals();});
+    button("Set Goal: 20 Questions",()->{prefs.edit().putInt("daily_target",20).apply();goals();});
+    label("🏆 Weekly challenges",22);
+    int games=prefs.getInt("games",0),tests=prefs.getInt("tests",0);
+    label((games>=5?"✅":"⬜")+" Complete 5 games ("+Math.min(5,games)+"/5)",17);
+    label((tests>=3?"✅":"⬜")+" Complete 3 practice tests ("+Math.min(3,tests)+"/3)",17);
+    label((stars()>=200?"✅":"⬜")+" Earn 200 stars",17);
+    label("Completed challenges stay checked. Daily question goals reset each day.",15);
+    back();
+  }
+  private final String[] prizeNames={"🌟 Golden Star Badge","🦁 Brave Learner Trophy","🚀 Space Explorer Badge","🎨 Creative Champion Ribbon","📚 Bookworm Crown","🏆 Master Scholar Cup"};
+  private final int[] prizeCosts={50,100,150,200,300,500};
+  private void prizes(){
+    base("🎁 Prize Shop & Trophy Room");
+    label("⭐ Available stars: "+stars(),22);
+    label("Earn stars by answering questions, playing games and taking tests. Prizes are virtual collectibles.",16);
+    for(int i=0;i<prizeNames.length;i++){
+      final int id=i;boolean owned=prefs.getBoolean("prize_"+i,false);
+      button(prizeNames[i]+" | "+(owned?"OWNED":"⭐ "+prizeCosts[i]),()->{
+        if(prefs.getBoolean("prize_"+id,false)){Toast.makeText(this,"Already in your trophy room!",Toast.LENGTH_SHORT).show();return;}
+        if(stars()<prizeCosts[id]){Toast.makeText(this,"Keep learning to earn more stars!",Toast.LENGTH_LONG).show();return;}
+        new android.app.AlertDialog.Builder(this).setTitle("Redeem prize?")
+          .setMessage("Spend "+prizeCosts[id]+" stars on "+prizeNames[id]+"?")
+          .setNegativeButton("Cancel",null).setPositiveButton("Redeem",(dialog,which)->{
+            prefs.edit().putInt("stars",stars()-prizeCosts[id]).putBoolean("prize_"+id,true)
+              .putInt("prizes_redeemed",prefs.getInt("prizes_redeemed",0)+1).apply();prizes();
+          }).show();
+      });
+    }
+    label("🏅 Your Trophy Room",21);
+    int owned=0;for(int i=0;i<prizeNames.length;i++)if(prefs.getBoolean("prize_"+i,false)){label(prizeNames[i],18);owned++;}
+    if(owned==0)label("No prizes yet. Play a game to earn your first badge!",16);
+    back();
   }
 \n  private void homework(){
     base("📝 Homework Checklist");
@@ -211,7 +268,7 @@ public final class GummieAcademyActivity extends Activity {
   private void parent(){
     base("👪 Parent View");
     label("Kentrey's Progress",22);label("⭐ Earned stars: "+stars(),20);
-    label("Questions solved: "+prefs.getInt("solved",0),19);\n    label("Games completed: "+prefs.getInt("games",0),19);\n    label("Tests completed: "+prefs.getInt("tests",0),19);\n    for(int i=0;i<subjects.length;i++)label(subjects[i]+" test best: "+prefs.getInt("best_"+i,0)+"/10",16);
+    label("Questions solved: "+prefs.getInt("solved",0),19);\n    label("Games completed: "+prefs.getInt("games",0),19);\n    label("Goal streak: "+prefs.getInt("goal_streak",0)+" days",19);\n    label("Prizes redeemed: "+prefs.getInt("prizes_redeemed",0),19);\n    label("Tests completed: "+prefs.getInt("tests",0),19);\n    for(int i=0;i<subjects.length;i++)label(subjects[i]+" test best: "+prefs.getInt("best_"+i,0)+"/10",16);
     int completed=0;for(int i=0;i<5;i++)if(prefs.getBoolean("hw"+i,false))completed++;
     label("Homework tasks complete: "+completed+"/5",19);
     label("Progress is saved locally on this device.",16);
