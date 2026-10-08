@@ -1,0 +1,39 @@
+name: FME Aippy Games APK Batch
+on:
+  workflow_dispatch:
+  push:
+    branches: [ rebuild/aippy-games-batch-v1 ]
+    paths: [ 'android/aippy-games/**', '.github/workflows/aippy-games-batch.yml' ]
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.9' }
+      - name: Build all three APKs
+        working-directory: android/aippy-games
+        run: gradle --no-daemon :eightbitism:assembleDebug :hyphyxels:assembleDebug :baycarnival3:assembleDebug
+      - name: Verify identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          declare -A P=( [eightbitism]=com.flymaccin.eightbitism [hyphyxels]=com.flymaccin.hyphyxels [baycarnival3]=com.flymaccin.baycarnival3 )
+          mkdir -p /tmp/aippy
+          for m in eightbitism hyphyxels baycarnival3; do
+            apk="android/aippy-games/$m/build/outputs/apk/debug/$m-debug.apk"
+            test -s "$apk"
+            "$AAPT" dump badging "$apk" | grep -q "package: name='${P[$m]}'"
+            cp "$apk" "/tmp/aippy/$m-debug.apk"
+          done
+          (cd /tmp/aippy && sha256sum *.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FME-Aippy-Games-3APK-Batch
+          path: /tmp/aippy
+          if-no-files-found: error
