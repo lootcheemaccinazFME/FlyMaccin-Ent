@@ -25,7 +25,7 @@ public final class DreyvenActivity extends Activity {
         title("FME UNIVERSAL APP HUB", 18, Color.WHITE);
         title("1 APP  •  0 LAUNCHERS  •  1 APK", 14, 0xffbbbbbb);
         room("Universal Emulator", true, "Launch the built-in emulator engine.");
-        room("Music & DAW Studio", false, "Music engine integration is in progress.");
+        room("Music & DAW Studio", true, "Built-in offline 16-step beat lab.");
         room("Demonic AI Studio", false, "AI engine integration is in progress.");
         room("LOOTCHEE OS", false, "Workflow engine integration is in progress.");
         room("FME Games", false, "Game engines are not yet certified.");
