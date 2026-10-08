@@ -29,7 +29,7 @@ public final class DreyvenActivity extends Activity {
         room("Demonic AI Studio", false, "AI engine integration is in progress.");
         room("LOOTCHEE OS", false, "Workflow engine integration is in progress.");
         room("FME Games", false, "Game engines are not yet certified.");
-        room("Gummie Bear Academy", true, "Offline fourth-grade math lab.");
+        room("Gummie Bear Academy", true, "Offline fourth-grade learning, games, tests, goals, stars and prizes.");
         setContentView(scroll);
     }
     private void title(String s, int sp, int color) {
@@ -45,7 +45,8 @@ public final class DreyvenActivity extends Activity {
         list.addView(b);
         b.setOnClickListener(v -> {
             if (ready) {
-                startActivity(new Intent(this, MainActivity.class));
+                Class<?> destination = name.equals("Gummie Bear Academy") ? GummieAcademyActivity.class : name.equals("Music & DAW Studio") ? DreyvenBeatLabActivity.class : MainActivity.class;
+                startActivity(new Intent(this, destination));
             } else {
                 new android.app.AlertDialog.Builder(this)
                     .setTitle(name + " • Coming Soon")
