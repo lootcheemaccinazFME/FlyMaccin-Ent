@@ -9,11 +9,11 @@ android {
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
-        applicationId = "com.flymaccin.lootcheerom"
+        applicationId = "com.flymaccin.dreyven"
         minSdk = 26
         targetSdk = 36
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = 101
+        versionName = "0.1.0"
 
         externalNativeBuild {
             cmake {
