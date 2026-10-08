@@ -83,6 +83,55 @@ final class StudioRenderer {
         return new Result(masterFile, stemFiles);
     }
 
+
+    Result renderProduction(Context context, ProductionProject project, String name, boolean exportStems) throws Exception {
+        double tickSeconds=60.0/Math.max(40,project.bpm)/ProductionProject.PPQ;
+        int frames=(int)Math.ceil(project.bars*4.0*ProductionProject.PPQ*tickSeconds*RATE)+RATE*3;
+        List<float[]> tracks=new ArrayList<>();
+        boolean anySolo=false; for(ProductionProject.Channel ch:project.channels) if(ch.solo) anySolo=true;
+        for(ProductionProject.Channel ch:project.channels){
+            float[] out=new float[frames*2];tracks.add(out);
+            if(ch.mute||(anySolo&&!ch.solo))continue;
+            for(ProductionProject.MidiNote n:ch.notes){
+                int off=(int)Math.round(n.startTick*tickSeconds*RATE);
+                int ms=Math.max(60,(int)Math.round(n.durationTick*tickSeconds*1000));
+                double hz=440.0*Math.pow(2,(n.note-69)/12.0);
+                float vel=Math.max(0,Math.min(1,n.velocity/127f));
+                float[] voice=(ch.instrument.type==ProductionProject.InstrumentType.GUITAR||ch.instrument.type==ProductionProject.InstrumentType.BASS)?pluck(hz,ms):piano(hz,ms);
+                addMono(out,voice,off,ch.volume*vel,ch.pan);
+            }
+            for(ProductionProject.AudioClip clip:ch.audio) addProductionClip(out,clip,(int)Math.round(clip.startTick*tickSeconds*RATE),ch.volume,ch.pan);
+            if(!ch.bypassFx) applyProductionFx(out,ch);
+        }
+        java.util.Map<String,float[]> busAudio=new java.util.HashMap<>();
+        for(ProductionProject.Bus bus:project.buses)busAudio.put(bus.id,new float[frames*2]);
+        float[] master=new float[frames*2];
+        for(int ti=0;ti<tracks.size();ti++){ProductionProject.Channel ch=project.channels.get(ti);float[] t=tracks.get(ti);float[] bus=busAudio.get(ch.route);float[] dst=bus==null?master:bus;for(int i=0;i<dst.length;i++)dst[i]+=t[i];}
+        for(ProductionProject.Bus bus:project.buses){float[] b=busAudio.get(bus.id);if(b==null||bus.mute)continue;applyBusFx(b,bus);mixStereo(master,b,bus.volume,bus.pan);}
+        normalize(master);
+        File root=new File(context.getExternalFilesDir(Environment.DIRECTORY_MUSIC),"DemonicExports");if(!root.exists()&&!root.mkdirs())throw new IllegalStateException("Cannot create export folder");
+        String stamp=new java.text.SimpleDateFormat("yyyyMMdd_HHmmss",java.util.Locale.US).format(new java.util.Date());File mf=new File(root,safe(name)+"_MASTER_"+stamp+".wav");writeWav(mf,master);
+        List<File> stems=new ArrayList<>();if(exportStems)for(int i=0;i<tracks.size();i++){float[] t=tracks.get(i);normalize(t);File sf=new File(root,safe(name)+"_STEM_"+safe(project.channels.get(i).name)+"_"+stamp+".wav");writeWav(sf,t);stems.add(sf);}return new Result(mf,stems);
+    }
+    private static void addProductionClip(float[] target,ProductionProject.AudioClip clip,int offset,float volume,float pan){
+        try{WavFile.Data d=WavFile.read(new File(clip.path));float[] src=WavFile.mono(d);int a=(int)Math.max(0,clip.trimStartMs*d.rate/1000L),b=clip.trimEndMs<0?src.length:(int)Math.min(src.length,clip.trimEndMs*d.rate/1000L);if(b<=a)return;int raw=b-a;float stretch=Math.max(.125f,Math.min(8f,clip.stretch));int len=Math.max(1,(int)(raw*stretch));float[] cut=new float[len];int fi=(int)(clip.fadeInMs*RATE/1000f),fo=(int)(clip.fadeOutMs*RATE/1000f);for(int i=0;i<len;i++){int q=Math.min(raw-1,(int)(i/stretch));int si=clip.reverse?b-1-q:a+q;float g=clip.gain;if(fi>0&&i<fi)g*=i/(float)fi;if(fo>0&&i>len-fo)g*=Math.max(0,(len-i)/(float)fo);cut[i]=src[si]*g;}addMono(target,cut,offset,volume,pan);}catch(Exception ignored){}
+    }
+    private static void applyProductionFx(float[] s,ProductionProject.Channel ch){applyEq(s,ch.eqLow,ch.eqMid,ch.eqHigh);applyDynamics(s,ch.drive,ch.compressor,ch.reverb,ch.delay);}
+    private static void applyBusFx(float[] s,ProductionProject.Bus b){applyEq(s,b.eqLow,b.eqMid,b.eqHigh);applyDynamics(s,b.drive,b.compressor,b.reverb,b.delay);}
+    private static void applyDynamics(float[] s,float drive,float compressor,float reverb,float delay){
+        drive=Math.max(0,drive);if(drive>0)for(int i=0;i<s.length;i++)s[i]=(float)Math.tanh(s[i]*(1+drive*5));
+        if(delay>0)addEcho(s,(int)(RATE*.27)*2,Math.min(.7f,delay));
+        if(reverb>0){addEcho(s,(int)(RATE*.061)*2,Math.min(.55f,reverb*.7f));addEcho(s,(int)(RATE*.097)*2,Math.min(.4f,reverb*.45f));}
+        if(compressor>0){float th=.75f-compressor*.45f;for(int i=0;i<s.length;i++){float a=Math.abs(s[i]);if(a>th)s[i]=Math.signum(s[i])*(th+(a-th)/(1+compressor*6));}}
+    }
+    private static void applyEq(float[] s,float lowDb,float midDb,float highDb){
+        if(Math.abs(lowDb)+Math.abs(midDb)+Math.abs(highDb)<.001f)return;float lg=db(lowDb),mg=db(midDb),hg=db(highDb);float[] lp={0,0},hpLast={0,0},xLast={0,0};float la=(float)Math.exp(-2*Math.PI*220/RATE),ha=(float)Math.exp(-2*Math.PI*3500/RATE);
+        for(int i=0;i<s.length;i++){int ch=i&1;float x=s[i];lp[ch]=(1-la)*x+la*lp[ch];float hp=ha*(hpLast[ch]+x-xLast[ch]);xLast[ch]=x;hpLast[ch]=hp;float mid=x-lp[ch]-hp;s[i]=lp[ch]*lg+mid*mg+hp*hg;}
+    }
+    private static float db(float v){v=Math.max(-18,Math.min(18,v));return (float)Math.pow(10,v/20f);}
+    private static void mixStereo(float[] dst,float[] src,float volume,float pan){float l=volume*(pan<=0?1f:1f-pan),r=volume*(pan>=0?1f:1f+pan);for(int i=0;i+1<dst.length;i+=2){dst[i]+=src[i]*l;dst[i+1]+=src[i+1]*r;}}
+
+
     static Uri publish(Context context, File source) throws Exception {
         ContentValues values = new ContentValues();
         values.put(MediaStore.Audio.Media.DISPLAY_NAME, source.getName());
