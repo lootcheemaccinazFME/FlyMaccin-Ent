@@ -179,7 +179,7 @@ public final class GummieAcademyActivity extends Activity {
     });
     button("End Test",this::tests);
   }
-\n
+
   private String today(){
     return new java.text.SimpleDateFormat("yyyy-MM-dd",java.util.Locale.US).format(new java.util.Date());
   }
