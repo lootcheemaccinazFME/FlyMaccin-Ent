@@ -4,6 +4,7 @@
     <activity android:name=".DreyvenActivity" android:exported="true">
       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
     </activity>
+    <activity android:name=".FmeToolsActivity" android:exported="false"/>
     <activity android:name=".DreyvenBeatLabActivity" android:exported="false"/>
     <activity android:name=".GummieAcademyActivity" android:exported="false"/>
     <activity android:name=".MainActivity" android:screenOrientation="sensorLandscape" android:exported="false"/>
