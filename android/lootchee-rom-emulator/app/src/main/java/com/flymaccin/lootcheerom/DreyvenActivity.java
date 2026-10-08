@@ -24,12 +24,15 @@ public final class DreyvenActivity extends Activity {
         title("DREYVEN", 34, 0xfff2ca65);
         title("FME UNIVERSAL APP HUB", 18, Color.WHITE);
         title("1 APP  •  0 LAUNCHERS  •  1 APK", 14, 0xffbbbbbb);
-        room("Universal Emulator", true, "Launch the built-in emulator engine.");
-        room("Music & DAW Studio", true, "Built-in offline 16-step beat lab.");
-        room("Demonic AI Studio", false, "AI engine integration is in progress.");
-        room("LOOTCHEE OS", false, "Workflow engine integration is in progress.");
-        room("FME Games", false, "Game engines are not yet certified.");
-        room("Gummie Bear Academy", true, "Offline fourth-grade learning, games, tests, goals, stars and prizes.");
+        room("DEMONIC DAW", true, "Offline 16-step beat lab.");
+        room("DEMONIC TV", true, "Local video player.");
+        room("UNIVERSAL EMULATOR", true, "Built-in emulator.");
+        room("FME GAMES", true, "Offline math arcade.");
+        room("FME AGENT", true, "Offline task board.");
+        room("POCKET POTNA", true, "Offline command notebook.");
+        room("AI VIDEO", true, "Storyboard builder.");
+        room("OCTOR FME", true, "Local workspace control plane.");
+        room("Gummie Bear Academy", true, "Fourth-grade education.");
         setContentView(scroll);
     }
     private void title(String s, int sp, int color) {
@@ -45,8 +48,10 @@ public final class DreyvenActivity extends Activity {
         list.addView(b);
         b.setOnClickListener(v -> {
             if (ready) {
-                Class<?> destination = name.equals("Gummie Bear Academy") ? GummieAcademyActivity.class : name.equals("Music & DAW Studio") ? DreyvenBeatLabActivity.class : MainActivity.class;
-                startActivity(new Intent(this, destination));
+                if (name.equals("Gummie Bear Academy")) startActivity(new Intent(this, GummieAcademyActivity.class));
+                else if (name.equals("DEMONIC DAW")) startActivity(new Intent(this, DreyvenBeatLabActivity.class));
+                else if (name.equals("UNIVERSAL EMULATOR")) startActivity(new Intent(this, MainActivity.class));
+                else { Intent i=new Intent(this,FmeToolsActivity.class);i.putExtra("module",name);startActivity(i); }
             } else {
                 new android.app.AlertDialog.Builder(this)
                     .setTitle(name + " • Coming Soon")
