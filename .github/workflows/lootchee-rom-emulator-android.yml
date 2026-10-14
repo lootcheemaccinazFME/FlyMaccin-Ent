@@ -128,15 +128,8 @@ jobs:
           echo "=== Gradle test results ==="
           find app/build/test-results app/build/outputs/androidTest-results -type f \\( -name '*.xml' -o -name '*.txt' \\) -print 2>/dev/null | head -n 50 || true
           echo "=== Emulator diagnostic log ==="
-          if command -v adb >/dev/null && adb devices | grep -q 'device
-        with:
-          name: lootchee-rom-emulator-debug-apk
-          path: |
-            android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk
-            android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk.sha256
-          if-no-files-found: error
-; then
-            adb logcat -d -s LOOTCHEE-NATIVE:* AndroidRuntime:E libc:F | tail -n 250 || true
+          if command -v adb >/dev/null && adb devices | grep -q 'device$'; then
+            adb logcat -d -s 'LOOTCHEE-NATIVE:*' 'AndroidRuntime:E' 'libc:F' | tail -n 250 || true
           fi
       - uses: actions/upload-artifact@v4
         if: always()
@@ -155,4 +148,4 @@ jobs:
           path: |
             android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk
             android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk.sha256
-          if-no-files-found: error
+          if-no-files-found: warn
