@@ -29,8 +29,29 @@ jobs:
         with:
           gradle-version: '8.9'
       - uses: android-actions/setup-android@v3
-      - name: Install pinned Android toolchain
-        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
+      - name: Install Android SDK and repair corrupted NDK downloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "cmake;3.22.1"
+          NDK="$ANDROID_SDK_ROOT/ndk/27.0.12077973"
+          for attempt in 1 2 3; do
+            if [ -f "$NDK/source.properties" ] && grep -q '27.0.12077973' "$NDK/source.properties"; then
+              echo "Verified NDK 27.0.12077973"
+              break
+            fi
+            echo "::warning::NDK installation attempt $attempt of 3"
+            rm -rf "$NDK"
+            if sdkmanager --install "ndk;27.0.12077973" && [ -f "$NDK/source.properties" ]; then
+              break
+            fi
+            rm -rf "$NDK"
+            sleep $((attempt * 15))
+          done
+          test -f "$NDK/source.properties"
+          grep -q '27.0.12077973' "$NDK/source.properties"
+          test -x "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
+          echo "NDK archive extracted and compiler verified"
       - name: Inspect Gradle entrypoint
         shell: bash
         run: |
