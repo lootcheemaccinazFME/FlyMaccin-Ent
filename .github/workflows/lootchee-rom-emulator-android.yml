@@ -43,6 +43,23 @@ jobs:
             command -v gradle
             echo "GRADLE_CMD=gradle" >> "$GITHUB_ENV"
           fi
+      - name: Acquire Android arm64 Libretro cores
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST=app/src/main/jniLibs/arm64-v8a
+          mkdir -p "$DEST"
+          for core in sameboy dosbox_pure; do
+            name="${core}_libretro_android.so"
+            url="https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/${name}.zip"
+            echo "Fetching $name from Libretro buildbot"
+            curl --fail --location --retry 3 --retry-delay 3 --output "/tmp/${name}.zip" "$url"
+            unzip -p "/tmp/${name}.zip" "$name" > "$DEST/lib$name"
+            test -s "$DEST/lib$name"
+            file "$DEST/lib$name"
+            readelf -h "$DEST/lib$name" | grep -q 'AArch64'
+            sha256sum "$DEST/lib$name"
+          done
       - name: Check project configuration
         run: $GRADLE_CMD --no-daemon projects
       - name: Compile native code and assemble APK
