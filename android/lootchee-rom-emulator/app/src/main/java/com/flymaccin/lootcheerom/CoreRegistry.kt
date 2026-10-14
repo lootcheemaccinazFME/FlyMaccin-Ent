@@ -37,5 +37,7 @@ object CoreRegistry {
         }
         return matches.firstOrNull()
     }
+    fun installed(context:Context,spec:CoreSpec):Boolean = File(libraryPath(context,spec)).let { it.isFile && it.canRead() && it.length()>0L }
+    fun installedSpecs(context:Context):List<CoreSpec> = specs.filter { installed(context,it) }
     fun libraryPath(context:Context,spec:CoreSpec)=File(context.applicationInfo.nativeLibraryDir,"lib"+spec.library+".so").absolutePath
 }
