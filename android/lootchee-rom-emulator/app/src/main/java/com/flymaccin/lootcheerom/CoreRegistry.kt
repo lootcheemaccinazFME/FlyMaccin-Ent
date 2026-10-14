@@ -21,6 +21,7 @@ object CoreRegistry {
         CoreSpec("stella","stella_libretro_android",setOf("Atari 2600"),setOf("a26"),"GPL-2.0"),
         CoreSpec("handy","handy_libretro_android",setOf("Atari Lynx"),setOf("lnx"),"zlib"),
         CoreSpec("geolith","geolith_libretro_android",setOf("Neo Geo AES","Neo Geo MVS"),setOf("neo"),"BSD-3-Clause/MIT",true),
+        CoreSpec("dosbox_pure","dosbox_pure_libretro_android",setOf("DOS PC","IBM PC compatible"),setOf("dosz"),"GPL-2.0"),
         CoreSpec("play","play_libretro_android",setOf("PlayStation 2"),setOf("iso","isz","cso","chd","elf"),"MIT")
     )
     fun extension(context:Context,uri:Uri)=RomVault.extension(context,uri)
