@@ -25,6 +25,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
       - uses: android-actions/setup-android@v3
       - name: Install pinned Android toolchain
         run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
@@ -36,10 +39,12 @@ jobs:
             chmod +x ./gradlew
             echo "GRADLE_CMD=./gradlew" >> "$GITHUB_ENV"
           else
-            echo "::warning::Project Gradle wrapper is incomplete; using runner Gradle if installed"
+            echo "::warning::Project Gradle wrapper is incomplete; using pinned Gradle 8.9 from setup-gradle"
             command -v gradle
             echo "GRADLE_CMD=gradle" >> "$GITHUB_ENV"
           fi
+      - name: Check project configuration
+        run: $GRADLE_CMD --no-daemon projects
       - name: Compile native code and assemble APK
         run: $GRADLE_CMD --no-daemon :app:assembleDebug
       - name: Run available unit tests
