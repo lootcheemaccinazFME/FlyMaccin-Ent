@@ -117,6 +117,7 @@ class MainActivity:Activity(){
     @Deprecated("compat")
     override fun onActivityResult(req:Int,result:Int,data:Intent?){super.onActivityResult(req,result,data);if(req==DemonicTvRoom.IMPORT_REQUEST&&result==RESULT_OK){val name=DemonicTvRoom.accept(this,data);status.text=if(name!=null)"DEMONIC TV • IMPORTED • "+name else "DEMONIC TV • IMPORT FAILED";showDemonicTv();return};if(req==100&&result==RESULT_OK&&data?.data!=null){
         val uri=data.data!!;runCatching{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}
+        val pcRoute=PcGameRouter.classify(RomVault.displayName(this,uri));if(pcRoute.runtime==PcRuntime.WINDOWS_COMPATIBILITY_RESEARCH){status.text="PC GAME • WINDOWS RUNTIME NOT INSTALLED";android.app.AlertDialog.Builder(this).setTitle("WINDOWS PC GAME").setMessage(pcRoute.explanation).setPositiveButton("OK",null).show();return};
         val matches=CoreRegistry.candidates(this,uri);if(matches.isEmpty()){status.text="UNSUPPORTED ROM TYPE";return};if(matches.size>1){chooseCore(uri,matches);return};loadUriWithCore(uri,matches.first())
     }}
     override fun onPause(){super.onPause();core?.pause();hardware.onPause()}
