@@ -64,28 +64,29 @@ jobs:
             command -v gradle
             echo "GRADLE_CMD=gradle" >> "$GITHUB_ENV"
           fi
-      - name: Acquire and verify Android Libretro cores for both supported ABIs
+      - name: Acquire and verify foundation cores for both Android ABIs
         shell: bash
         run: |
           set -euo pipefail
-          # Binary availability is not proof of functional gameplay.
-          cores=(sameboy dosbox_pure fceumm mgba gearsystem)
+          cores=(sameboy dosbox_pure)
           for abi in arm64-v8a x86_64; do
             dest="app/src/main/jniLibs/$abi"
             mkdir -p "$dest"
             for core in "${cores[@]}"; do
               name="${core}_libretro_android.so"
-              url="https://buildbot.libretro.com/nightly/android/latest/$abi/${name}.zip"
               archive="/tmp/${abi}_${name}.zip"
+              url="https://buildbot.libretro.com/nightly/android/latest/$abi/${name}.zip"
               curl --fail --location --retry 3 --retry-delay 3 --output "$archive" "$url"
-              entry=$(unzip -Z1 "$archive" | grep -E "(^|/)${name}$" | head -n 1)
+              unzip -Z1 "$archive" > "/tmp/${abi}_${name}.entries"
+              entry=$(grep -E "(^|/)${name}$" "/tmp/${abi}_${name}.entries" | head -n 1)
               test -n "$entry"
               unzip -p "$archive" "$entry" > "$dest/lib$name"
               test -s "$dest/lib$name"
-              readelf -h "$dest/lib$name" | grep -q 'ELF64'
+              readelf -h "$dest/lib$name" > "/tmp/${abi}_${name}.elf"
+              grep -q 'ELF64' "/tmp/${abi}_${name}.elf"
               case "$abi" in
-                arm64-v8a) readelf -h "$dest/lib$name" | grep -q 'AArch64' ;;
-                x86_64) readelf -h "$dest/lib$name" | grep -q 'Advanced Micro Devices X86-64' ;;
+                arm64-v8a) grep -q 'AArch64' "/tmp/${abi}_${name}.elf" ;;
+                x86_64) grep -q 'Advanced Micro Devices X86-64' "/tmp/${abi}_${name}.elf" ;;
               esac
               sha256sum "$dest/lib$name"
             done
@@ -104,7 +105,7 @@ jobs:
           test -s "$APK"
           unzip -Z1 "$APK" > /tmp/lootchee-apk-entries.txt
           for abi in arm64-v8a x86_64; do
-            for core in sameboy dosbox_pure fceumm mgba gearsystem; do
+            for core in sameboy dosbox_pure; do
               grep -Fxq "lib/$abi/lib${core}_libretro_android.so" /tmp/lootchee-apk-entries.txt
             done
             grep -Fxq "lib/$abi/liblootchee_frontend.so" /tmp/lootchee-apk-entries.txt
