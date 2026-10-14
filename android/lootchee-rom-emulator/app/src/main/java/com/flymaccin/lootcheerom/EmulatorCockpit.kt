@@ -8,15 +8,14 @@ object EmulatorCockpit {
  fun build(a:Activity,action:(String)->Unit):View{
   val root=LinearLayout(a).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(FmeCockpit.BG);setPadding(10,8,10,8)}
   root.addView(FmeCockpit.title(a,"UNIVERSAL EMULATOR"))
-  root.addView(FmeCockpit.subtitle(a,"LIBRARY • PLAY • BIOS • STATES • SETTINGS • 16 CORES"))
+  root.addView(FmeCockpit.subtitle(a,"LIBRARY • PLAY • BIOS • STATES • SETTINGS • "+CoreRegistry.specs.size+" CORES"))
   val actions=LinearLayout(a).apply{orientation=LinearLayout.HORIZONTAL}
   listOf("IMPORT ROM" to "import","TEST ROM" to "test","SAVE STATE" to "save","LOAD STATE" to "load","RESET" to "reset").forEach{(n,id)->actions.addView(FmeCockpit.button(a,n){action(id)},LinearLayout.LayoutParams(0,78,1f))}
   root.addView(actions)
   val scroll=ScrollView(a);val body=LinearLayout(a).apply{orientation=LinearLayout.VERTICAL}
   val systems=FmeCockpit.section(a,"SYSTEM LIBRARY")
   CoreRegistry.specs.forEach{s->
-   val binary = java.io.File(a.applicationInfo.nativeLibraryDir, "lib" + s.library + ".so")
-   val installed = binary.isFile && binary.canRead()
+   val installed = CoreRegistry.installed(a,s)
    val row=LinearLayout(a).apply{orientation=LinearLayout.HORIZONTAL;setPadding(4,4,4,4)}
    row.addView(TextView(a).apply{text=s.systems.joinToString(" / ");setTextColor(Color.WHITE);textSize=14f},LinearLayout.LayoutParams(0,58,2f))
    row.addView(TextView(a).apply{text=s.id.uppercase()+(if(installed)" • BINARY FOUND" else " • NOT INSTALLED")+(if(s.needsFirmware)" • BIOS" else "");setTextColor(if(installed)FmeCockpit.MUTED else 0xffffb14a.toInt());gravity=android.view.Gravity.CENTER_VERTICAL},LinearLayout.LayoutParams(0,58,1f))
