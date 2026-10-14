@@ -15,7 +15,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: android/lootchee-rom-emulator
@@ -90,7 +90,17 @@ jobs:
           done
           sha256sum "$APK" > "$APK.sha256"
           ls -lh "$APK"
+      - name: Run real SameBoy and DOSBox Pure tests on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          working-directory: android/lootchee-rom-emulator
+          script: gradle --no-daemon :app:connectedDebugAndroidTest
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: lootchee-rom-emulator-debug-apk
           path: |
