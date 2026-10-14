@@ -121,6 +121,33 @@ jobs:
           profile: pixel_6
           working-directory: android/lootchee-rom-emulator
           script: gradle --no-daemon :app:connectedDebugAndroidTest
+      - name: Print failing Gradle and Android test reports
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Gradle test results ==="
+          find app/build/test-results app/build/outputs/androidTest-results -type f \\( -name '*.xml' -o -name '*.txt' \\) -print 2>/dev/null | head -n 50 || true
+          echo "=== Emulator diagnostic log ==="
+          if command -v adb >/dev/null && adb devices | grep -q 'device
+        with:
+          name: lootchee-rom-emulator-debug-apk
+          path: |
+            android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk
+            android/lootchee-rom-emulator/app/build/outputs/apk/debug/app-debug.apk.sha256
+          if-no-files-found: error
+; then
+            adb logcat -d -s LOOTCHEE-NATIVE:* AndroidRuntime:E libc:F | tail -n 250 || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lootchee-android-test-reports
+          path: |
+            android/lootchee-rom-emulator/app/build/reports/tests/
+            android/lootchee-rom-emulator/app/build/test-results/
+            android/lootchee-rom-emulator/app/build/outputs/androidTest-results/
+            android/lootchee-rom-emulator/app/build/reports/androidTests/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:
