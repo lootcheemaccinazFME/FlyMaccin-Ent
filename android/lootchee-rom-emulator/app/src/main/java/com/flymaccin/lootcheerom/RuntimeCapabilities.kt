@@ -3,7 +3,7 @@ enum class RenderBackend { SOFTWARE, OPENGL_ES, VULKAN, UNSUPPORTED }
 data class RuntimeCapability(val core:String,val backend:RenderBackend,val note:String)
 object RuntimeCapabilities {
     fun forCore(id:String)=when(id){
-        "sameboy","fceumm","mgba","bsnes","gearsystem","clownmdemu","pcsx_rearmed","mednafen_pce_fast","stella","handy","geolith" -> RuntimeCapability(id,RenderBackend.SOFTWARE,"Software framebuffer supported by LOOTCHEE frontend")
+        "dosbox_pure","sameboy","fceumm","mgba","bsnes","gearsystem","clownmdemu","pcsx_rearmed","mednafen_pce_fast","stella","handy","geolith" -> RuntimeCapability(id,RenderBackend.SOFTWARE,"Software framebuffer supported by LOOTCHEE frontend")
         "mupen64plus_next","melondsds","ppsspp","flycast","play" -> RuntimeCapability(id,RenderBackend.OPENGL_ES,"GLSurfaceView/EGL host available; per-core runtime certification required")
         else -> RuntimeCapability(id,RenderBackend.UNSUPPORTED,"No certified renderer")
     }
