@@ -28,11 +28,12 @@ class NativeCoreSmokeTest {
         open("sameboy")
         try {
             assertTrue("Game Boy test ROM rejected: ${NativeBridge.diagnostic()}", NativeBridge.loadGame(null, TestRom.build()))
-            repeat(180) { NativeBridge.runFrame() }
+            var audioSamples = 0
+            repeat(180) { NativeBridge.runFrame(); audioSamples += NativeBridge.drainAudio().size }
             assertTrue("No Game Boy video callbacks", NativeBridge.videoCount() > 0)
             assertTrue("No Game Boy frame pixels", NativeBridge.frame().isNotEmpty())
             assertTrue("No Game Boy dimensions", NativeBridge.frameWidth() > 0 && NativeBridge.frameHeight() > 0)
-            assertTrue("No Game Boy audio", NativeBridge.drainAudio().isNotEmpty())
+            assertTrue("No Game Boy audio", audioSamples > 0)
             val saved = NativeBridge.saveState()
             assertNotNull("Game Boy save state unsupported", saved)
             assertTrue("Game Boy save state empty", saved!!.isNotEmpty())
