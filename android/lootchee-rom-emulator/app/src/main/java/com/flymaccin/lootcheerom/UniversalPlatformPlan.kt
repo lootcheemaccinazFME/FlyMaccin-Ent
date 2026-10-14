@@ -19,6 +19,8 @@ object UniversalPlatformPlan {
         PlatformPlan("Super Nintendo", PlatformStage.REGISTERED_LIBRETRO, "bsnes", "Check device performance"),
         PlatformPlan("Nintendo 64", PlatformStage.REGISTERED_LIBRETRO, "mupen64plus_next", "OpenGL ES runtime testing required"),
         PlatformPlan("Game Boy / Game Boy Color", PlatformStage.REGISTERED_LIBRETRO, "sameboy", "Original test ROM available"),
+        PlatformPlan("DOS PC / IBM PC compatible", PlatformStage.REGISTERED_LIBRETRO, "dosbox_pure", "DOSBox Pure candidate; .dosz archive support, binary packaging and Android runtime verification required"),
+        PlatformPlan("Windows PC games", PlatformStage.NATIVE_RESEARCH, "Wine / Box64 / ARM64 translation feasibility", "Not integrated; desktop Windows executables cannot run through the Libretro DOS core"),
         PlatformPlan("Xbox (original)", PlatformStage.NATIVE_RESEARCH, "xemu / alternative ARM64 research", "No integrated Android native core"),
         PlatformPlan("PlayStation 1", PlatformStage.REGISTERED_LIBRETRO, "pcsx_rearmed", "Firmware may be required"),
         PlatformPlan("PlayStation 2", PlatformStage.REGISTERED_LIBRETRO, "play", "Compatibility and performance vary"),
