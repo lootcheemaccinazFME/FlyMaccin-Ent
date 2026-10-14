@@ -43,6 +43,13 @@ android {
     }
 
     sourceSets["main"].jniLibs.srcDir("src/main/jniLibs")
+
+    packaging {
+        jniLibs {
+            // The frontend dlopen() uses nativeLibraryDir paths, requiring extracted .so files.
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
