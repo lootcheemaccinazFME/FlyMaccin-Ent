@@ -102,17 +102,17 @@ class MainActivity:Activity(){
         android.app.AlertDialog.Builder(this).setTitle("FME UNIVERSAL EMULATOR • SYSTEMS").setItems(names){_,i->status.text="READY • "+CoreRegistry.specs[i].systems.joinToString("/")+" • IMPORT A ROM"}.setNegativeButton("CLOSE",null).show()
     }
     private fun chooseCore(uri:android.net.Uri,matches:List<CoreSpec>){
-        val labels=matches.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()
+        val labels=matches.map{it.systems.joinToString(" / ")+"  •  "+it.id+(if(CoreRegistry.installed(this,it))" • BINARY FOUND" else " • NOT INSTALLED")}.toTypedArray()
         android.app.AlertDialog.Builder(this).setTitle("CHOOSE SYSTEM").setItems(labels){_,i->loadUriWithCore(uri,matches[i])}.setNegativeButton("CANCEL",null).show()
     }
-    private fun loadUriWithCore(uri:android.net.Uri,spec:CoreSpec){prepareDisplay(spec);switchCore(spec);val c=core?:return;c.load(uri).onSuccess{c.start();status.text="PLAYING "+spec.systems.joinToString("/")+" • "+spec.id}.onFailure{status.text="ROM ERROR: "+it.message}}
+    private fun loadUriWithCore(uri:android.net.Uri,spec:CoreSpec){if(!CoreRegistry.installed(this,spec)){status.text="CORE NOT INSTALLED • "+spec.id;return};prepareDisplay(spec);switchCore(spec);val c=core?:return;c.load(uri).onSuccess{c.start();status.text="PLAYING "+spec.systems.joinToString("/")+" • "+spec.id}.onFailure{status.text="ROM ERROR: "+it.message}}
     private fun prepareDisplay(spec:CoreSpec){
         display.removeAllViews()
         if(RuntimeCapabilities.forCore(spec.id).backend==RenderBackend.OPENGL_ES){display.addView(hardware,FrameLayout.LayoutParams(-1,-1));status.text="HARDWARE RENDER • "+spec.id}
         else display.addView(screen,FrameLayout.LayoutParams(-1,-1))
     }
-    private fun loadTest(){ prepareDisplay(CoreRegistry.specs.first{it.id=="sameboy"}); switchCore(CoreRegistry.specs.first{it.id=="sameboy"}); val c=core?:return;c.loadBuiltIn(TestRom.build(),"lootchee-test-rom").onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • SAMEBOY"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }
-    private fun switchCore(spec:CoreSpec){core?.stop();core=runCatching{LibretroCore(this,spec){p,w,h->runOnUiThread{screen.submit(p,w,h)}}}.getOrElse{status.text="CORE ERROR "+spec.id+": "+it.message;null}}
+    private fun loadTest(){ val testSpec=CoreRegistry.specs.first{it.id=="sameboy"};if(!CoreRegistry.installed(this,testSpec)){status.text="SAMEBOY BINARY NOT INSTALLED";return};prepareDisplay(testSpec); switchCore(CoreRegistry.specs.first{it.id=="sameboy"}); val c=core?:return;c.loadBuiltIn(TestRom.build(),"lootchee-test-rom").onSuccess{c.start();status.text="PLAYING: LOOTCHEE INPUT TEST • SAMEBOY"}.onFailure{status.text="TEST ROM ERROR: "+it.message} }
+    private fun switchCore(spec:CoreSpec){core?.stop();core=null;if(!CoreRegistry.installed(this,spec)){status.text="CORE NOT INSTALLED • "+spec.id;return};core=runCatching{LibretroCore(this,spec){p,w,h->runOnUiThread{screen.submit(p,w,h)}}}.getOrElse{status.text="CORE ERROR "+spec.id+": "+it.message;null}}
     private fun pickRom(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/octet-stream";addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)},100)}
     @Deprecated("compat")
     override fun onActivityResult(req:Int,result:Int,data:Intent?){super.onActivityResult(req,result,data);if(req==DemonicTvRoom.IMPORT_REQUEST&&result==RESULT_OK){val name=DemonicTvRoom.accept(this,data);status.text=if(name!=null)"DEMONIC TV • IMPORTED • "+name else "DEMONIC TV • IMPORT FAILED";showDemonicTv();return};if(req==100&&result==RESULT_OK&&data?.data!=null){
