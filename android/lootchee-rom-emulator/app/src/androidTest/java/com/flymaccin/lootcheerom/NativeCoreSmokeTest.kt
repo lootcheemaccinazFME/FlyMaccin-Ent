@@ -58,7 +58,7 @@ class NativeCoreSmokeTest {
             val bytes = zip.readBytes()
             assertTrue("DOSBox Pure rejected test archive: ${NativeBridge.diagnostic()}",
                 NativeBridge.loadGame(zip.absolutePath, bytes))
-            repeat(180) { NativeBridge.runFrame() }
+            repeat(180) { NativeBridge.runFrame(); NativeBridge.drainAudio() }
             assertTrue("No DOS video callbacks", NativeBridge.videoCount() > 0)
             assertTrue("No DOS frame pixels", NativeBridge.frame().isNotEmpty())
         } finally { NativeBridge.close() }
