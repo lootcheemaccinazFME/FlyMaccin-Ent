@@ -115,15 +115,17 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridg
     p_set_env(env_cb); p_set_video(video_cb); p_set_audio(audio_one); p_set_audio_batch(audio_batch); p_set_poll(input_poll); p_set_state(input_state); mark("RETRO_INIT_BEGIN"); p_init(); core_initialized=true; mark("RETRO_INIT_OK"); return true;
 }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_loadGame(JNIEnv* e,jobject,jstring jpath,jbyteArray a){
+    if (!core || !core_initialized || !p_get_info || !p_load) { mark("LOAD_REJECTED_CORE_NOT_INITIALIZED"); return false; }
+    if (!a && !jpath) { mark("LOAD_REJECTED_NO_CONTENT"); return false; }
     retro_system_info si{}; p_get_info(&si);
     std::string path;
     if(jpath){ const char* p=e->GetStringUTFChars(jpath,nullptr); path=p?p:""; e->ReleaseStringUTFChars(jpath,p); auto slash=path.find_last_of("/\\\\"); content_dir=slash==std::string::npos?"":path.substr(0,slash); }
     retro_game_info info{};
     if(si.need_fullpath){ if(path.empty()) return false; info.path=path.c_str(); }
-    else { jsize n=e->GetArrayLength(a); rom.resize(n); e->GetByteArrayRegion(a,0,n,(jbyte*)rom.data()); info.data=rom.data(); info.size=rom.size(); info.path=path.empty()?nullptr:path.c_str(); }
+    else { if (!a) { mark("LOAD_REJECTED_NO_ROM_BYTES"); return false; } jsize n=e->GetArrayLength(a); rom.resize(n); e->GetByteArrayRegion(a,0,n,(jbyte*)rom.data()); info.data=rom.data(); info.size=rom.size(); info.path=path.empty()?nullptr:path.c_str(); }
     if(game_loaded&&p_unload){p_unload();game_loaded=false;} mark("RETRO_LOAD_GAME_BEGIN"); if(!p_load||!p_load(&info)){mark("RETRO_LOAD_GAME_FAILED");return false;} game_loaded=true; mark("RETRO_LOAD_GAME_OK"); retro_system_av_info av{};p_get_av(&av);sample_rate=av.timing.sample_rate;fps=av.timing.fps>1.0?av.timing.fps:60.0;return true;
 }
-extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_runFrame(JNIEnv*,jobject){ if(p_run){ if(run_count++==0) mark("FIRST_RETRO_RUN"); p_run(); } }
+extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_runFrame(JNIEnv*,jobject){ if(game_loaded && p_run){ if(run_count++==0) mark("FIRST_RETRO_RUN"); p_run(); } }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_reset(JNIEnv*,jobject){ if(p_reset) p_reset(); }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setButton(JNIEnv*,jobject,jint id,jboolean down){ if(id>=0&&id<16) buttons[id]=down?1:0; }
 extern "C" JNIEXPORT void JNICALL Java_com_flymaccin_lootcheerom_NativeBridge_setPointer(JNIEnv*,jobject,jfloat x,jfloat y,jboolean down){ pointer_x=(int16_t)(x*32767.0f);pointer_y=(int16_t)(y*32767.0f);pointer_pressed=down?1:0; }
