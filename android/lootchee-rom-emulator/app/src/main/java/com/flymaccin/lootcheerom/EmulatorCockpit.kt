@@ -15,12 +15,14 @@ object EmulatorCockpit {
   val scroll=ScrollView(a);val body=LinearLayout(a).apply{orientation=LinearLayout.VERTICAL}
   val systems=FmeCockpit.section(a,"SYSTEM LIBRARY")
   CoreRegistry.specs.forEach{s->
+   val binary = java.io.File(a.applicationInfo.nativeLibraryDir, "lib" + s.library + ".so")
+   val installed = binary.isFile && binary.canRead()
    val row=LinearLayout(a).apply{orientation=LinearLayout.HORIZONTAL;setPadding(4,4,4,4)}
    row.addView(TextView(a).apply{text=s.systems.joinToString(" / ");setTextColor(Color.WHITE);textSize=14f},LinearLayout.LayoutParams(0,58,2f))
-   row.addView(TextView(a).apply{text=s.id.uppercase()+(if(s.needsFirmware)" • BIOS" else "");setTextColor(if(s.needsFirmware)0xffffb14a.toInt() else FmeCockpit.MUTED);gravity=android.view.Gravity.CENTER_VERTICAL},LinearLayout.LayoutParams(0,58,1f))
+   row.addView(TextView(a).apply{text=s.id.uppercase()+(if(installed)" • BINARY FOUND" else " • NOT INSTALLED")+(if(s.needsFirmware)" • BIOS" else "");setTextColor(if(installed)FmeCockpit.MUTED else 0xffffb14a.toInt());gravity=android.view.Gravity.CENTER_VERTICAL},LinearLayout.LayoutParams(0,58,1f))
    systems.addView(row)
   };body.addView(systems)
-  val note=FmeCockpit.section(a,"RUNTIME STATUS");note.addView(TextView(a).apply{text="SameBoy includes built-in frame-test support. Other cores remain subject to legal ROM/firmware runtime certification.";setTextColor(FmeCockpit.TEXT);setPadding(8,8,8,8)});body.addView(note)
+  val note=FmeCockpit.section(a,"RUNTIME STATUS");note.addView(TextView(a).apply{text="BINARY FOUND means the native library exists, NOT that gameplay is verified. NOT INSTALLED means the core cannot launch. Firmware and runtime certification remain separate requirements.";setTextColor(FmeCockpit.TEXT);setPadding(8,8,8,8)});body.addView(note)
   scroll.addView(body);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f));return root
  }
 }
