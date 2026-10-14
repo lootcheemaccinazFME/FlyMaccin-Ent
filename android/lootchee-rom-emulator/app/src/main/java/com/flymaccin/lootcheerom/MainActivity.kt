@@ -98,8 +98,8 @@ class MainActivity:Activity(){
         status.text="DEMONIC TV • FREE LIVE TV"
     }
     private fun showSystems(){
-        val names=CoreRegistry.specs.map{it.systems.joinToString(" / ")+"  •  "+it.id}.toTypedArray()
-        android.app.AlertDialog.Builder(this).setTitle("FME UNIVERSAL EMULATOR • SYSTEMS").setItems(names){_,i->status.text="READY • "+CoreRegistry.specs[i].systems.joinToString("/")+" • IMPORT A ROM"}.setNegativeButton("CLOSE",null).show()
+        val names=CoreRegistry.specs.map{it.systems.joinToString(" / ")+"  •  "+it.id+(if(CoreRegistry.installed(this,it))" • BINARY FOUND" else " • NOT INSTALLED")}.toTypedArray()
+        android.app.AlertDialog.Builder(this).setTitle("FME UNIVERSAL EMULATOR • SYSTEMS").setItems(names){_,i->status.text=(if(CoreRegistry.installed(this,CoreRegistry.specs[i]))"CORE BINARY FOUND" else "CORE NOT INSTALLED")+" • "+CoreRegistry.specs[i].systems.joinToString("/")}.setNegativeButton("CLOSE",null).show()
     }
     private fun chooseCore(uri:android.net.Uri,matches:List<CoreSpec>){
         val labels=matches.map{it.systems.joinToString(" / ")+"  •  "+it.id+(if(CoreRegistry.installed(this,it))" • BINARY FOUND" else " • NOT INSTALLED")}.toTypedArray()
