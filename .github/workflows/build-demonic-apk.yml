@@ -37,6 +37,10 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
 
+      - name: Enable KVM
+        run: sudo chmod 666 /dev/kvm
+        working-directory: ${{ github.workspace }}
+
       - name: Install and launch on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:

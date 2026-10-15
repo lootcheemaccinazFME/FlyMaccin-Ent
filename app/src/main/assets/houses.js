@@ -116,3 +116,12 @@ byId('houseReset').onclick=()=>{
 byId('houseSave').onclick=()=>persistHouse();
 
 renderHouse();
+
+const housePatternCard=document.querySelector('.housePatternCard');
+if(housePatternCard&&!document.getElementById('openDemonicSongAI')){
+  const launch=document.createElement('button');
+  launch.id='openDemonicSongAI';
+  launch.textContent='Open Demonic Song AI';
+  launch.onclick=()=>{window.location.href='music.html'};
+  housePatternCard.appendChild(launch);
+}

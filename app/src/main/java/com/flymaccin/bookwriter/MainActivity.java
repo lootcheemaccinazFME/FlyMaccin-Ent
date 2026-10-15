@@ -10,7 +10,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
-    private static final String TRUSTED_URL = "file:///android_asset/index.html";
+    private static final String HOME_URL = "file:///android_asset/index.html";
+    private static final String TRUSTED_PREFIX = "file:///android_asset/";
     private WebView webView;
     private BookwriterBridge bridge;
 
@@ -37,16 +38,23 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return !TRUSTED_URL.equals(request.getUrl().toString());
+                return !isTrustedAsset(request.getUrl().toString());
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return !TRUSTED_URL.equals(url);
+                return !isTrustedAsset(url);
             }
         });
-        webView.loadUrl(TRUSTED_URL);
+        webView.loadUrl(HOME_URL);
     }
 
-    @Override public void onBackPressed() { super.onBackPressed(); }
+    private static boolean isTrustedAsset(String url) {
+        return url != null && url.startsWith(TRUSTED_PREFIX);
+    }
+
+    @Override public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) webView.goBack();
+        else super.onBackPressed();
+    }
 
     @Override protected void onDestroy() {
         if (webView != null) {

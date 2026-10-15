@@ -55,6 +55,83 @@ public class BookwriterBridge {
     }
 
     @JavascriptInterface
+    public void saveVoiceConfig(String id, String endpoint, String token) {
+        try {
+            String clean = endpoint == null ? "" : endpoint.trim();
+            if (!(clean.startsWith("https://") || clean.startsWith("http://127.0.0.1") || clean.startsWith("http://localhost"))) {
+                throw new IllegalArgumentException("Voice endpoint must use HTTPS, localhost, or 127.0.0.1.");
+            }
+            SecureVoiceStore.save(context, clean, token == null ? "" : token);
+            callback(id, true, "Voice configuration saved.");
+        } catch (Throwable t) {
+            callback(id, false, t.getMessage() == null ? "Could not save voice configuration." : t.getMessage());
+        }
+    }
+
+    @JavascriptInterface
+    public boolean hasVoiceConfig() {
+        return SecureVoiceStore.has(context);
+    }
+
+    @JavascriptInterface
+    public void clearVoiceConfig(String id) {
+        SecureVoiceStore.clear(context);
+        callback(id, true, "Voice configuration cleared.");
+    }
+
+    @JavascriptInterface
+    public void renderAuthorizedVoice(String id, String renderPackageJson) {
+        executor.execute(() -> {
+            try {
+                String[] cfg = SecureVoiceStore.load(context);
+                if (cfg == null || cfg.length < 1 || cfg[0] == null || cfg[0].trim().isEmpty()) {
+                    throw new IllegalStateException("Configure the authorized voice endpoint first.");
+                }
+                JSONObject request = new JSONObject(renderPackageJson == null ? "{}" : renderPackageJson);
+                JSONObject voice = request.optJSONObject("voice");
+                if (voice == null || !voice.optBoolean("authorizedByCreator", false)) {
+                    throw new IllegalArgumentException("Voice render refused: creator authorization flag is required.");
+                }
+                String profile = voice.optString("profileId", "").trim();
+                if (profile.isEmpty()) throw new IllegalArgumentException("Voice profile ID is required.");
+
+                HttpURLConnection connection = (HttpURLConnection) new URL(cfg[0]).openConnection();
+                active = connection;
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(30000);
+                connection.setReadTimeout(240000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                if (cfg.length > 1 && cfg[1] != null && !cfg[1].trim().isEmpty()) {
+                    connection.setRequestProperty("Authorization", "Bearer " + cfg[1].trim());
+                }
+                connection.setRequestProperty("X-Demonic-Voice-Profile", profile);
+                connection.setRequestProperty("X-Creator-Authorization", "true");
+
+                try (OutputStream os = connection.getOutputStream()) {
+                    os.write(request.toString().getBytes(StandardCharsets.UTF_8));
+                }
+
+                int code = connection.getResponseCode();
+                InputStream in = code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream();
+                String raw = readAll(in).trim();
+                if (code < 200 || code >= 300) {
+                    throw new IllegalStateException("Voice endpoint failed (" + code + "): " + compact(raw));
+                }
+                if (raw.isEmpty()) throw new IllegalStateException("Voice endpoint returned an empty response.");
+                new JSONObject(raw); // validate contract; response may contain audioBase64 or jobId/status.
+                callback(id, true, raw);
+            } catch (Throwable t) {
+                callback(id, false, t.getMessage() == null ? "Voice render failed" : t.getMessage());
+            } finally {
+                HttpURLConnection connection = active;
+                if (connection != null) connection.disconnect();
+                active = null;
+            }
+        });
+    }
+
+    @JavascriptInterface
     public void cancelGeneration() {
         HttpURLConnection connection = active;
         if (connection != null) connection.disconnect();
@@ -142,13 +219,18 @@ public class BookwriterBridge {
 
     private static String readAll(InputStream in) throws IOException {
         if (in == null) return "";
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(in, StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             StringBuilder out = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) out.append(line).append('\n');
             return out.toString();
         }
+    }
+
+    private static String compact(String raw) {
+        if (raw == null) return "";
+        String c = raw.replace('\n', ' ').replace('\r', ' ').trim();
+        return c.length() > 400 ? c.substring(0, 400) + "…" : c;
     }
 
     private static String error(int code, String raw) {
