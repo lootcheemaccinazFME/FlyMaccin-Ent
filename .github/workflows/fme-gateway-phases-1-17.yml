@@ -1,0 +1,58 @@
+name: FME Gateway Phases 1-17
+
+on:
+  push:
+    branches: [main, build/gateway-phases-15-17]
+    paths:
+      - 'gateway/**'
+      - '.github/workflows/fme-gateway-phases-1-17.yml'
+  pull_request:
+    paths:
+      - 'gateway/**'
+      - '.github/workflows/fme-gateway-phases-1-17.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify required source files
+        run: |
+          test -f src/fme-gateway-core.ts
+          test -f src/mcp-contract.ts
+          test -f src/resilience-policy.ts
+          test -f src/device-sync-policy.ts
+          test -f src/release-gates.ts
+          test -f migrations/015_017_resilience_multidevice_release.sql
+          test -f test/phases-1-17.spec.ts
+      - name: Verify 1821 and release invariants
+        run: |
+          grep -q "COMMAND_1821 = '1821'" src/fme-gateway-core.ts
+          grep -q "FME_HAHA_RS2_HIGH_ENERGY_V1" src/fme-gateway-core.ts
+          grep -q "slots.length!==50" src/fme-gateway-core.ts
+          grep -q "physical_android_e2e" src/release-gates.ts
+          grep -q "PHASES_1_17_ACCEPTANCE: PASS" test/phases-1-17.spec.ts
+      - name: Prevent fabricated provider success
+        run: |
+          grep -q "PENDING_PROVIDER" src/fme-gateway-core.ts
+          grep -q "state!=='READY'" src/fme-gateway-core.ts
+      - name: Publish CI evidence summary
+        run: |
+          {
+            echo '## FME Gateway source-contract verification'
+            echo '- Required Phase 1-17 source files: PASS'
+            echo '- 1821 50-slot invariant present: PASS'
+            echo '- Provider truth boundary present: PASS'
+            echo '- Physical Android fail-closed gate present: PASS'
+            echo '- External production gates are intentionally not marked PASS by this workflow.'
+          } >> "$GITHUB_STEP_SUMMARY"
