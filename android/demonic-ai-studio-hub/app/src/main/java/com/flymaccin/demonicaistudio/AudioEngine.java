@@ -5,6 +5,9 @@ import android.media.AudioFormat;
 import android.media.AudioTrack;
 
 import java.util.Random;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 
 final class AudioEngine {
     static final int SAMPLE_RATE = 44100;
@@ -45,6 +48,53 @@ final class AudioEngine {
 
     void playDrum(int lane, float volume, float pan, boolean reverb, boolean delay) {
         start("demonic-drum", () -> playBuffer(drum(lane), volume, pan, reverb, delay));
+    }
+
+    void playSample(File wavFile, double rootFrequency, double targetFrequency,
+                    float volume, float pan, boolean reverb, boolean delay) {
+        start("pocketband-sample", () -> {
+            float[] source = readPcm16MonoWav(wavFile);
+            if (source.length == 0) return;
+            double ratio = Math.max(0.125, Math.min(8.0, targetFrequency / Math.max(1.0, rootFrequency)));
+            int count = Math.max(1, (int) (source.length / ratio));
+            float[] pitched = new float[count];
+            for (int i = 0; i < count; i++) {
+                double position = i * ratio;
+                int a = Math.min(source.length - 1, (int) position);
+                int b = Math.min(source.length - 1, a + 1);
+                float mix = (float) (position - a);
+                pitched[i] = source[a] * (1f - mix) + source[b] * mix;
+            }
+            playBuffer(pitched, volume, pan, reverb, delay);
+        });
+    }
+
+    private static float[] readPcm16MonoWav(File file) {
+        if (file == null || !file.isFile() || file.length() <= 44) return new float[0];
+        try (BufferedInputStream input = new BufferedInputStream(new FileInputStream(file))) {
+            byte[] header = new byte[44];
+            if (input.read(header) != header.length) return new float[0];
+            int channels = Math.max(1, header[22] & 0xff);
+            int bits = header[34] & 0xff;
+            if (bits != 16) return new float[0];
+            byte[] bytes = input.readAllBytes();
+            int frameBytes = channels * 2;
+            int frames = bytes.length / frameBytes;
+            float[] mono = new float[frames];
+            for (int frame = 0; frame < frames; frame++) {
+                int base = frame * frameBytes;
+                int sum = 0;
+                for (int ch = 0; ch < channels; ch++) {
+                    int p = base + ch * 2;
+                    short sample = (short) (((bytes[p + 1] & 0xff) << 8) | (bytes[p] & 0xff));
+                    sum += sample;
+                }
+                mono[frame] = (sum / (float) channels) / 32768f;
+            }
+            return mono;
+        } catch (Exception ignored) {
+            return new float[0];
+        }
     }
 
     private float[] piano(double frequency, int durationMs) {

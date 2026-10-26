@@ -37,6 +37,10 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
 
+      - name: Enable KVM
+        run: sudo chmod 666 /dev/kvm
+        working-directory: ${{ github.workspace }}
+
       - name: Install and launch on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -47,12 +51,40 @@ jobs:
           script: |
             adb install -r android/demonic-ai-studio-hub/app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.flymaccin.demonicaistudio android.permission.RECORD_AUDIO
+            adb logcat -c
             adb shell am start -W -n com.flymaccin.demonicaistudio/.StudioActivity
             sleep 5
-            adb shell pidof com.flymaccin.demonicaistudio
-            if adb logcat -d '*:E' | grep -q 'FATAL EXCEPTION.*com.flymaccin.demonicaistudio'; then exit 1; fi
+            echo "=== DEMONIC PROCESS ==="
+            adb shell ps -A | grep com.flymaccin.demonicaistudio || true
+            echo "=== FOCUSED ACTIVITY ==="
+            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|com.flymaccin.demonicaistudio" | tail -40 || true
+            echo "=== CRASH BUFFER ==="
+            adb logcat -b crash -d || true
+            adb shell pidof com.flymaccin.demonicaistudio || (echo "DEMONIC_PROCESS_DIED"; adb logcat -d | grep -E -A 80 -B 20 "FATAL EXCEPTION|AndroidRuntime|com.flymaccin.demonicaistudio" || true; exit 1)
+            adb shell input tap 300 330
+            sleep 1
+            adb shell input tap 220 420
+            sleep 1
+            adb shell input tap 620 720
+            sleep 1
+            adb shell input tap 700 720
+            sleep 1
+            adb shell input tap 1060 720
+            sleep 1
+            ! adb logcat -b crash -d | grep -q 'com.flymaccin.demonicaistudio' || (adb logcat -b crash -d; exit 1)
+            echo "=== POCKETBAND SEMANTIC DAW SMOKE ==="
+            adb logcat -c
+            adb shell am force-stop com.flymaccin.demonicaistudio
+            adb shell am start -W -n com.flymaccin.demonicaistudio/.PocketBandSmokeActivity
+            sleep 12
+            adb logcat -d -s PocketBandSmoke:V "*:S"
+            adb logcat -d -s PocketBandSmoke:E "*:S" | grep -q "POCKETBAND_SMOKE_FAIL" && exit 2 || true
+            adb logcat -d -s PocketBandSmoke:I "*:S" | grep "POCKETBAND_RENDER_PASS"
+            adb logcat -d -s PocketBandSmoke:I "*:S" | grep "POCKETBAND_PLAYBACK_STARTED"
+            adb logcat -d -s PocketBandSmoke:I "*:S" | grep "POCKETBAND_SMOKE_PASS"
 
       - name: Upload APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: FME-Demonic-AI-Studio-APK
