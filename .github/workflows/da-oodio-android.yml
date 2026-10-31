@@ -1,0 +1,33 @@
+name: DA OODIO Android APK (source-ready)
+on:
+  workflow_dispatch:
+  push:
+    branches: [da-oodio-universal-integration]
+    paths:
+      - 'DA_OODIO/android/**'
+      - '.github/workflows/da-oodio-android.yml'
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Android project source
+        run: |
+          test -f DA_OODIO/android/settings.gradle || test -f DA_OODIO/android/settings.gradle.kts || { echo "::error::Android source not yet imported into DA_OODIO/android. Upload and audit the source first."; exit 1; }
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Assemble debug APK
+        working-directory: DA_OODIO/android
+        run: |
+          if [ -f ./gradlew ]; then chmod +x ./gradlew; ./gradlew assembleDebug; else gradle assembleDebug; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DA-OODIO-UNIVERSAL-debug-APK
+          path: DA_OODIO/android/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
